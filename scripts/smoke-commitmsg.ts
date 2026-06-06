@@ -6,7 +6,9 @@ async function main() {
   const { generateAiCommitMessage } =
     await import("../src/main/lib/git/aiCommitMessage");
 
-  const projectPath = process.cwd();
+  const projectPath =
+    process.argv.find((a) => a.startsWith("--projectPath="))?.split("=")[1] ||
+    process.cwd();
   const mode = (process.argv
     .find((a) => a.startsWith("--mode="))
     ?.split("=")[1] || "all") as "staged" | "all";

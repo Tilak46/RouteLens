@@ -364,6 +364,10 @@ async function main() {
           : path.relative(rootPath, r.file).replace(/\\/g, "/"),
         handler: redact ? undefined : r.handler,
         middlewares: redact ? undefined : r.middlewares,
+        description: r.description,
+        pathParams: r.pathParams,
+        inferredBodyFields: r.inferredBodyFields,
+        inferredQueryFields: r.inferredQueryFields,
       })),
       logs: result.logs,
     };

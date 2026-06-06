@@ -5,11 +5,15 @@ import { ApiFolder, ApiRoute, isRoute } from "../../../types";
 
 type SidebarProps = {
   tree: ApiFolder[];
-  selectedId?: string;
+  selectedKey?: string;
   onSelect: (route: ApiRoute) => void;
 };
 
-export function Sidebar({ tree, selectedId, onSelect }: SidebarProps) {
+const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
+  return `${String(route.method).toUpperCase()}:${route.path}`;
+};
+
+export function Sidebar({ tree, selectedKey, onSelect }: SidebarProps) {
   return (
     <div className="p-2 space-y-0.5">
       {tree.map((node) => (
@@ -17,7 +21,7 @@ export function Sidebar({ tree, selectedId, onSelect }: SidebarProps) {
           key={node.id}
           node={node}
           level={0}
-          selectedId={selectedId}
+          selectedKey={selectedKey}
           onSelect={onSelect}
         />
       ))}
@@ -28,16 +32,16 @@ export function Sidebar({ tree, selectedId, onSelect }: SidebarProps) {
 type TreeNodeProps = {
   node: ApiFolder | ApiRoute;
   level: number;
-  selectedId?: string;
+  selectedKey?: string;
   onSelect: (route: ApiRoute) => void;
 };
 
-function TreeNode({ node, level, selectedId, onSelect }: TreeNodeProps) {
+function TreeNode({ node, level, selectedKey, onSelect }: TreeNodeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const paddingLeft = level * 12 + 8; // Indent
 
   if (isRoute(node)) {
-    const isSelected = selectedId === node.id;
+    const isSelected = selectedKey === toRouteKey(node);
     return (
       <div
         onClick={() => onSelect(node)}
@@ -81,7 +85,7 @@ function TreeNode({ node, level, selectedId, onSelect }: TreeNodeProps) {
               key={child.id}
               node={child}
               level={level + 1}
-              selectedId={selectedId}
+              selectedKey={selectedKey}
               onSelect={onSelect}
             />
           ))}

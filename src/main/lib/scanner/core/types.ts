@@ -11,6 +11,10 @@ export type DetectedRoute = {
   file: string; // absolute file path
   handler?: string;
   middlewares?: string[];
+  description?: string;
+  pathParams?: string[];
+  inferredBodyFields?: string[];
+  inferredQueryFields?: string[];
 };
 
 export type AstCacheStats = {

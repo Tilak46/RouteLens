@@ -11,6 +11,8 @@ import type {
   DetectedApp,
   DetectedBrowser,
   ApiFolder,
+  ApiHttpRequest,
+  ApiHttpResponse,
 } from "../types"; // Use WorkspaceSettings
 
 export const api = {
@@ -179,6 +181,10 @@ export const api = {
     path: string,
   ): Promise<{ tree: ApiFolder[]; logs: string[] }> => {
     return ipcRenderer.invoke("api-explorer:scan-project", path);
+  },
+
+  runApiRequest: (request: ApiHttpRequest): Promise<ApiHttpResponse> => {
+    return ipcRenderer.invoke("api-explorer:run-request", request);
   },
 
   // --- Git Management ---

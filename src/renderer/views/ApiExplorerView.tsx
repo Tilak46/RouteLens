@@ -19,9 +19,19 @@ import {
 } from "@/components/ui/select";
 import { Plus, RefreshCw, Play, X } from "lucide-react";
 
-import { ApiRoute, ApiFolder, Project } from "../../types";
+import { ApiRoute, ApiFolder, Project, ApiHttpResponse } from "../../types";
 
 const API_EXPLORER_TABS_STORAGE_KEY = "devdash.apiExplorer.tabs.v1";
+const API_EXPLORER_SCAN_CACHE_KEY = "devdash.apiExplorer.scanCache.v1";
+
+type ApiExplorerScanCacheEntry = {
+  tree: ApiFolder[];
+  logs: string[];
+  cachedAt: number;
+  selectedRouteKey?: string | null;
+};
+
+type ApiExplorerScanCache = Record<string, ApiExplorerScanCacheEntry>;
 
 type ApiProjectTab = {
   id: string;
@@ -40,14 +50,103 @@ function guessNameFromPath(p: string) {
   return parts[parts.length - 1] || "Project";
 }
 
+const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
+  return `${String(route.method).toUpperCase()}:${route.path}`;
+};
+
+const findRouteByKey = (
+  tree: ApiFolder[],
+  routeKey: string,
+): ApiRoute | null => {
+  const walk = (nodes: (ApiFolder | ApiRoute)[]): ApiRoute | null => {
+    for (const n of nodes) {
+      if (!n) continue;
+      if ((n as any).method) {
+        const r = n as ApiRoute;
+        if (toRouteKey(r) === routeKey) return r;
+        continue;
+      }
+      const folder = n as ApiFolder;
+      const found = walk(folder.children);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  return walk(tree as any);
+};
+
+const readScanCache = (): ApiExplorerScanCache => {
+  try {
+    if (typeof window === "undefined") return {};
+    const raw = window.localStorage.getItem(API_EXPLORER_SCAN_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ApiExplorerScanCache;
+  } catch {
+    return {};
+  }
+};
+
+const writeScanCache = (cache: ApiExplorerScanCache) => {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      API_EXPLORER_SCAN_CACHE_KEY,
+      JSON.stringify(cache),
+    );
+  } catch {
+    // ignore
+  }
+};
+
+const getScanCacheEntry = (
+  projectPath: string,
+): ApiExplorerScanCacheEntry | null => {
+  if (!projectPath) return null;
+  const cache = readScanCache();
+  const entry = cache[projectPath];
+  if (!entry || !Array.isArray(entry.tree) || !Array.isArray(entry.logs))
+    return null;
+  return entry;
+};
+
+const upsertScanCacheEntry = (
+  projectPath: string,
+  patch: Partial<ApiExplorerScanCacheEntry>,
+) => {
+  if (!projectPath) return;
+  const cache = readScanCache();
+  const existing = cache[projectPath];
+  cache[projectPath] = {
+    tree: (patch.tree ?? existing?.tree ?? []) as ApiFolder[],
+    logs: (patch.logs ?? existing?.logs ?? []) as string[],
+    cachedAt: patch.cachedAt ?? existing?.cachedAt ?? Date.now(),
+    selectedRouteKey:
+      patch.selectedRouteKey !== undefined
+        ? patch.selectedRouteKey
+        : existing?.selectedRouteKey,
+  };
+  writeScanCache(cache);
+};
+
 export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
   const [selectedRoute, setSelectedRoute] = useState<ApiRoute | null>(null);
-  const [activeResponse, setActiveResponse] = useState<any>(null);
+  const [activeResponse, setActiveResponse] = useState<ApiHttpResponse | null>(
+    null,
+  );
 
   const handleSelectRoute = (route: ApiRoute) => {
     setSelectedRoute(route);
     // Reset response when changing routes
     setActiveResponse(null);
+
+    if (activeTab?.path) {
+      upsertScanCacheEntry(activeTab.path, {
+        selectedRouteKey: toRouteKey(route),
+      });
+    }
   };
 
   const [tree, setTree] = useState<ApiFolder[]>([]);
@@ -153,17 +252,54 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
     if (!activeTab) return;
     setSelectedRoute(null);
     setActiveResponse(null);
-    void scan(activeTab);
+
+    // Prefer cached scan results so revisiting the view doesn't trigger a full rescan.
+    const cached = getScanCacheEntry(activeTab.path);
+    if (cached) {
+      setTree(cached.tree || []);
+      setLogs(cached.logs || []);
+      setLoading(false);
+
+      if (cached.selectedRouteKey) {
+        const restored = findRouteByKey(
+          cached.tree || [],
+          cached.selectedRouteKey,
+        );
+        if (restored) setSelectedRoute(restored);
+      }
+      return;
+    }
+
+    void scan(activeTab, { force: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabId]);
 
-  const scan = async (tab: ApiProjectTab) => {
+  const scan = async (tab: ApiProjectTab, opts?: { force?: boolean }) => {
+    const force = Boolean(opts?.force);
+    if (!force) {
+      const cached = getScanCacheEntry(tab.path);
+      if (cached) {
+        setTree(cached.tree || []);
+        setLogs(cached.logs || []);
+        return;
+      }
+    }
+
     setLoading(true);
     setLogs([]);
     try {
       const result = await apiClient.scanProject(tab.path);
       setTree(result.tree || []);
       setLogs(result.logs || []);
+
+      // Persist scan results so returning to the screen doesn't rescan.
+      const existing = getScanCacheEntry(tab.path);
+      upsertScanCacheEntry(tab.path, {
+        tree: result.tree || [],
+        logs: result.logs || [],
+        cachedAt: Date.now(),
+        selectedRouteKey: existing?.selectedRouteKey,
+      });
     } catch (err) {
       console.error("Scan failed", err);
       setLogs((prev) => [...prev, `Client Error: ${err}`]);
@@ -229,19 +365,22 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
     <div className="flex h-full w-full bg-[#0a0a0a] text-white overflow-hidden font-sans select-none">
       {/* SIDEBAR */}
       <div className="w-64 bg-[#0f0f0f] border-r border-white/5 flex flex-col shrink-0">
-        <div className="h-12 border-b border-white/5 flex items-center px-4 justify-between" style={{ WebkitAppRegion: 'drag' } as any}>
+        <div
+          className="h-12 border-b border-white/5 flex items-center px-4 justify-between"
+          style={{ WebkitAppRegion: "drag" } as any}
+        >
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-400">DevDash</span>
           </div>
         </div>
-        
+
         <div className="p-4 flex-1 overflow-y-auto">
-          <div className="text-xs font-semibold text-gray-500 mb-2 tracking-wider">PROJECTS</div>
+          <div className="text-xs font-semibold text-gray-500 mb-2 tracking-wider">
+            PROJECTS
+          </div>
           <Popover open={addPopoverOpen} onOpenChange={setAddPopoverOpen}>
             <PopoverTrigger asChild>
-              <button 
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors mb-4"
-              >
+              <button className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors mb-4">
                 <span className="text-sm font-medium">Add Backend</span>
                 <Plus size={14} />
               </button>
@@ -324,11 +463,16 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
                   title={t.path}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="text-sm text-gray-300 truncate">{t.name}</span>
+                    <span className="text-sm text-gray-300 truncate">
+                      {t.name}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {loading && active ? (
-                      <RefreshCw size={14} className="animate-spin text-blue-400" />
+                      <RefreshCw
+                        size={14}
+                        className="animate-spin text-blue-400"
+                      />
                     ) : active ? (
                       <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]"></div>
                     ) : (
@@ -354,7 +498,9 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
       <div className="flex-1 flex flex-col relative min-w-0">
         <div className="h-12 border-b border-white/5 bg-[#0a0a0a] flex items-center px-4 justify-between shrink-0">
           <div className="flex gap-4 text-sm font-medium text-gray-400 h-full">
-            <span className="text-white border-b-2 border-white pt-3">API Explorer</span>
+            <span className="text-white border-b-2 border-white pt-3">
+              API Explorer
+            </span>
             <span className="pt-3">Logs</span>
             <span className="pt-3">Git</span>
           </div>
@@ -370,7 +516,7 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
                 </span>
                 <button
                   className="text-gray-400 hover:text-white"
-                  onClick={() => activeTab && scan(activeTab)}
+                  onClick={() => activeTab && scan(activeTab, { force: true })}
                   disabled={loading || !activeTab}
                   title="Refresh Scan"
                 >
@@ -399,12 +545,16 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
               ) : tree.length > 0 ? (
                 <Sidebar
                   tree={tree}
-                  selectedId={selectedRoute?.id}
+                  selectedKey={
+                    selectedRoute ? toRouteKey(selectedRoute) : undefined
+                  }
                   onSelect={handleSelectRoute}
                 />
               ) : (
                 <div className="p-4 space-y-2">
-                  <p className="text-xs text-gray-500 text-center">No APIs found.</p>
+                  <p className="text-xs text-gray-500 text-center">
+                    No APIs found.
+                  </p>
                   {logs.length > 0 && (
                     <div className="bg-black/40 rounded p-2 text-[10px] font-mono text-gray-500 overflow-x-auto whitespace-pre-wrap">
                       {logs.map((log, i) => (
@@ -425,13 +575,18 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
                   <RefreshCw size={48} className="text-gray-400" />
                 </div>
                 <h3 className="text-xl text-white mb-2">No Project Selected</h3>
-                <p>Add or select a backend project from the sidebar to scan for APIs.</p>
+                <p>
+                  Add or select a backend project from the sidebar to scan for
+                  APIs.
+                </p>
               </div>
             ) : loading ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-blue-400">
                 <RefreshCw size={48} className="mb-4 animate-spin" />
                 <h3 className="text-xl text-white mb-2">Scanning AST...</h3>
-                <p className="font-mono text-sm text-gray-500">Parsing Express/Next.js routes in real-time</p>
+                <p className="font-mono text-sm text-gray-500">
+                  Parsing Express/Next.js routes in real-time
+                </p>
               </div>
             ) : !selectedRoute ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
@@ -439,13 +594,17 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
                   <Play size={24} />
                 </div>
                 <h3 className="text-xl text-white mb-2">Select an Endpoint</h3>
-                <p>Choose an API endpoint from the detected routes tree to start testing.</p>
+                <p>
+                  Choose an API endpoint from the detected routes tree to start
+                  testing.
+                </p>
               </div>
             ) : (
               <div className="flex flex-col h-full gap-4">
                 <RequestPanel
                   route={selectedRoute}
                   baseUrl={activeTab?.baseUrl ?? "http://localhost:3000"}
+                  draftKey={`${activeTab?.path ?? ""}::${selectedRoute.path}`}
                   onRun={(res) => setActiveResponse(res)}
                 />
                 <ResponsePanel response={activeResponse} />

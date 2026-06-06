@@ -38,6 +38,20 @@ win-unpacked/
 *.sln
 *.sw?
 
+# Scanner results
+*_scan_results.json
+scan_results.json
+*_results.json
+
+# Scratch files
+scratch/
+
+# Build logs and temporary outputs
+build_log.txt
+build_output.txt
+build_win_output.txt
+tsc_output.txt
+tsc_errors.log
 
 # Electron build outputs
 release-packager/

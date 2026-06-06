@@ -542,7 +542,7 @@ export function GitActionSheet({
                   !activeSummary?.isRepo ||
                   isGenerating
                 }
-                rows={2}
+                rows={5}
               />
               <Button
                 size="icon"

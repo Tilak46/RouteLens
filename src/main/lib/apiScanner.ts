@@ -30,6 +30,10 @@ function mapDetectedToApiRoute(
     file: fileRel,
     handler: r.handler,
     middlewares,
+    description: r.description,
+    pathParams: r.pathParams,
+    inferredBodyFields: r.inferredBodyFields,
+    inferredQueryFields: r.inferredQueryFields,
   };
 }
 

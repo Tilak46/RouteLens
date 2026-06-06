@@ -146,6 +146,10 @@ export type ApiRoute = {
   file?: string;
   handler?: string;
   middlewares?: string[];
+  description?: string;
+  pathParams?: string[];
+  inferredBodyFields?: string[];
+  inferredQueryFields?: string[];
 };
 
 export type ApiFolder = {
@@ -157,4 +161,49 @@ export type ApiFolder = {
 
 export const isRoute = (item: ApiFolder | ApiRoute): item is ApiRoute => {
   return (item as any).method !== undefined;
+};
+
+// --- API Explorer: Request/Response Types (v1) ---
+
+export type ApiKeyLocation = "header" | "query";
+
+export type ApiAuth =
+  | { type: "none" }
+  | { type: "bearer"; token: string }
+  | { type: "basic"; username: string; password: string }
+  | { type: "apiKey"; key: string; value: string; in: ApiKeyLocation };
+
+export type ApiKeyValueRow = {
+  id: string;
+  enabled: boolean;
+  key: string;
+  value: string;
+};
+
+export type ApiBody =
+  | { mode: "none" }
+  | { mode: "json"; text: string }
+  | { mode: "text"; text: string }
+  | { mode: "form"; fields: ApiKeyValueRow[] };
+
+export type ApiHttpRequest = {
+  method: Method;
+  url: string;
+  query: ApiKeyValueRow[];
+  headers: ApiKeyValueRow[];
+  auth: ApiAuth;
+  body: ApiBody;
+  timeoutMs?: number;
+};
+
+export type ApiHttpResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  timeMs: number;
+  sizeBytes: number;
+  headers: Record<string, string>;
+  bodyText: string;
+  parsedJson?: unknown;
+  error?: string;
 };
