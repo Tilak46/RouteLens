@@ -6,7 +6,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  LayoutGrid,
   FolderKanban,
   Settings,
   PanelLeftClose,
@@ -14,10 +13,11 @@ import {
   ListTree,
   Briefcase,
   Ghost,
+  Radio,
 } from "lucide-react";
 import apiClient from "@/lib/apiClient";
 
-export type ActiveView = "projects" | "workspaces";
+export type ActiveView = "projects" | "workspaces" | "api-explorer";
 
 type DashboardLayoutProps = {
   children: React.ReactNode;
@@ -141,6 +141,14 @@ export function DashboardLayout({
                 icon={Briefcase}
                 label="Workspaces"
                 tooltip="VS Code Workspaces"
+              />
+              <NavButton
+                viewId="api-explorer"
+                currentView={activeView}
+                setView={onViewChange}
+                icon={Radio}
+                label="API Explorer"
+                tooltip="Auto-Discovery Client"
               />
             </nav>
 

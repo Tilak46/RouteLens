@@ -1,0 +1,9 @@
+{
+  "name": "noob-express",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/index.js",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

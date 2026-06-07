@@ -10,6 +10,9 @@ import type {
   AppWorkspace,
   DetectedApp,
   DetectedBrowser,
+  ApiFolder,
+  ApiHttpRequest,
+  ApiHttpResponse,
 } from "../types"; // Use WorkspaceSettings
 
 export const api = {
@@ -173,6 +176,17 @@ export const api = {
     return ipcRenderer.invoke("browsers:scan");
   },
 
+  // API Explorer
+  scanProject: (
+    path: string,
+  ): Promise<{ tree: ApiFolder[]; logs: string[] }> => {
+    return ipcRenderer.invoke("api-explorer:scan-project", path);
+  },
+
+  runApiRequest: (request: ApiHttpRequest): Promise<ApiHttpResponse> => {
+    return ipcRenderer.invoke("api-explorer:run-request", request);
+  },
+
   // --- Git Management ---
   getGitSummary: (projectPath: string): Promise<GitSummary> => {
     return ipcRenderer.invoke("git:summary", projectPath);
@@ -252,6 +266,12 @@ export const api = {
   // AI (OpenRouter)
   aiGenerateCommitMessage: (diff: string): Promise<string> => {
     return ipcRenderer.invoke("ai:generate-commit-message", diff);
+  },
+  aiGenerateCommitMessageForProject: (args: {
+    projectPath: string;
+    mode?: "staged" | "all";
+  }): Promise<string> => {
+    return ipcRenderer.invoke("ai:generate-commit-message-for-project", args);
   },
   aiExplainLog: (log: string): Promise<string> => {
     return ipcRenderer.invoke("ai:explain-log", log);

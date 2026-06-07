@@ -49,9 +49,17 @@ function parseRegQueryValues(output: string): string[] {
   return values;
 }
 
-async function regGetValue(key: string, valueName: string): Promise<string | undefined> {
+async function regGetValue(
+  key: string,
+  valueName: string,
+): Promise<string | undefined> {
   try {
-    const { stdout } = await execFileAsync("reg", ["query", key, "/v", valueName]);
+    const { stdout } = await execFileAsync("reg", [
+      "query",
+      key,
+      "/v",
+      valueName,
+    ]);
     return parseRegQueryValues(stdout)[0];
   } catch {
     return undefined;
@@ -67,14 +75,18 @@ async function regGetDefaultValue(key: string): Promise<string | undefined> {
   }
 }
 
-async function getDefaultBrowserOpenCommandWindows(): Promise<string | undefined> {
+async function getDefaultBrowserOpenCommandWindows(): Promise<
+  string | undefined
+> {
   // Best-effort resolution of the *default* browser command for http URLs.
   // This lets us support "Default + Incognito/New Window" for common browsers.
   const progIdRaw = await regGetValue(
     "HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice",
     "ProgId",
   );
-  const progId = String(progIdRaw ?? "").replace(/^"|"$/g, "").trim();
+  const progId = String(progIdRaw ?? "")
+    .replace(/^"|"$/g, "")
+    .trim();
   if (!progId) return undefined;
 
   const candidates = [
@@ -165,7 +177,9 @@ async function openUrlInBrowserWindows(args: {
   if (process.platform === "win32") {
     try {
       const detected = await scanInstalledBrowsersWindows();
-      const match = detected.find((b) => browserNameFromExe(b.exePath) === args.browser);
+      const match = detected.find(
+        (b) => browserNameFromExe(b.exePath) === args.browser,
+      );
       if (match?.command) {
         const cmd = buildBrowserCommandForUrl({
           command: match.command,

@@ -1,9 +1,10 @@
 import { app, ipcMain, nativeImage, shell } from "electron";
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import type { DetectedApp } from "../../types";
 
-const MAX_RESULTS = 250;
+const MAX_RESULTS = 1200;
 const MAX_DEPTH = 10;
 
 function toId(p: string) {
@@ -84,9 +85,88 @@ function iconDataUrlForShortcut(linkPath: string): string | undefined {
   }
 }
 
+type AppsFolderItem = {
+  Name?: string;
+  Path?: string;
+  AUMID?: string;
+};
+
+function execPowerShell(command: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+      { windowsHide: true, maxBuffer: 10 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) {
+          reject(new Error(stderr || err.message));
+          return;
+        }
+        resolve(String(stdout || ""));
+      },
+    );
+  });
+}
+
+async function scanAppsFolderWindows(): Promise<DetectedApp[]> {
+  const script = [
+    // Ensure UTF-8 output for non-ascii app names
+    "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8",
+    "$s=New-Object -ComObject Shell.Application",
+    "$f=$s.Namespace('shell:AppsFolder')",
+    // Collect a lean object to keep JSON small
+    "$out=@()",
+    "foreach($i in $f.Items()) {",
+    "  $name=$i.Name",
+    "  $p=$i.Path",
+    "  if([string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($p)) { continue }",
+    "  $aumid=$i.ExtendedProperty('System.AppUserModel.ID')",
+    "  $out += [PSCustomObject]@{ Name=$name; Path=$p; AUMID=$aumid }",
+    "}",
+    "$out | ConvertTo-Json -Compress",
+  ].join("; ");
+
+  const raw = (await execPowerShell(script)).trim();
+  if (!raw) return [];
+
+  let parsed: AppsFolderItem[] = [];
+  try {
+    const json = JSON.parse(raw);
+    parsed = Array.isArray(json) ? json : [json];
+  } catch {
+    return [];
+  }
+
+  const results: DetectedApp[] = [];
+  for (const item of parsed) {
+    const name = String(item?.Name || "").trim();
+    const key = String(item?.Path || "").trim();
+    if (!name || !key) continue;
+
+    // Some entries can be internal/resources; skip obvious junk.
+    if (name.toLowerCase() === "desktop") continue;
+    if (key.toLowerCase().startsWith("ms-resource:")) continue;
+
+    const shellPath = `shell:AppsFolder\\${key}`;
+    results.push({
+      id: toId(shellPath),
+      name,
+      path: shellPath,
+      kind: "appsfolder",
+    });
+
+    if (results.length >= MAX_RESULTS) break;
+  }
+
+  return results;
+}
+
 export function registerAppScanHandlers() {
   ipcMain.handle("apps:scan", async (): Promise<DetectedApp[]> => {
     const candidates: string[] = [];
+
+    const appsFolderApps: DetectedApp[] =
+      process.platform === "win32" ? await scanAppsFolderWindows() : [];
 
     const roots: string[] = [];
     try {
@@ -168,14 +248,23 @@ export function registerAppScanHandlers() {
       };
     });
 
+    // Merge AppsFolder apps (Store + classic registered apps)
+    const byPath = new Map<string, DetectedApp>();
+    for (const r of results) byPath.set(r.path, r);
+    for (const a of appsFolderApps) {
+      if (!byPath.has(a.path)) byPath.set(a.path, a);
+    }
+
+    const merged = Array.from(byPath.values());
+
     // Sort: has icon first, then name
-    results.sort((a, b) => {
+    merged.sort((a, b) => {
       const ai = a.iconDataUrl ? 0 : 1;
       const bi = b.iconDataUrl ? 0 : 1;
       if (ai !== bi) return ai - bi;
       return a.name.localeCompare(b.name);
     });
 
-    return results;
+    return merged;
   });
 }

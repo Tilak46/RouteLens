@@ -1,5 +1,11 @@
-export const generateCommitMessage = async (diff: string): Promise<string> => {
-  return await window.api.aiGenerateCommitMessage(diff);
+export const generateCommitMessage = async (
+  projectPath: string,
+  mode: "staged" | "all" = "staged",
+): Promise<string> => {
+  return await window.api.aiGenerateCommitMessageForProject({
+    projectPath,
+    mode,
+  });
 };
 
 export const explainLog = async (log: string): Promise<string> => {

@@ -4,78 +4,40 @@
 
 @layer base {
   :root {
-    /* --- ETHEREAL SLATE (Soft Modern Luxury) --- */
-    
-    /* Background: Deep, rich slate (not harsh black) */
-    --background: 222 47% 11%; /* #0f172a - Slate 950 */
-    --foreground: 210 40% 98%; /* #f8fafc - Slate 50 */
+    /* ========================================== */
+    /* DEFAULT THEME: DEEP OCEAN (Professional)   */
+    /* ========================================== */
+    --background: 222 47% 11%; /* Deep Slate */
+    --foreground: 210 40% 98%;
 
-    /* Card: Slightly lighter/glassy */
-    --card: 217 33% 17%; /* #1e293b - Slate 800 */
+    --card: 217 33% 15%; /* Lighter Slate for depth */
     --card-foreground: 210 40% 98%;
-    --popover: 217 33% 17%;
+
+    --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    /* Primary: Soft Indigo/Violet */
-    --primary: 262 83% 74%; /* #c084fc - Purple 400 (Soft Neon) */
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%; /* Bright Blue */
+    --primary-foreground: 222 47% 11%;
 
-    /* Secondary: Muted Slate */
-    --secondary: 217 33% 22%; /* Slate 700ish */
+    --secondary: 217 33% 22%;
     --secondary-foreground: 210 40% 98%;
 
-    /* Muted Text */
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%; /* Slate 400 */
+    --muted: 217 33% 20%;
+    --muted-foreground: 215 20% 65%;
 
-    /* Accent: Soft Sky Blue (Fresh, consistent with Ethereal theme) */
-    --accent: 199 89% 60%; /* #38bdf8 - Sky 400 */
+    --accent: 217 33% 22%;
     --accent-foreground: 210 40% 98%;
 
-    /* Destructive: Soft Red */
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    /* Borders: Subtle slate */
-    --border: 217 33% 22%; /* Slate 700 */
-    --input: 217 33% 22%;
-    --ring: 262 83% 74%; /* Match Primary */
-    --radius: 0.75rem; /* Larger radius for modern feel */
-
-    /* --- LEGACY BRIDGE --- */
-    --bg: hsl(var(--background));
-    --bg-darker: hsl(222 47% 8%); /* Slightly darker than bg */
-    --bg-card: hsl(var(--card));
-    --bg-hover: hsl(var(--secondary));
-    --text-main: hsl(var(--foreground));
-    --text-alt: hsl(var(--muted-foreground));
-    --border-main: hsl(var(--border));
-    --green: #2dd4bf; /* Teal for success */
-    --red: #f87171; /* Soft Red */
-  }
-
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 217 33% 17%;
-    --card-foreground: 210 40% 98%;
-    --popover: 217 33% 17%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 262 83% 74%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 22%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 199 89% 60%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
     --border: 217 33% 22%;
     --input: 217 33% 22%;
-    --ring: 262 83% 74%;
+    --ring: 224 76% 48%;
 
-    /* Legacy Bridge */
+    --radius: 0.5rem; /* Clean Vercel-like radius */
+
+    /* --- LEGACY BRIDGE (Do not touch) --- */
     --bg: hsl(var(--background));
     --bg-darker: hsl(222 47% 8%);
     --bg-card: hsl(var(--card));
@@ -83,49 +45,450 @@
     --text-main: hsl(var(--foreground));
     --text-alt: hsl(var(--muted-foreground));
     --border-main: hsl(var(--border));
+    --green: #10b981;
+    --red: #ef4444;
+  }
+
+  /* ========================================== */
+  /* THEME 2: TOKYO NIGHT (Creative/Cyber)      */
+  /* Usage: <body class="theme-tokyo">          */
+  /* ========================================== */
+  .theme-tokyo {
+    --background: 235 25% 12%; /* Stormy Purple-Grey */
+    --foreground: 235 80% 95%;
+
+    --card: 236 22% 19%; /* Slightly lighter */
+    --card-foreground: 235 80% 95%;
+
+    --popover: 235 25% 12%;
+    --popover-foreground: 235 80% 95%;
+
+    --primary: 265 85% 70%; /* Soft Neon Purple */
+    --primary-foreground: 235 20% 10%;
+
+    --secondary: 236 20% 25%;
+    --secondary-foreground: 235 80% 95%;
+
+    --muted: 236 22% 19%;
+    --muted-foreground: 235 30% 65%;
+
+    --accent: 236 20% 25%;
+    --accent-foreground: 235 80% 95%;
+
+    --destructive: 345 80% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 236 22% 25%;
+    --input: 236 22% 25%;
+    --ring: 265 85% 70%;
+
+    /* Legacy Bridge Overrides */
+    --bg: hsl(235 25% 12%);
+    --bg-darker: hsl(235 25% 9%);
+    --bg-card: hsl(236 22% 19%);
+    --bg-hover: hsl(236 20% 25%);
+    --text-main: hsl(235 80% 95%);
+    --text-alt: hsl(235 30% 65%);
+    --border-main: hsl(236 22% 25%);
+  }
+
+  /* ========================================== */
+  /* THEME 3: FOREST GLASS (Soothing Nature)    */
+  /* Usage: <body class="theme-forest">         */
+  /* ========================================== */
+  .theme-forest {
+    --background: 155 40% 5%; /* Very Dark Green */
+    --foreground: 140 20% 96%;
+
+    --card: 155 25% 10%; /* Dark Moss */
+    --card-foreground: 140 20% 96%;
+
+    --popover: 155 40% 5%;
+    --popover-foreground: 140 20% 96%;
+
+    --primary: 142 70% 50%; /* Emerald */
+    --primary-foreground: 155 40% 5%;
+
+    --secondary: 155 20% 15%;
+    --secondary-foreground: 140 20% 96%;
+
+    --muted: 155 20% 12%;
+    --muted-foreground: 150 10% 60%;
+
+    --accent: 155 20% 15%;
+    --accent-foreground: 140 20% 96%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 155 20% 15%;
+    --input: 155 20% 15%;
+    --ring: 142 70% 50%;
+
+    /* Legacy Bridge Overrides */
+    --bg: hsl(155 40% 5%);
+    --bg-darker: hsl(155 40% 3%);
+    --bg-card: hsl(155 25% 10%);
+    --bg-hover: hsl(155 20% 15%);
+    --text-main: hsl(140 20% 96%);
+    --text-alt: hsl(150 10% 60%);
+    --border-main: hsl(155 20% 15%);
+  }
+
+  /* ========================================== */
+  /* THEME 4: CARBON & COFFEE (Warm Dark)       */
+  /* Usage: <body class="theme-carbon">         */
+  /* ========================================== */
+  .theme-carbon {
+    --background: 20 6% 10%; /* Warm Charcoal */
+    --foreground: 30 15% 96%;
+
+    --card: 24 5% 14%; /* Lighter Charcoal */
+    --card-foreground: 30 15% 96%;
+
+    --popover: 20 6% 10%;
+    --popover-foreground: 30 15% 96%;
+
+    --primary: 35 90% 60%; /* Amber/Orange */
+    --primary-foreground: 20 6% 10%;
+
+    --secondary: 24 5% 18%;
+    --secondary-foreground: 30 15% 96%;
+
+    --muted: 24 5% 15%;
+    --muted-foreground: 24 5% 65%;
+
+    --accent: 24 5% 18%;
+    --accent-foreground: 30 15% 96%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 24 5% 18%; /* Warm Grey Border */
+    --input: 24 5% 18%;
+    --ring: 35 90% 60%;
+
+    /* Legacy Bridge Overrides */
+    --bg: hsl(20 6% 10%);
+    --bg-darker: hsl(20 6% 7%);
+    --bg-card: hsl(24 5% 14%);
+    --bg-hover: hsl(24 5% 18%);
+    --text-main: hsl(30 15% 96%);
+    --text-alt: hsl(24 5% 65%);
+    --border-main: hsl(24 5% 18%);
+  }
+
+  /* ========================================== */
+  /* THEME 5: NORDIC FROST (Clean & Matte)      */
+  /* Usage: <body class="theme-nord">           */
+  /* Vibe: Engineering, Clean, Icy              */
+  /* ========================================== */
+  .theme-nord {
+    --background: 220 23% 22%; /* #2e3440 (Polar Night) */
+    --foreground: 218 27% 94%; /* #eceff4 (Snow Storm) */
+
+    --card: 220 23% 26%; /* Lighter Polar Night */
+    --card-foreground: 218 27% 92%;
+
+    --popover: 220 23% 22%;
+    --popover-foreground: 218 27% 94%;
+
+    --primary: 193 43% 67%; /* #88c0d0 (Frost Blue) */
+    --primary-foreground: 220 23% 22%;
+
+    --secondary: 220 23% 30%; /* Lighter Grey-Blue */
+    --secondary-foreground: 218 27% 94%;
+
+    --muted: 220 23% 30%;
+    --muted-foreground: 218 15% 65%;
+
+    --accent: 220 23% 30%;
+    --accent-foreground: 218 27% 94%;
+
+    --destructive: 354 42% 56%; /* Red */
+    --destructive-foreground: 218 27% 94%;
+
+    --border: 220 23% 30%;
+    --input: 220 23% 30%;
+    --ring: 193 43% 67%;
+
+    /* Legacy Bridge */
+    --bg: hsl(220 23% 22%);
+    --bg-darker: hsl(220 23% 18%);
+    --bg-card: hsl(220 23% 26%);
+    --bg-hover: hsl(220 23% 30%);
+    --text-main: hsl(218 27% 94%);
+    --text-alt: hsl(218 15% 65%);
+    --border-main: hsl(220 23% 30%);
+  }
+
+  /* ========================================== */
+  /* THEME 6: SYNTHWAVE (High Energy)           */
+  /* Usage: <body class="theme-synth">          */
+  /* Vibe: Cyberpunk, Neon, Creative            */
+  /* ========================================== */
+  .theme-synth {
+    --background: 265 40% 10%; /* Deep Violet Black */
+    --foreground: 280 20% 96%;
+
+    --card: 265 35% 15%; /* Deep Purple */
+    --card-foreground: 280 20% 96%;
+
+    --popover: 265 40% 10%;
+    --popover-foreground: 280 20% 96%;
+
+    --primary: 320 100% 60%; /* Hot Pink */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 265 30% 25%;
+    --secondary-foreground: 320 100% 90%;
+
+    --muted: 265 30% 20%;
+    --muted-foreground: 265 20% 65%;
+
+    --accent: 265 30% 25%;
+    --accent-foreground: 280 20% 96%;
+
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 265 30% 25%; /* Purple-ish Border */
+    --input: 265 30% 25%;
+    --ring: 180 100% 50%; /* Cyan Ring for contrast */
+
+    /* Legacy Bridge */
+    --bg: hsl(265 40% 10%);
+    --bg-darker: hsl(265 40% 7%);
+    --bg-card: hsl(265 35% 15%);
+    --bg-hover: hsl(265 30% 25%);
+    --text-main: hsl(280 20% 96%);
+    --text-alt: hsl(265 20% 65%);
+    --border-main: hsl(265 30% 25%);
+  }
+
+  /* ========================================== */
+  /* THEME 7: RETRO TERMINAL (Warm Vintage)     */
+  /* Usage: <body class="theme-retro">          */
+  /* Vibe: 70s Mainframe, Coffee, "Gruvbox"     */
+  /* ========================================== */
+  .theme-retro {
+    --background: 40 20% 12%; /* Warm Brown-Black */
+    --foreground: 40 40% 90%; /* Cream */
+
+    --card: 40 15% 18%; /* Lighter Brown */
+    --card-foreground: 40 40% 90%;
+
+    --popover: 40 20% 12%;
+    --popover-foreground: 40 40% 90%;
+
+    --primary: 45 100% 50%; /* Retro Gold/Yellow */
+    --primary-foreground: 40 20% 12%;
+
+    --secondary: 40 15% 25%;
+    --secondary-foreground: 40 40% 90%;
+
+    --muted: 40 15% 20%;
+    --muted-foreground: 40 10% 60%;
+
+    --accent: 40 15% 25%;
+    --accent-foreground: 40 40% 90%;
+
+    --destructive: 0 70% 55%; /* Brick Red */
+    --destructive-foreground: 40 40% 90%;
+
+    --border: 40 15% 25%;
+    --input: 40 15% 25%;
+    --ring: 45 100% 50%;
+
+    /* Legacy Bridge */
+    --bg: hsl(40 20% 12%);
+    --bg-darker: hsl(40 20% 9%);
+    --bg-card: hsl(40 15% 18%);
+    --bg-hover: hsl(40 15% 25%);
+    --text-main: hsl(40 40% 90%);
+    --text-alt: hsl(40 10% 60%);
+    --border-main: hsl(40 15% 25%);
+  }
+
+  /* ========================================== */
+  /* THEME 8: SHADCN ZINC (The Standard)        */
+  /* Usage: <body class="theme-zinc">           */
+  /* Vibe: Neutral, Industrial, "Vercel-ish"    */
+  /* ========================================== */
+  .theme-zinc {
+    --background: 240 10% 3.9%; /* #09090b (Deep Black) */
+    --foreground: 0 0% 98%;
+
+    /* Card is LIGHTER (Zinc-900) to create depth */
+    --card: 240 6% 10%; /* #18181b */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%; /* White Text */
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%; /* Zinc-800 */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Borders are BRIGHTER to define the "grid" look */
+    --border: 240 3.7% 20%; /* Visible Zinc Border */
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+
+    --radius: 0.5rem;
+
+    /* Legacy Bridge */
+    --bg: hsl(240 10% 3.9%);
+    --bg-darker: hsl(240 10% 2%);
+    --bg-card: hsl(240 6% 10%);
+    --bg-hover: hsl(240 3.7% 15.9%);
+    --text-main: hsl(0 0% 98%);
+    --text-alt: hsl(240 5% 64.9%);
+    --border-main: hsl(240 3.7% 20%);
+  }
+
+  /* ========================================== */
+  /* THEME 9: SHADCN STONE (Warm & Premium)     */
+  /* Usage: <body class="theme-stone">          */
+  /* Vibe: "Linear" App Style, Warm Grey        */
+  /* ========================================== */
+  .theme-stone {
+    --background: 20 14.3% 4.1%; /* Warm Deep Brown-Black */
+    --foreground: 60 9.1% 97.8%;
+
+    --card: 24 9.8% 10%; /* Warm Grey Card */
+    --card-foreground: 60 9.1% 97.8%;
+
+    --popover: 20 14.3% 4.1%;
+    --popover-foreground: 60 9.1% 97.8%;
+
+    --primary: 60 9.1% 97.8%; /* Creamy White */
+    --primary-foreground: 24 9.8% 10%;
+
+    --secondary: 12 6.5% 15.1%;
+    --secondary-foreground: 60 9.1% 97.8%;
+
+    --muted: 12 6.5% 15.1%;
+    --muted-foreground: 24 5.4% 63.9%;
+
+    --accent: 12 6.5% 15.1%;
+    --accent-foreground: 60 9.1% 97.8%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 9.1% 97.8%;
+
+    --border: 12 6.5% 20%; /* Warm Border */
+    --input: 12 6.5% 15.1%;
+    --ring: 24 5.7% 82.9%;
+
+    /* Legacy Bridge */
+    --bg: hsl(20 14.3% 4.1%);
+    --bg-darker: hsl(20 14.3% 2%);
+    --bg-card: hsl(24 9.8% 10%);
+    --bg-hover: hsl(12 6.5% 15.1%);
+    --text-main: hsl(60 9.1% 97.8%);
+    --text-alt: hsl(24 5.4% 63.9%);
+    --border-main: hsl(12 6.5% 20%);
+  }
+
+  /* ========================================== */
+  /* THEME 10: SHADCN SLATE (The Classic)       */
+  /* Usage: <body class="theme-slate">          */
+  /* Vibe: Technical, Reliable, Blue-Grey       */
+  /* ========================================== */
+  .theme-slate {
+    --background: 222 47% 11%; /* #0f172a (Standard Slate) */
+    --foreground: 210 40% 98%;
+
+    --card: 217 33% 15%; /* Distinctly Lighter */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11.2%;
+
+    --secondary: 217 33% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217 33% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 20%; /* Visible Blue-Grey Border */
+    --input: 217 33% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+
+    /* Legacy Bridge */
+    --bg: hsl(222 47% 11%);
+    --bg-darker: hsl(222 47% 8%);
+    --bg-card: hsl(217 33% 15%);
+    --bg-hover: hsl(217 33% 17.5%);
+    --text-main: hsl(210 40% 98%);
+    --text-alt: hsl(215 20.2% 65.1%);
+    --border-main: hsl(217 33% 20%);
   }
 }
 
-  /* Global Polish */
-  @layer utilities {
-    .glass {
-      @apply bg-opacity-70 backdrop-blur-md border border-white/10 shadow-lg;
-    }
-    .glass-card {
-      @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-xl;
-    }
-    .text-glow {
-      text-shadow: 0 0 10px hsla(var(--primary), 0.5);
-    }
-    .drag {
-      -webkit-app-region: drag;
-    }
-    .no-drag {
-      -webkit-app-region: no-drag;
-    }
+/* ========================================== */
+/* GLOBAL UTILITIES & POLISH                  */
+/* ========================================== */
+@layer utilities {
+  .glass {
+    @apply bg-opacity-70 backdrop-blur-md border border-white/5 shadow-lg;
   }
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-xl;
+  }
+  .text-glow {
+    text-shadow: 0 0 10px hsla(var(--primary), 0.4);
+  }
+  .drag {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
 
 @layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300 ease-in-out;
   }
 
-  /* Custom Scrollbar for WebKit (Chrome, Electron) */
+  /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: transparent; 
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full;
+    @apply bg-muted-foreground/30 rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    @apply bg-muted-foreground/50;
   }
   ::-webkit-scrollbar-corner {
     background: transparent;

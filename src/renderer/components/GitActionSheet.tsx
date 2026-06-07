@@ -542,7 +542,7 @@ export function GitActionSheet({
                   !activeSummary?.isRepo ||
                   isGenerating
                 }
-                rows={2}
+                rows={5}
               />
               <Button
                 size="icon"
@@ -561,7 +561,8 @@ export function GitActionSheet({
                       return;
                     }
                     const msg = await generateCommitMessage(
-                      `Staged files:\n${stagedFiles}`,
+                      project.path,
+                      "staged",
                     );
                     setCommitMessage(msg);
                   } catch (err: any) {

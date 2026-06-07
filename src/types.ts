@@ -79,7 +79,8 @@ export type DetectedApp = {
   id: string;
   name: string;
   path: string;
-  kind: "shortcut" | "exe";
+  // `path` can be a filesystem path (exe/lnk) or a shell path like `shell:AppsFolder\\<AppId>`
+  kind: "shortcut" | "exe" | "appsfolder";
   iconDataUrl?: string;
 };
 
@@ -131,4 +132,78 @@ export type SystemStats = {
     status: "ok" | "unavailable" | "permission-denied";
     message?: string;
   };
+};
+
+export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "ALL";
+
+export type ApiRoute = {
+  id: string;
+  name: string;
+  method: Method;
+  path: string;
+
+  // Optional metadata for API Explorer details panels
+  file?: string;
+  handler?: string;
+  middlewares?: string[];
+  description?: string;
+  pathParams?: string[];
+  inferredBodyFields?: string[];
+  inferredQueryFields?: string[];
+};
+
+export type ApiFolder = {
+  id: string;
+  name: string;
+  children: (ApiFolder | ApiRoute)[];
+  isRoute?: false;
+};
+
+export const isRoute = (item: ApiFolder | ApiRoute): item is ApiRoute => {
+  return (item as any).method !== undefined;
+};
+
+// --- API Explorer: Request/Response Types (v1) ---
+
+export type ApiKeyLocation = "header" | "query";
+
+export type ApiAuth =
+  | { type: "none" }
+  | { type: "bearer"; token: string }
+  | { type: "basic"; username: string; password: string }
+  | { type: "apiKey"; key: string; value: string; in: ApiKeyLocation };
+
+export type ApiKeyValueRow = {
+  id: string;
+  enabled: boolean;
+  key: string;
+  value: string;
+};
+
+export type ApiBody =
+  | { mode: "none" }
+  | { mode: "json"; text: string }
+  | { mode: "text"; text: string }
+  | { mode: "form"; fields: ApiKeyValueRow[] };
+
+export type ApiHttpRequest = {
+  method: Method;
+  url: string;
+  query: ApiKeyValueRow[];
+  headers: ApiKeyValueRow[];
+  auth: ApiAuth;
+  body: ApiBody;
+  timeoutMs?: number;
+};
+
+export type ApiHttpResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  timeMs: number;
+  sizeBytes: number;
+  headers: Record<string, string>;
+  bodyText: string;
+  parsedJson?: unknown;
+  error?: string;
 };

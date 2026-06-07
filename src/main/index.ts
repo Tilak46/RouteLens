@@ -6,6 +6,7 @@ import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
 import Store from "electron-store";
 import type { Project, Group, StoreType } from "../types";
+import { getAiModel, getAiProvider } from "./lib/ai/openrouter";
 
 // Load environment variables from .env.
 // electron-vite/electron may start with a CWD that is NOT the `devdash/` folder,
@@ -25,14 +26,36 @@ import type { Project, Group, StoreType } from "../types";
     }
 
     if (is.dev) {
-      const hasKey = Boolean(
-        String(process.env["OPENROUTER_API_KEY"] ?? "").trim(),
-      );
-      const model = String(
-        process.env["OPENROUTER_MODEL"] ?? "mistralai/devstral-2512:free",
-      ).trim();
+      const provider = getAiProvider();
+      const hasKey = provider !== "none";
+      const model = getAiModel();
       console.log(
-        `[AI] OpenRouter key loaded: ${hasKey ? "yes" : "no"} | model: ${model}`,
+        `[AI] AI provider: ${provider} | key loaded: ${hasKey ? "yes" : "no"} | model: ${model}`,
+      );
+
+      const bool = (k: string) => {
+        const v = String(process.env[k] ?? "")
+          .trim()
+          .toLowerCase();
+        if (!v) return false;
+        return v === "1" || v === "true" || v === "yes";
+      };
+      const num = (k: string, d: number) => {
+        const raw = String(process.env[k] ?? "").trim();
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : d;
+      };
+
+      const namingEnabled = (() => {
+        const raw = String(process.env["API_EXPLORER_AI_NAMING"] ?? "")
+          .trim()
+          .toLowerCase();
+        if (!raw) return hasKey;
+        return raw === "1" || raw === "true" || raw === "yes";
+      })();
+
+      console.log(
+        `[AI] API Explorer naming: enabled=${namingEnabled ? "yes" : "no"} debug=${bool("API_EXPLORER_AI_DEBUG") ? "yes" : "no"} force=${bool("API_EXPLORER_AI_FORCE") ? "yes" : "no"} budgetRoutes=${num("API_EXPLORER_AI_BUDGET_ROUTES", 60)} batchSize=${num("API_EXPLORER_AI_BATCH_SIZE", 20)}`,
       );
     }
   } catch (e) {
@@ -64,6 +87,7 @@ import { registerAppWorkspaceHandlers } from "./ipcHandlers/appWorkspaceHandlers
 import { registerAIHandlers } from "./ipcHandlers/aiHandlers";
 import { registerAppScanHandlers } from "./ipcHandlers/appScanHandlers";
 import { registerBrowserScanHandlers } from "./ipcHandlers/browserScanHandlers";
+import { registerApiExplorerHandlers } from "./ipcHandlers/apiExplorerHandlers";
 
 let mainWindow: BrowserWindow | null = null; // Global reference
 
@@ -343,6 +367,9 @@ app.whenReady().then(() => {
 
     console.log("Registering App Scan Handlers...");
     registerAppScanHandlers();
+
+    console.log("Registering API Explorer Handlers...");
+    registerApiExplorerHandlers();
 
     console.log("Registering Browser Scan Handlers...");
     registerBrowserScanHandlers();

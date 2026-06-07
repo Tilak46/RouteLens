@@ -226,8 +226,12 @@ export function buildBrowserCommandForUrl(args: {
   const { exePath } = parseCommandToExe(raw);
   const exeName = exePath ? path.basename(exePath).toLowerCase() : "";
 
-  const isFirefox = exeName === "firefox.exe" || raw.toLowerCase().includes("firefox.exe");
-  const isEdge = exeName === "msedge.exe" || raw.toLowerCase().includes("msedge.exe") || raw.toLowerCase().includes("microsoftedge");
+  const isFirefox =
+    exeName === "firefox.exe" || raw.toLowerCase().includes("firefox.exe");
+  const isEdge =
+    exeName === "msedge.exe" ||
+    raw.toLowerCase().includes("msedge.exe") ||
+    raw.toLowerCase().includes("microsoftedge");
   const isChromiumFamily =
     isEdge ||
     exeName === "chrome.exe" ||
@@ -248,7 +252,9 @@ export function buildBrowserCommandForUrl(args: {
     if (trimmed.startsWith('"')) {
       const end = trimmed.indexOf('"', 1);
       if (end > 1) {
-        return trimmed.slice(0, end + 1) + ` ${toInsert}` + trimmed.slice(end + 1);
+        return (
+          trimmed.slice(0, end + 1) + ` ${toInsert}` + trimmed.slice(end + 1)
+        );
       }
     }
 
@@ -268,20 +274,25 @@ export function buildBrowserCommandForUrl(args: {
   if (args.privateMode) {
     if (isChromiumFamily) {
       if (isEdge) {
-        if (!lower.includes("-inprivate")) cmd = insertAfterExe(cmd, "-inprivate");
+        if (!lower.includes("-inprivate"))
+          cmd = insertAfterExe(cmd, "-inprivate");
       } else {
-        if (!lower.includes("--incognito")) cmd = insertAfterExe(cmd, "--incognito");
+        if (!lower.includes("--incognito"))
+          cmd = insertAfterExe(cmd, "--incognito");
       }
     } else if (isFirefox) {
-      if (!lower.includes("-private-window")) cmd = insertAfterExe(cmd, "-private-window");
+      if (!lower.includes("-private-window"))
+        cmd = insertAfterExe(cmd, "-private-window");
     }
   }
 
   if (args.newWindow) {
     if (isChromiumFamily) {
-      if (!lower.includes("--new-window")) cmd = insertAfterExe(cmd, "--new-window");
+      if (!lower.includes("--new-window"))
+        cmd = insertAfterExe(cmd, "--new-window");
     } else if (isFirefox) {
-      if (!lower.includes("-new-window")) cmd = insertAfterExe(cmd, "-new-window");
+      if (!lower.includes("-new-window"))
+        cmd = insertAfterExe(cmd, "-new-window");
     }
   }
 
