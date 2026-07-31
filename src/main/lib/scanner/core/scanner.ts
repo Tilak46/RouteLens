@@ -59,20 +59,40 @@ export async function scanProjectAst(
     }
   }
 
-  // Normalize + stable ids + dedupe
+  // Normalize + stable ids + dedupe by framework, method, and path
   const byKey = new Map<string, DetectedRoute>();
   for (const r of all) {
-    const rel = path.relative(rootPath, r.file).replace(/\\/g, "/");
-    const key = `${r.framework}|${r.method}|${r.path}|${rel}|${r.handler || ""}`;
-    if (byKey.has(key)) continue;
-    byKey.set(key, {
-      ...r,
-      id:
-        r.id || stableId([r.framework, r.method, r.path, rel, r.handler || ""]),
-    });
+    const methodUpper = String(r.method || "GET").toUpperCase();
+    const key = `${r.framework}|${methodUpper}|${r.path}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      const existingScore =
+        (existing.handler ? 2 : 0) +
+        (existing.description ? 1 : 0) +
+        ((Array.isArray(existing.middlewares) && existing.middlewares.length > 0) ? 1 : 0) +
+        ((Array.isArray(existing.pathParams) && existing.pathParams.length > 0) ? 1 : 0);
+      const currentScore =
+        (r.handler ? 2 : 0) +
+        (r.description ? 1 : 0) +
+        ((Array.isArray(r.middlewares) && r.middlewares.length > 0) ? 1 : 0) +
+        ((Array.isArray(r.pathParams) && r.pathParams.length > 0) ? 1 : 0);
+      
+      if (currentScore > existingScore) {
+        byKey.set(key, r);
+      }
+    } else {
+      byKey.set(key, r);
+    }
   }
 
-  const deduped = Array.from(byKey.values());
+  const deduped: DetectedRoute[] = [];
+  for (const r of byKey.values()) {
+    const rel = path.relative(rootPath, r.file).replace(/\\/g, "/");
+    deduped.push({
+      ...r,
+      id: r.id || stableId([r.framework, r.method, r.path, rel, r.handler || ""]),
+    });
+  }
   const stats = ctx.astStats();
   log(
     `[ASTScanner] AST cache hits=${stats.hits} misses=${stats.misses} errors=${stats.errors}`,

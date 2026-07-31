@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Project,
   Group,
@@ -7,22 +7,36 @@ import {
   AppWorkspace,
   WorkspaceSettings,
   GitSummary,
+  Method,
+  ApiRoute,
+  ApiHttpResponse,
 } from "@/../types";
 import { AddProjectModal } from "@/components/AddProjectModal";
 import { EditProjectModal } from "@/components/EditProjectModal";
-import { LogViewer } from "@/components/LogViewer";
 import { AddGroupModal } from "@/components/AddGroupModal";
 import { ManageGroupsModal } from "@/components/ManageGroupsModal";
-import { WorkspacesView } from "@/views/WorkspacesView";
-import { ProjectsView } from "@/views/ProjectsView";
-import { ApiExplorerView } from "@/views/ApiExplorerView";
 import { EditWorkspaceNameModal } from "@/components/EditWorkspaceNameModal";
-import { AppWorkspaceConfigModal as CreateAppWorkspaceModal } from "@/components/CreateAppWorkspaceModal"; // Import
-import { DashboardLayout, ActiveView } from "@/layouts/DashboardLayout";
+import { AppWorkspaceConfigModal as CreateAppWorkspaceModal } from "@/components/CreateAppWorkspaceModal";
+import { DashboardLayout, SidebarTab } from "@/layouts/DashboardLayout";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/apiClient";
 import { Toaster, toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Compass, Plus } from "lucide-react";
+
+// Sidebar tab panels
+import { ApiExplorerSidebarPanel } from "@/views/ApiExplorerView";
+import { ServersPanel } from "@/components/api-explorer/ServersPanel";
+import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
+import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarPanel";
+
+// Main workspace panels
+import { WorkspaceTabs, RequestTab } from "@/components/api-explorer/WorkspaceTabs";
+import { RequestPanel } from "@/components/api-explorer/RequestPanel";
+import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
+import { ConsoleLogsDrawer } from "@/components/api-explorer/ConsoleLogsDrawer";
+import { ManageEnvironmentsModal, ApiEnvironment } from "@/components/api-explorer/ManageEnvironmentsModal";
 
 type ProjectState = {
   [id: string]: {
@@ -32,37 +46,315 @@ type ProjectState = {
   };
 };
 
+const defaultTab = (projectId?: string | null): RequestTab => ({
+  id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+  name: "Untitled Request",
+  method: "GET",
+  url: "",
+  params: [],
+  headers: [],
+  auth: { type: "none" },
+  bodyMode: "none",
+  bodyText: "{\n\n}",
+  formFields: [],
+  urlencodedFields: [],
+  binaryFilePath: "",
+  lastCompletedAt: 0,
+  response: null,
+  projectId: projectId || undefined,
+  preRequestScript: "",
+  postResponseScript: "",
+  activeScriptSubTab: "prerequest",
+  pathVariables: [],
+});
+
+// State variables initialTabs and initialActiveId removed. Persisted in Electron Store.
+
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [appWorkspaces, setAppWorkspaces] = useState<AppWorkspace[]>([]);
   const [projectState, setProjectState] = useState<ProjectState>({});
-  const [gitSummaries, setGitSummaries] = useState<Record<string, GitSummary>>(
-    {},
-  );
+  const [gitSummaries, setGitSummaries] = useState<Record<string, GitSummary>>({});
   const [settings, setSettings] = useState<WorkspaceSettings>({
     manageWorkspaces: false,
     workspaceSavePath: null,
   });
-  const [currentView, setCurrentView] = useState<ActiveView>("projects");
+
+  // Layout UI state
+  const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>("explorer");
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [consoleProjectId, setConsoleProjectId] = useState<string | null>(null);
+
+  // Map of project ID -> RequestTab[]
+  const [projectTabsMap, setProjectTabsMap] = useState<Record<string, RequestTab[]>>({});
+  // Map of project ID -> activeRequestTabId
+  const [projectActiveTabIdMap, setProjectActiveTabIdMap] = useState<Record<string, string | null>>({});
+
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [isTabsRestored, setIsTabsRestored] = useState(false);
+  const [isEnvsRestored, setIsEnvsRestored] = useState(false);
+  const [isLayoutRestored, setIsLayoutRestored] = useState(false);
+
+  const currentProjId = activeProjectId || "global";
+
+  const tabs = useMemo(() => {
+    return projectTabsMap[currentProjId] || [defaultTab(currentProjId)];
+  }, [projectTabsMap, currentProjId]);
+
+  const activeTabId = useMemo(() => {
+    const projActiveId = projectActiveTabIdMap[currentProjId];
+    if (projActiveId && tabs.some((t) => t.id === projActiveId)) {
+      return projActiveId;
+    }
+    return tabs[0]?.id || null;
+  }, [projectActiveTabIdMap, currentProjId, tabs]);
+
+  const setTabs = (updater: RequestTab[] | ((prev: RequestTab[]) => RequestTab[])) => {
+    setProjectTabsMap((prevMap) => {
+      const prevTabs = prevMap[currentProjId] || [defaultTab(currentProjId)];
+      const nextTabs = typeof updater === "function" ? updater(prevTabs) : updater;
+      return {
+        ...prevMap,
+        [currentProjId]: nextTabs,
+      };
+    });
+  };
+
+  const setActiveTabId = (updater: string | null | ((prev: string | null) => string | null)) => {
+    setProjectActiveTabIdMap((prevMap) => {
+      const prevActiveId = prevMap[currentProjId] || null;
+      const nextActiveId = typeof updater === "function" ? updater(prevActiveId) : updater;
+      return {
+        ...prevMap,
+        [currentProjId]: nextActiveId,
+      };
+    });
+  };
+
+  // Resizing states
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem("devdash.sidebarWidth");
+    return saved ? Math.max(270, parseInt(saved, 10)) : 270;
+  });
+
+  const [requestHeight, setRequestHeight] = useState<number>(() => {
+    const saved = localStorage.getItem("devdash.requestHeight");
+    return saved ? Math.max(220, parseInt(saved, 10)) : 320;
+  });
+
+  const [consoleHeight, setConsoleHeight] = useState<number>(() => {
+    const saved = localStorage.getItem("devdash.consoleHeight");
+    return saved ? Math.max(120, parseInt(saved, 10)) : 288;
+  });
+
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  const startSidebarResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const doDrag = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(270, Math.min(500, startWidth + deltaX));
+      setSidebarWidth(newWidth);
+      localStorage.setItem("devdash.sidebarWidth", String(newWidth));
+    };
+
+    const stopDrag = () => {
+      document.removeEventListener("mousemove", doDrag);
+      document.removeEventListener("mouseup", stopDrag);
+    };
+
+    document.addEventListener("mousemove", doDrag);
+    document.addEventListener("mouseup", stopDrag);
+  };
+
+  const startRequestResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = requestHeight;
+    const totalHeight = workspaceRef.current ? workspaceRef.current.getBoundingClientRect().height : 600;
+
+    const doDrag = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const newHeight = Math.max(220, Math.min(totalHeight - 180 - 6, startHeight + deltaY));
+      setRequestHeight(newHeight);
+      localStorage.setItem("devdash.requestHeight", String(newHeight));
+    };
+
+    const stopDrag = () => {
+      document.removeEventListener("mousemove", doDrag);
+      document.removeEventListener("mouseup", stopDrag);
+    };
+
+    document.addEventListener("mousemove", doDrag);
+    document.addEventListener("mouseup", stopDrag);
+  };
+
+  const startConsoleResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = consoleHeight;
+
+    const doDrag = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const newHeight = Math.max(120, Math.min(550, startHeight - deltaY));
+      setConsoleHeight(newHeight);
+      localStorage.setItem("devdash.consoleHeight", String(newHeight));
+    };
+
+    const stopDrag = () => {
+      document.removeEventListener("mousemove", doDrag);
+      document.removeEventListener("mouseup", stopDrag);
+    };
+
+    document.addEventListener("mousemove", doDrag);
+    document.addEventListener("mouseup", stopDrag);
+  };
+
+  // Modals state
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
-  const [isCreateAppWorkspaceModalOpen, setIsCreateAppWorkspaceModalOpen] =
-    useState(false); // New State
+  const [isCreateAppWorkspaceModalOpen, setIsCreateAppWorkspaceModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [viewingLogsFor, setViewingLogsFor] = useState<Project | null>(null);
   const [isManageGroupsModalOpen, setIsManageGroupsModalOpen] = useState(false);
-  const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(
-    null,
-  );
-  const [editingAppWorkspace, setEditingAppWorkspace] =
-    useState<AppWorkspace | null>(null);
+  const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
+  const [editingAppWorkspace, setEditingAppWorkspace] = useState<AppWorkspace | null>(null);
 
+  // Environment variables state
+  const [environments, setEnvironments] = useState<ApiEnvironment[]>([]);
+  const [activeEnvId, setActiveEnvId] = useState<string | null>(null);
+  const [isManageEnvsModalOpen, setIsManageEnvsModalOpen] = useState(false);
+  const [treeCache, setTreeCache] = useState<Record<string, any>>({});
+
+  // 1. Load persisted states from Electron Store on mount
+  useEffect(() => {
+    Promise.all([
+      apiClient.storeGet("projectTabsMap").catch(() => null),
+      apiClient.storeGet("projectActiveTabIdMap").catch(() => null),
+      apiClient.storeGet("activeProjectId").catch(() => null),
+      apiClient.storeGet("environments").catch(() => null),
+      apiClient.storeGet("activeEnvId").catch(() => null),
+      apiClient.storeGet("activeSidebarTab").catch(() => null),
+      apiClient.storeGet("isSidebarExpanded").catch(() => null),
+      apiClient.storeGet("isConsoleOpen").catch(() => null),
+      apiClient.storeGet("consoleProjectId").catch(() => null),
+      apiClient.storeGet("apiScannerTreeCache").catch(() => null)
+    ]).then(([
+      storedMap,
+      storedActiveIdMap,
+      storedActiveProjectId,
+      storedEnvs,
+      storedEnvId,
+      storedSidebarTab,
+      storedSidebarExpanded,
+      storedConsoleOpen,
+      storedConsoleProjectId,
+      storedTreeCache
+    ]) => {
+      // 1. Restore tree cache
+      if (storedTreeCache && typeof storedTreeCache === "object") {
+        setTreeCache(storedTreeCache);
+      }
+      
+      // 2. Restore tabs
+      const finalMap = (storedMap && typeof storedMap === "object")
+        ? (storedMap as Record<string, RequestTab[]>)
+        : {};
+      const finalActiveIdMap = (storedActiveIdMap && typeof storedActiveIdMap === "object")
+        ? (storedActiveIdMap as Record<string, string | null>)
+        : {};
+      setProjectTabsMap(finalMap);
+      setProjectActiveTabIdMap(finalActiveIdMap);
+      const activeProj = typeof storedActiveProjectId === "string" ? storedActiveProjectId : null;
+      setActiveProjectId(activeProj);
+
+      // 3. Restore environments
+      if (Array.isArray(storedEnvs)) {
+        setEnvironments(storedEnvs);
+      }
+      if (typeof storedEnvId === "string") {
+        setActiveEnvId(storedEnvId);
+      }
+
+      // 4. Restore layout
+      if (storedSidebarTab) {
+        setActiveSidebarTab(storedSidebarTab as SidebarTab);
+      }
+      if (typeof storedSidebarExpanded === "boolean") {
+        setIsSidebarExpanded(storedSidebarExpanded);
+      }
+      if (typeof storedConsoleOpen === "boolean") {
+        setIsConsoleOpen(storedConsoleOpen);
+      }
+      if (storedConsoleProjectId !== undefined) {
+        setConsoleProjectId(storedConsoleProjectId);
+      }
+
+      // Mark all as restored
+      setIsTabsRestored(true);
+      setIsEnvsRestored(true);
+      setIsLayoutRestored(true);
+    });
+  }, []);
+
+  // Sync request tabs state to Electron Store
+  useEffect(() => {
+    if (!isTabsRestored) return;
+    apiClient.storeSet("projectTabsMap", projectTabsMap);
+  }, [projectTabsMap, isTabsRestored]);
+
+  useEffect(() => {
+    if (!isTabsRestored) return;
+    apiClient.storeSet("projectActiveTabIdMap", projectActiveTabIdMap);
+  }, [projectActiveTabIdMap, isTabsRestored]);
+
+  useEffect(() => {
+    if (!isTabsRestored) return;
+    apiClient.storeSet("activeProjectId", activeProjectId);
+  }, [activeProjectId, isTabsRestored]);
+
+  // Sync environment variables state to Electron Store
+  useEffect(() => {
+    if (!isEnvsRestored) return;
+    apiClient.storeSet("environments", environments);
+  }, [environments, isEnvsRestored]);
+
+  useEffect(() => {
+    if (!isEnvsRestored) return;
+    apiClient.storeSet("activeEnvId", activeEnvId);
+  }, [activeEnvId, isEnvsRestored]);
+
+  // Sync layout configuration state to Electron Store
+  useEffect(() => {
+    if (!isLayoutRestored) return;
+    apiClient.storeSet("activeSidebarTab", activeSidebarTab);
+  }, [activeSidebarTab, isLayoutRestored]);
+
+  useEffect(() => {
+    if (!isLayoutRestored) return;
+    apiClient.storeSet("isSidebarExpanded", isSidebarExpanded);
+  }, [isSidebarExpanded, isLayoutRestored]);
+
+  // Sync console drawer state to Electron Store
+  useEffect(() => {
+    if (!isLayoutRestored) return;
+    apiClient.storeSet("isConsoleOpen", isConsoleOpen);
+  }, [isConsoleOpen, isLayoutRestored]);
+
+  useEffect(() => {
+    if (!isLayoutRestored) return;
+    apiClient.storeSet("consoleProjectId", consoleProjectId);
+  }, [consoleProjectId, isLayoutRestored]);
+
+  // Load initial configurations from Electron Store
   useEffect(() => {
     apiClient.getSettings();
     apiClient.onGroupsLoaded(setGroups);
-    // ... rest of the existing useEffect code
     apiClient.onProjectsLoaded((loadedProjects) => {
       setProjects(loadedProjects);
 
@@ -103,7 +395,7 @@ function App() {
       setGitSummaries((prev) => ({ ...prev, [projectId]: summary }));
     });
     apiClient.onWorkspacesLoaded(setWorkspaces);
-    apiClient.onAppWorkspacesLoaded(setAppWorkspaces); // App Workspaces
+    apiClient.onAppWorkspacesLoaded(setAppWorkspaces);
     apiClient.onServerStatusChanged(({ projectId, status }) => {
       setProjectState((prevState) => ({
         ...prevState,
@@ -145,11 +437,41 @@ function App() {
     apiClient.onSettingsUpdated(setSettings);
   }, []);
 
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + T (New Request)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        handleNewTab();
+      }
+      // Ctrl + W (Close Active Tab)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        if (activeTabId) {
+          handleCloseTab(activeTabId);
+        }
+      }
+      // Alt + Ctrl + W (Force Close Active Tab)
+      if (e.altKey && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        if (activeTabId) {
+          handleCloseTab(activeTabId);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeTabId, tabs]);
+
   const handleGitSummaryChange = (projectId: string, summary: GitSummary) => {
     setGitSummaries((prev) => ({ ...prev, [projectId]: summary }));
   };
 
-  // --- Handlers ---
+  // --- Projects View Event Handlers ---
   const handleSaveProject = async (
     projectName: string,
     startCommand: string,
@@ -175,32 +497,41 @@ function App() {
       toast.error("Failed to add project");
     }
   };
+
   const handleUpdateProject = (project: Project) => {
     apiClient.updateProject(project);
     setEditingProject(null);
     toast.success("Project updated", { description: project.name });
   };
+
   const handleOpenEditModal = (project: Project) => {
     setEditingProject(project);
   };
+
   const handleViewLogs = (project: Project) => {
-    setViewingLogsFor(project);
+    setConsoleProjectId(project.id);
+    setIsConsoleOpen(true);
   };
+
   const handleSaveGroup = (groupName: string) => {
     apiClient.addGroup(groupName);
     setIsAddGroupModalOpen(false);
     toast.success("Group added", { description: groupName });
   };
+
   const handleDeleteGroup = (groupId: string) => {
     apiClient.deleteGroup(groupId);
     toast.success("Group deleted");
   };
+
   const handleOpenWorkspace = (workspacePath: string) => {
     apiClient.openWorkspace(workspacePath);
   };
+
   const handleToggleWorkspaces = (enabled: boolean) => {
     apiClient.toggleWorkspaceManagement(enabled);
   };
+
   const handleSelectWorkspacePath = async () => {
     const newPath = await apiClient.selectWorkspacePath();
     if (newPath) {
@@ -208,12 +539,14 @@ function App() {
       toast.success("Workspace save path set");
     }
   };
+
   const handleAssignProjectGroup = (
     projectId: string,
     groupId: string | null,
   ) => {
     apiClient.assignProjectToGroup(projectId, groupId);
   };
+
   const handleAddWorkspaceFile = async () => {
     const path = await apiClient.selectWorkspaceFile();
     if (path) {
@@ -224,7 +557,7 @@ function App() {
 
   const handleCreateAppWorkspace = (workspace: AppWorkspace) => {
     apiClient.createAppWorkspace(workspace);
-    toast.success("God Mode Workspace Created", {
+    toast.success("Stack Automation Created", {
       description: workspace.name,
     });
   };
@@ -263,7 +596,7 @@ function App() {
   const handleUpdateAppWorkspace = (workspace: AppWorkspace) => {
     apiClient.updateAppWorkspace(workspace);
     setEditingAppWorkspace(null);
-    toast.success("God Mode Workspace Updated", {
+    toast.success("Stack Automation Updated", {
       description: workspace.name,
     });
   };
@@ -273,29 +606,29 @@ function App() {
     setIsCreateAppWorkspaceModalOpen(true);
   };
 
-  // Workspace Edit Name Handlers
   const handleOpenEditWorkspaceNameModal = (workspace: Workspace) => {
     setEditingWorkspace(workspace);
   };
+
   const handleSaveWorkspaceName = (
     workspaceId: string,
     newDisplayName: string | null,
   ) => {
     apiClient.updateWorkspace({ id: workspaceId, displayName: newDisplayName });
-    setEditingWorkspace(null); // Close modal
+    setEditingWorkspace(null);
   };
-  // Workspace Pin Handler
+
   const handleToggleWorkspacePin = (workspace: Workspace) => {
     apiClient.updateWorkspace({
       id: workspace.id,
       isPinned: !workspace.isPinned,
     });
   };
-  // Workspace Reveal File Handler
+
   const handleRevealWorkspaceFile = (workspacePath: string) => {
     apiClient.showItemInFolder(workspacePath);
   };
-  // Workspace Remove Handler
+
   const handleRemoveWorkspace = (workspaceId: string) => {
     if (
       confirm(
@@ -307,16 +640,427 @@ function App() {
     }
   };
 
+  // --- Horizontal Request Tab Actions ---
+  const handleNewTab = () => {
+    const tab = defaultTab();
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+  };
+
+  const handleSelectTab = (id: string) => {
+    setActiveTabId(id);
+  };
+
+  const handleCloseTab = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setTabs((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      if (activeTabId === id) {
+        setActiveTabId(next[next.length - 1]?.id || null);
+      }
+      return next;
+    });
+  };
+
+  const handleDuplicateTab = (id: string) => {
+    const tabToDup = tabs.find((t) => t.id === id);
+    if (!tabToDup) return;
+    const duplicated: RequestTab = {
+      ...tabToDup,
+      id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: `${tabToDup.name} (Copy)`,
+      response: null,
+      lastCompletedAt: 0,
+    };
+    
+    const idx = tabs.findIndex((t) => t.id === id);
+    setTabs((prev) => {
+      const next = [...prev];
+      next.splice(idx + 1, 0, duplicated);
+      return next;
+    });
+    setActiveTabId(duplicated.id);
+  };
+
+  const handleCloseOtherTabs = (id: string) => {
+    setTabs((prev) => {
+      const next = prev.filter((t) => t.id === id);
+      setActiveTabId(id);
+      return next;
+    });
+  };
+
+  const handleCloseTabsToRight = (id: string) => {
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    setTabs((prev) => {
+      const next = prev.slice(0, idx + 1);
+      if (activeTabId && !next.some((t) => t.id === activeTabId)) {
+        setActiveTabId(id);
+      }
+      return next;
+    });
+  };
+
+  const handleCloseTabsToLeft = (id: string) => {
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx === -1) return;
+    setTabs((prev) => {
+      const next = prev.slice(idx);
+      if (activeTabId && !next.some((t) => t.id === activeTabId)) {
+        setActiveTabId(id);
+      }
+      return next;
+    });
+  };
+
+  const handleCloseAllTabs = () => {
+    setTabs([]);
+    setActiveTabId(null);
+  };
+
+  const handleChangeTab = (updatedTab: RequestTab) => {
+    setTabs((prev) => prev.map((t) => (t.id === updatedTab.id ? updatedTab : t)));
+
+    // If tab name changed, sync it to the sidebar treeCache!
+    const oldTab = tabs.find((t) => t.id === updatedTab.id);
+    if (oldTab && oldTab.name !== updatedTab.name) {
+      const targetId = updatedTab.routeId || updatedTab.id;
+      if (targetId) {
+        setTreeCache((prev) => {
+          let cacheChanged = false;
+          const nextCache = { ...prev };
+
+          for (const projectPath of Object.keys(prev)) {
+            const cached = prev[projectPath];
+            if (!cached || !cached.tree) continue;
+
+            const renameRecursive = (nodes: any[]): { tree: any[]; updated: boolean } => {
+              let updated = false;
+              const nextNodes = nodes.map((n) => {
+                if (n.id === targetId) {
+                  updated = true;
+                  return { ...n, name: updatedTab.name };
+                }
+                if (n.children && Array.isArray(n.children)) {
+                  const res = renameRecursive(n.children);
+                  if (res.updated) {
+                    updated = true;
+                    return { ...n, children: res.tree };
+                  }
+                }
+                return n;
+              });
+              return { tree: nextNodes, updated };
+            };
+
+            const result = renameRecursive(cached.tree);
+            if (result.updated) {
+              nextCache[projectPath] = { ...cached, tree: result.tree };
+              cacheChanged = true;
+              break;
+            }
+          }
+
+          if (cacheChanged) {
+            apiClient.storeSet("apiScannerTreeCache", nextCache);
+            return nextCache;
+          }
+          return prev;
+        });
+      }
+    }
+  };
+
+  const handleUpdateTabResponse = (tabId: string, response: ApiHttpResponse) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, response, loading: false, lastCompletedAt: Date.now() } : t))
+    );
+  };
+
+  const handleSelectRoute = (route: ApiRoute, baseUrl: string, projectId: string) => {
+    // Check if we already have an open tab for this specific scanned route path or routeId
+    const existing = tabs.find(
+      (t) => t.projectId === projectId && (t.routeId === route.id || (t.routePath === route.path && !t.routeId))
+    );
+    if (existing) {
+      // Dynamic URL update on click to respect any newly set Base URL
+      const cleanBase = baseUrl.replace(/\/+$/, "");
+      const newUrl = route.path ? `${cleanBase}${route.path}` : "";
+      if (existing.url !== newUrl) {
+        setTabs((prev) =>
+          prev.map((t) => (t.id === existing.id ? { ...t, url: newUrl } : t))
+        );
+      }
+      setActiveTabId(existing.id);
+      return;
+    }
+
+    // Build inferred parameters
+    const queryRows = Array.isArray(route.inferredQueryFields)
+      ? route.inferredQueryFields.map((field) => ({
+          id: `query_${field}_${Math.random().toString(36).slice(2, 5)}`,
+          enabled: true,
+          key: field,
+          value: "",
+        }))
+      : [];
+
+    let bodyText = "{\n  \n}";
+    if (Array.isArray(route.inferredBodyFields) && route.inferredBodyFields.length > 0) {
+      const template: Record<string, string> = {};
+      route.inferredBodyFields.forEach((field) => {
+        template[field] = "";
+      });
+      bodyText = JSON.stringify(template, null, 2);
+    }
+
+    const pathCleaned = route.path;
+    const finalMethod = (route.method === "ALL" ? "GET" : route.method) as Method;
+
+    const newTab: RequestTab = {
+      id: `scanned_${projectId}_${route.id}`,
+      name: route.name || pathCleaned,
+      method: finalMethod,
+      url: route.path ? `${baseUrl.replace(/\/+$/, "")}${route.path}` : "",
+      params: queryRows,
+      headers: [],
+      auth: { type: "none" },
+      bodyMode: finalMethod === "GET" || finalMethod === "HEAD" ? "none" : "json",
+      bodyText: bodyText,
+      formFields: [],
+      urlencodedFields: [],
+      binaryFilePath: "",
+      lastCompletedAt: 0,
+      response: null,
+      projectId,
+      routePath: route.path,
+      routeId: route.id,
+      isNew: (route as any).isNew || false,
+      preRequestScript: "",
+      postResponseScript: "",
+      activeScriptSubTab: "prerequest",
+      pathVariables: [],
+    };
+
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newTab.id);
+  };
+
+  const handleBaseUrlChange = (projectId: string, newBaseUrl: string) => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.projectId === projectId && t.routePath) {
+          const cleanBase = newBaseUrl.replace(/\/+$/, "");
+          const newUrl = `${cleanBase}${t.routePath}`;
+          return { ...t, url: newUrl };
+        }
+        return t;
+      })
+    );
+  };
+
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.id === activeTabId) || null,
+    [tabs, activeTabId]
+  );
+
+  const activeRouteKey = useMemo(() => {
+    if (!activeTab) return null;
+    if (activeTab.routeId) return activeTab.routeId;
+    if (activeTab.method && activeTab.routePath) {
+      return `${String(activeTab.method).toUpperCase()}:${activeTab.routePath}`;
+    }
+    return null;
+  }, [activeTab]);
+
+  // Render secondary sidebar based on selected vertical tab
+  const sidebarContent = useMemo(() => {
+    switch (activeSidebarTab) {
+      case "explorer":
+        return (
+          <ApiExplorerSidebarPanel
+            projects={projects}
+            projectState={projectState}
+            onSelectRoute={handleSelectRoute}
+            onBaseUrlChange={handleBaseUrlChange}
+            treeCache={treeCache}
+            setTreeCache={setTreeCache}
+            activeProjectId={activeProjectId}
+            onActiveProjectIdChange={setActiveProjectId}
+            activeRouteKey={activeRouteKey}
+          />
+        );
+      case "servers":
+        return (
+          <ServersPanel
+            projects={projects}
+            projectState={projectState}
+            onAddProjectClick={() => setIsAddProjectModalOpen(true)}
+            onEditProject={handleOpenEditModal}
+            onViewLogs={handleViewLogs}
+          />
+        );
+      case "automations":
+        return (
+          <AutomationsPanel
+            appWorkspaces={appWorkspaces}
+            workspaces={workspaces}
+            onNewAutomation={() => {
+              setEditingAppWorkspace(null);
+              setIsCreateAppWorkspaceModalOpen(true);
+            }}
+            onAddWorkspace={handleAddWorkspaceFile}
+            onLaunchAppWorkspace={handleLaunchAppWorkspace}
+            onDeleteAppWorkspace={apiClient.deleteAppWorkspace}
+            onEditAppWorkspace={handleEditAppWorkspace}
+            onOpenWorkspace={handleOpenWorkspace}
+            onTogglePin={handleToggleWorkspacePin}
+            onRemoveWorkspace={handleRemoveWorkspace}
+          />
+        );
+      case "settings":
+        return (
+          <SettingsSidebarPanel
+            settings={settings}
+            onToggleWorkspaces={handleToggleWorkspaces}
+            onSelectWorkspacePath={handleSelectWorkspacePath}
+          />
+        );
+      default:
+        return null;
+    }
+  }, [
+    activeSidebarTab,
+    projects,
+    projectState,
+    appWorkspaces,
+    workspaces,
+    settings,
+    tabs,
+    activeProjectId,
+    activeTabId,
+    activeRouteKey,
+  ]);
+
+  // Compute active environment variables
+  const activeVariables = useMemo(() => {
+    const activeEnv = environments.find((e) => e.id === activeEnvId);
+    return activeEnv ? activeEnv.variables : [];
+  }, [environments, activeEnvId]);
+
+  const activeEnvName = useMemo(() => {
+    const activeEnv = environments.find((e) => e.id === activeEnvId);
+    return activeEnv ? activeEnv.name : null;
+  }, [environments, activeEnvId]);
+
+  const handleAddOrUpdateVariable = (key: string, value: string) => {
+    // 1. Determine target environment ID and creation config synchronously.
+    let targetEnvId = activeEnvId;
+    let isNewEnvCreated = false;
+    let newEnvObj: ApiEnvironment | null = null;
+
+    const envExists = targetEnvId ? environments.some((e) => e.id === targetEnvId) : false;
+
+    if (!targetEnvId || !envExists) {
+      if (!targetEnvId) {
+        if (environments.length > 0) {
+          targetEnvId = environments[0].id;
+        } else {
+          targetEnvId = `env_${Date.now()}`;
+          isNewEnvCreated = true;
+        }
+      } else {
+        isNewEnvCreated = true;
+      }
+
+      if (isNewEnvCreated) {
+        newEnvObj = {
+          id: targetEnvId,
+          name: "Default Environment",
+          variables: [],
+        };
+      }
+      
+      // Update active environment ID safely outside the pure setEnvironments callback.
+      setActiveEnvId(targetEnvId);
+    }
+
+    // 2. Perform functional environments update
+    setEnvironments((prevEnvs) => {
+      let updatedEnvs = [...prevEnvs];
+
+      if (isNewEnvCreated && newEnvObj) {
+        if (!updatedEnvs.some((e) => e.id === targetEnvId)) {
+          updatedEnvs.push(newEnvObj);
+        }
+      }
+
+      return updatedEnvs.map((env) => {
+        if (env.id === targetEnvId) {
+          const existingVarIdx = env.variables.findIndex((v) => v.key === key);
+          let nextVars = [...env.variables];
+          
+          // If there's only one variable and it's empty, replace it
+          if (nextVars.length === 1 && !nextVars[0].key && !nextVars[0].value) {
+            nextVars[0] = {
+              ...nextVars[0],
+              key,
+              value,
+              enabled: true,
+            };
+          } else if (existingVarIdx !== -1) {
+            nextVars[existingVarIdx] = {
+              ...nextVars[existingVarIdx],
+              value,
+              enabled: true,
+            };
+          } else {
+            nextVars.push({
+              id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+              enabled: true,
+              key,
+              value,
+            });
+          }
+          return {
+            ...env,
+            variables: nextVars,
+          };
+        }
+        return env;
+      });
+    });
+
+    toast.success(`Variable saved: ${key}`);
+  };
+
   return (
     <TooltipProvider>
       <Toaster position="top-right" richColors closeButton theme="dark" />
       <ErrorBoundary>
         <DashboardLayout
-          activeView={currentView}
-          onViewChange={setCurrentView}
-          onManageGroupsClick={() => setIsManageGroupsModalOpen(true)}
+          activeTab={activeSidebarTab}
+          onTabChange={setActiveSidebarTab}
+          sidebarContent={sidebarContent}
+          isSidebarExpanded={isSidebarExpanded}
+          onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
+          sidebarWidth={sidebarWidth}
+          onSidebarResizeStart={startSidebarResize}
+          consoleDrawer={
+            <ConsoleLogsDrawer
+              isOpen={isConsoleOpen}
+              onClose={() => setIsConsoleOpen(!isConsoleOpen)}
+              projects={projects}
+              projectState={projectState}
+              activeProjectId={consoleProjectId}
+              onSelectProject={setConsoleProjectId}
+              consoleHeight={consoleHeight}
+              onConsoleResizeStart={startConsoleResize}
+            />
+          }
         >
-          {/* Modals */}
+          {/* Settings Modals */}
           <AddProjectModal
             isOpen={isAddProjectModalOpen}
             onClose={() => setIsAddProjectModalOpen(false)}
@@ -328,15 +1072,6 @@ function App() {
             onClose={() => setEditingProject(null)}
             onSave={handleUpdateProject}
             groups={groups}
-          />
-          <LogViewer
-            isOpen={!!viewingLogsFor}
-            onClose={() => setViewingLogsFor(null)}
-            projectName={viewingLogsFor?.name || ""}
-            projectId={viewingLogsFor?.id || ""}
-            logs={
-              viewingLogsFor ? projectState[viewingLogsFor.id]?.logs || "" : ""
-            }
           />
           <AddGroupModal
             isOpen={isAddGroupModalOpen}
@@ -367,47 +1102,89 @@ function App() {
             projects={projects}
             workspaces={workspaces}
           />
+          <ManageEnvironmentsModal
+            isOpen={isManageEnvsModalOpen}
+            onClose={() => setIsManageEnvsModalOpen(false)}
+            environments={environments}
+            onUpdateEnvironments={setEnvironments}
+          />
 
-          {/* Main Content Area */}
-          {currentView === "projects" && (
-            <ProjectsView
-              projects={projects}
-              groups={groups}
-              projectState={projectState}
-              gitSummaries={gitSummaries}
-              settings={settings}
-              onAddProjectClick={() => setIsAddProjectModalOpen(true)}
-              onAddGroupClick={() => setIsAddGroupModalOpen(true)}
-              onEditProject={handleOpenEditModal}
-              onViewLogs={handleViewLogs}
-              onDeleteGroup={handleDeleteGroup}
-              onOpenWorkspace={handleOpenWorkspace}
-              onToggleWorkspaces={handleToggleWorkspaces}
-              onSelectWorkspacePath={handleSelectWorkspacePath}
-              onGitSummaryChange={handleGitSummaryChange}
-            />
-          )}
-          {currentView === "workspaces" && (
-            <WorkspacesView
-              workspaces={workspaces}
-              appWorkspaces={appWorkspaces}
-              projects={projects} // Helper for selection
-              onAddWorkspace={handleAddWorkspaceFile}
-              onNewAutomation={() => {
-                setEditingAppWorkspace(null);
-                setIsCreateAppWorkspaceModalOpen(true);
-              }}
-              onLaunchAppWorkspace={handleLaunchAppWorkspace}
-              onDeleteAppWorkspace={apiClient.deleteAppWorkspace}
-              onEditWorkspaceName={handleOpenEditWorkspaceNameModal} // Pass handler
-              onTogglePin={handleToggleWorkspacePin} // Pass handler
-              onRevealFile={handleRevealWorkspaceFile} // Pass handler
-              onRemoveWorkspace={handleRemoveWorkspace} // Pass handler
-              onEditAppWorkspace={handleEditAppWorkspace}
-            />
-          )}
-          {currentView === "api-explorer" && (
-            <ApiExplorerView projects={projects} />
+          {/* Center Request Workspace Area */}
+          {!activeTab ? (
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-8 select-none">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
+                <Compass size={28} />
+              </div>
+              <h2 className="text-xl font-bold text-foreground mb-1.5">Welcome to RouteLens</h2>
+              <p className="text-sm text-muted-foreground max-w-sm mb-6 leading-normal">
+                Explore automatically discovered project routes, run test requests, and manage local server stacks.
+              </p>
+              <Button onClick={handleNewTab} className="bg-primary text-primary-foreground font-semibold">
+                <Plus size={14} className="mr-1.5" /> Create New Request
+              </Button>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
+              {/* Request Tabs Row */}
+              <WorkspaceTabs
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onSelectTab={handleSelectTab}
+                onCloseTab={handleCloseTab}
+                onNewTab={handleNewTab}
+                environments={environments}
+                activeEnvId={activeEnvId}
+                onSelectEnv={setActiveEnvId}
+                onManageEnvsClick={() => setIsManageEnvsModalOpen(true)}
+                onReorderTabs={setTabs}
+                onDuplicateTab={handleDuplicateTab}
+                onCloseOtherTabs={handleCloseOtherTabs}
+                onCloseAllTabs={handleCloseAllTabs}
+                onCloseTabsToRight={handleCloseTabsToRight}
+                onCloseTabsToLeft={handleCloseTabsToLeft}
+              />
+              
+              {/* Resizable Split Request Panels Content */}
+              <div 
+                ref={workspaceRef}
+                className="flex-grow flex flex-col min-h-0 overflow-hidden relative"
+              >
+                {/* Top Request Panel */}
+                <div 
+                  style={{ height: `${requestHeight}px` }} 
+                  className="flex flex-col shrink-0 min-h-[220px] overflow-hidden"
+                >
+                  <RequestPanel
+                    tab={activeTab}
+                    onChangeTab={handleChangeTab}
+                    onRun={(res) => handleUpdateTabResponse(activeTab.id, res)}
+                    activeVariables={activeVariables}
+                    activeEnvName={activeEnvName || undefined}
+                    onAddOrUpdateVariable={handleAddOrUpdateVariable}
+                    projects={projects}
+                    projectState={projectState}
+                    treeCache={treeCache}
+                  />
+                </div>
+
+                {/* Horizontal Drag Handle */}
+                <div
+                  onMouseDown={startRequestResize}
+                  className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-border/40"
+                  title="Drag to resize panels"
+                />
+
+                {/* Bottom Response Panel */}
+                <div className="flex-1 flex flex-col min-h-[180px] p-4 pt-0 overflow-hidden">
+                  <ResponsePanel
+                    response={activeTab.response}
+                    loading={activeTab.loading}
+                    tabId={activeTab.id}
+                    lastCompletedAt={activeTab.lastCompletedAt}
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </DashboardLayout>
       </ErrorBoundary>

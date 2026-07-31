@@ -41,6 +41,18 @@ export type StoreType = {
   settings: WorkspaceSettings;
   workspaces: Workspace[]; // Legacy: .code-workspace files
   appWorkspaces: AppWorkspace[]; // New: God Mode Workspaces
+  requestTabs?: RequestTab[];
+  activeRequestTabId?: string | null;
+  environments?: any[]; // We can use ApiEnvironment[] but type is imported/defined elsewhere, using any[] is safe
+  activeEnvId?: string | null;
+  apiScannerTabs?: ApiProjectTab[];
+  activeApiScannerTabId?: string | null;
+  apiScannerTreeCache?: Record<string, { tree: ApiFolder[]; logs: string[]; selectedRouteKey?: string | null }>;
+  expandedFolderIds?: Record<string, string[]>;
+  activeSidebarTab?: string;
+  isSidebarExpanded?: boolean;
+  isConsoleOpen?: boolean;
+  consoleProjectId?: string | null;
 };
 
 // --- New "God Mode" Workspace Types ---
@@ -178,13 +190,20 @@ export type ApiKeyValueRow = {
   enabled: boolean;
   key: string;
   value: string;
+  description?: string;
+  type?: "text" | "file";
 };
 
 export type ApiBody =
   | { mode: "none" }
   | { mode: "json"; text: string }
   | { mode: "text"; text: string }
-  | { mode: "form"; fields: ApiKeyValueRow[] };
+  | { mode: "javascript"; text: string }
+  | { mode: "html"; text: string }
+  | { mode: "xml"; text: string }
+  | { mode: "form-data"; fields: ApiKeyValueRow[] }
+  | { mode: "urlencoded"; fields: ApiKeyValueRow[] }
+  | { mode: "binary"; filePath: string };
 
 export type ApiHttpRequest = {
   method: Method;
@@ -207,3 +226,37 @@ export type ApiHttpResponse = {
   parsedJson?: unknown;
   error?: string;
 };
+
+export type ApiProjectTab = {
+  id: string;
+  name: string;
+  path: string;
+  baseUrl: string;
+};
+
+export interface RequestTab {
+  id: string;
+  name: string;
+  method: Method;
+  url: string;
+  params: any[];
+  headers: any[];
+  auth: any;
+  bodyMode: any;
+  bodyText: string;
+  formFields: any[];
+  urlencodedFields?: any[];
+  binaryFilePath?: string;
+  lastCompletedAt?: number;
+  response: any | null;
+  projectId?: string;
+  routePath?: string;
+  routeId?: string;
+  isNew?: boolean;
+  activeSubTab?: string;
+  loading?: boolean;
+  preRequestScript?: string;
+  postResponseScript?: string;
+  activeScriptSubTab?: string;
+  pathVariables?: any[];
+}

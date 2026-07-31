@@ -102,4 +102,12 @@ export function registerSettingsHandlers(
     const newPath = await getWorkspaceSavePath(store, true); // Pass store, force select
     return newPath;
   });
+
+  ipcMain.handle("store:get", async (_, key: string) => {
+    return (store as any).get(key);
+  });
+
+  ipcMain.handle("store:set", async (_, key: string, value: any) => {
+    (store as any).set(key, value);
+  });
 }

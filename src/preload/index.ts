@@ -138,6 +138,9 @@ export const api = {
   selectWorkspaceFile: (): Promise<string | null> => {
     return ipcRenderer.invoke("dialog:openWorkspaceFile");
   },
+  selectFile: (): Promise<string | null> => {
+    return ipcRenderer.invoke("dialog:selectFile");
+  },
   selectAppFile: (): Promise<string | null> => {
     return ipcRenderer.invoke("dialog:selectAppFile");
   },
@@ -185,6 +188,10 @@ export const api = {
 
   runApiRequest: (request: ApiHttpRequest): Promise<ApiHttpResponse> => {
     return ipcRenderer.invoke("api-explorer:run-request", request);
+  },
+
+  detectProjectPort: (path: string): Promise<number | null> => {
+    return ipcRenderer.invoke("api-explorer:detect-port", path);
   },
 
   // --- Git Management ---
@@ -288,6 +295,12 @@ export const api = {
   },
   killProcess: (pid: number): Promise<void> => {
     return ipcRenderer.invoke("system:kill-process", pid);
+  },
+  storeGet: (key: string): Promise<any> => {
+    return ipcRenderer.invoke("store:get", key);
+  },
+  storeSet: (key: string, value: any): Promise<void> => {
+    return ipcRenderer.invoke("store:set", key, value);
   },
 };
 
