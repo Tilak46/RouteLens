@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -6,234 +6,184 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  FolderKanban,
+  Compass,
+  Server,
+  Zap,
   Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ListTree,
-  Briefcase,
   Ghost,
-  Radio,
+  ChevronLeft,
+  ChevronRight,
+  FolderCode
 } from "lucide-react";
 import apiClient from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
 
-export type ActiveView = "projects" | "workspaces" | "api-explorer";
+export type SidebarTab = "explorer" | "servers" | "automations" | "settings";
 
 type DashboardLayoutProps = {
   children: React.ReactNode;
-  activeView: ActiveView;
-  onViewChange: (view: ActiveView) => void;
-  onManageGroupsClick: () => void;
+  activeTab: SidebarTab;
+  onTabChange: (tab: SidebarTab) => void;
+  sidebarContent: React.ReactNode;
+  consoleDrawer: React.ReactNode;
+  isSidebarExpanded: boolean;
+  onToggleSidebar: () => void;
+  sidebarWidth?: number;
+  onSidebarResizeStart?: (e: React.MouseEvent) => void;
 };
 
 export function DashboardLayout({
   children,
-  activeView,
-  onViewChange,
-  onManageGroupsClick,
+  activeTab,
+  onTabChange,
+  sidebarContent,
+  consoleDrawer,
+  isSidebarExpanded,
+  onToggleSidebar,
+  sidebarWidth,
+  onSidebarResizeStart,
 }: DashboardLayoutProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  // Helper component for navigation buttons
-  const NavButton = ({
-    viewId,
-    currentView,
-    setView,
+  // Helper for leftmost toolbar icons
+  const ToolbarButton = ({
+    tabId,
     icon: Icon,
     label,
-    tooltip,
   }: {
-    viewId: ActiveView;
-    currentView: ActiveView;
-    setView: (view: ActiveView) => void;
+    tabId: SidebarTab;
     icon: React.ElementType;
     label: string;
-    tooltip: string;
   }) => {
-    const isActive = viewId === currentView;
+    const isActive = activeTab === tabId;
     return (
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={() => setView(viewId)}
-            className={`group relative flex items-center gap-4 h-12 rounded-xl transition-all duration-300 overflow-hidden ${
+            onClick={() => onTabChange(tabId)}
+            className={cn(
+              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
               isActive
-                ? "bg-primary/10 text-primary shadow-[0_0_20px_rgba(192,132,252,0.15)] ring-1 ring-primary/20"
+                ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-            } ${
-              isExpanded ? "w-full px-4 justify-start" : "w-12 justify-center"
-            }`}
+            )}
           >
             {isActive && (
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary shadow-[0_0_10px_var(--primary)]" />
+              <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-primary rounded-r-md" />
             )}
             <Icon
-              className={`h-5 w-5 flex-shrink-0 transition-transform duration-300 ${
+              className={cn(
+                "h-4 w-4 transition-transform duration-200",
                 isActive ? "scale-110" : "group-hover:scale-110"
-              }`}
+              )}
             />
-            {isExpanded && (
-              <span className="font-medium truncate tracking-wide text-sm">
-                {label}
-              </span>
-            )}
-            <span className="sr-only">{tooltip}</span>
           </button>
         </TooltipTrigger>
-        {!isExpanded && (
-          <TooltipContent side="right" className="bg-popover/90 backdrop-blur border-white/10 text-popover-foreground">
-            {tooltip}
-          </TooltipContent>
-        )}
+        <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+          {label}
+        </TooltipContent>
       </Tooltip>
     );
   };
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden selection:bg-primary/20 selection:text-primary">
-        {/* Glassmorphism Sidebar */}
-        <aside
-          className={`relative h-screen flex flex-col justify-between transition-all duration-500 ease-spring ${
-            isExpanded ? "w-72" : "w-20"
-          } bg-card/30 backdrop-blur-xl border-r border-white/5 z-50`}
-        >
-          {/* Top Sections Wrapper */}
-          <div className="flex flex-col w-full p-4 gap-6">
-            {/* Logo & Toggle */}
-            <div
-              className={`flex items-center ${
-                isExpanded ? "justify-between" : "justify-center"
-              }`}
-            >
-              {isExpanded && (
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-purple-300 to-accent bg-clip-text text-transparent pl-1 animate-pulse-slow">
-                  DevDash
-                </h1>
-              )}
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-                title={isExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-              >
-                {isExpanded ? (
-                  <PanelLeftClose size={20} />
-                ) : (
-                  <PanelLeftOpen size={20} />
-                )}
-              </button>
+      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans">
+        
+        {/* 1. LEFT NARROW ICON TOOLBAR */}
+        <div className="w-12 bg-[hsl(240,6%,4%)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
+          <div className="flex flex-col items-center gap-4 w-full">
+            {/* Logo Icon */}
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(255,108,55,0.1)]">
+              <FolderCode size={16} />
             </div>
 
-            {/* Navigation */}
-            <nav className="flex flex-col gap-2 w-full">
-              <NavButton
-                viewId="projects"
-                currentView={activeView}
-                setView={onViewChange}
-                icon={FolderKanban}
-                label="Projects"
-                tooltip="All XML Projects"
-              />
-              <NavButton
-                viewId="workspaces"
-                currentView={activeView}
-                setView={onViewChange}
-                icon={Briefcase}
-                label="Workspaces"
-                tooltip="VS Code Workspaces"
-              />
-              <NavButton
-                viewId="api-explorer"
-                currentView={activeView}
-                setView={onViewChange}
-                icon={Radio}
-                label="API Explorer"
-                tooltip="Auto-Discovery Client"
-              />
-            </nav>
-
-            <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-2" />
-
-            {/* Actions */}
-            <nav className="flex flex-col gap-2 w-full">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={onManageGroupsClick}
-                    className={`group flex items-center gap-4 h-12 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-300 ${
-                      isExpanded
-                        ? "w-full px-4 justify-start"
-                        : "w-12 justify-center"
-                    }`}
-                  >
-                    <ListTree className="h-5 w-5 flex-shrink-0 group-hover:text-accent transition-colors" />
-                    {isExpanded && (
-                      <span className="font-medium truncate text-sm">Organize</span>
-                    )}
-                  </button>
-                </TooltipTrigger>
-                {!isExpanded && (
-                  <TooltipContent side="right" className="bg-popover/90 backdrop-blur border-white/10">Organize Groups</TooltipContent>
-                )}
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => apiClient.toggleGhostMode()}
-                    className={`group flex items-center gap-4 h-12 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-300 ${
-                      isExpanded
-                        ? "w-full px-4 justify-start"
-                        : "w-12 justify-center"
-                    }`}
-                  >
-                    <Ghost className="h-5 w-5 flex-shrink-0 group-hover:text-accent transition-colors" />
-                    {isExpanded && (
-                      <span className="font-medium truncate text-sm">Ghost Mode</span>
-                    )}
-                  </button>
-                </TooltipTrigger>
-                {!isExpanded && (
-                  <TooltipContent side="right" className="bg-popover/90 backdrop-blur border-white/10">Ghost Mode</TooltipContent>
-                )}
-              </Tooltip>
-            </nav>
+            {/* Tabs */}
+            <ToolbarButton tabId="explorer" icon={Compass} label="API Discovery" />
+            <ToolbarButton tabId="servers" icon={Server} label="Local Servers" />
+            <ToolbarButton tabId="automations" icon={Zap} label="Stack Automations" />
           </div>
 
-          {/* Bottom Section (Settings) */}
-          <div className="p-4 w-full">
+          <div className="flex flex-col items-center gap-3 w-full">
+            {/* Ghost Mode */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className={`group flex items-center gap-4 h-12 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-300 ${
-                    isExpanded
-                      ? "w-full px-4 justify-start"
-                      : "w-12 justify-center"
-                  }`}
+                  onClick={() => apiClient.toggleGhostMode()}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-200"
                 >
-                  <Settings className="h-5 w-5 flex-shrink-0 group-hover:rotate-90 transition-transform duration-500" />
-                  {isExpanded && (
-                    <span className="font-medium truncate text-sm">Settings</span>
-                  )}
+                  <Ghost size={16} className="hover:animate-bounce-slow" />
                 </button>
               </TooltipTrigger>
-              {!isExpanded && (
-                <TooltipContent side="right" className="bg-popover/90 backdrop-blur border-white/10">Settings</TooltipContent>
-              )}
+              <TooltipContent side="right" className="bg-popover border-border text-xs">
+                Ghost Mode Widget
+              </TooltipContent>
             </Tooltip>
+
+            {/* Settings */}
+            <ToolbarButton tabId="settings" icon={Settings} label="RouteLens Settings" />
           </div>
+        </div>
+
+        {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
+        <aside
+          className={cn(
+            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-20",
+            isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
+          )}
+          style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px` } : undefined}
+        >
+          {isSidebarExpanded && (
+            <div className="flex flex-col h-full p-3.5 overflow-hidden">
+              {/* App Brand Header */}
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <span className="text-sm font-bold tracking-wider text-foreground">
+                  Route<span className="text-primary">Lens</span>
+                </span>
+                <button
+                  onClick={onToggleSidebar}
+                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Collapse Sidebar"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              </div>
+
+              {/* Sidebar Content */}
+              <div className="flex-1 overflow-y-auto">
+                {sidebarContent}
+              </div>
+            </div>
+          )}
+
+          {/* Col resize handle centered on border */}
+          {isSidebarExpanded && onSidebarResizeStart && (
+            <div
+              onMouseDown={onSidebarResizeStart}
+              className="absolute right-[-2px] top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-primary/50 active:bg-primary/70 transition-colors z-30"
+            />
+          )}
+
+          {/* Toggle sidebar handle when collapsed */}
+          {!isSidebarExpanded && (
+            <button
+              onClick={onToggleSidebar}
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-primary/10 border border-l-0 border-primary/20 text-primary p-1.5 rounded-r-md hover:bg-primary/20 transition-all shadow-md z-30"
+              title="Expand Sidebar"
+            >
+              <ChevronRight size={14} />
+            </button>
+          )}
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-background to-background">
-          {/* Subtle glow effect in the top right corner */}
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[100px] pointer-events-none rounded-full" />
-          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/5 blur-[100px] pointer-events-none rounded-full" />
-          
-          <div className="relative z-10 p-8 h-full">
+        {/* 3. MAIN WORKSPACE AREA */}
+        <div className="flex-1 flex flex-col min-w-0 bg-[hsl(240,5%,11%)] overflow-hidden relative">
+          {/* Main workspace container (no padding so request/response tab layouts can fit edge-to-edge) */}
+          <main className="flex-grow flex flex-col min-h-0 relative">
             {children}
-          </div>
-        </main>
+          </main>
+
+          {/* 4. BOTTOM LOGS CONSOLE */}
+          {consoleDrawer}
+        </div>
       </div>
     </TooltipProvider>
   );

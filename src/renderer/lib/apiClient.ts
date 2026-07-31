@@ -70,6 +70,7 @@ interface ElectronApi {
   addWorkspace: (workspacePath: string) => void;
   removeWorkspace: (workspaceId: string) => void;
   selectWorkspaceFile: () => Promise<string | null>;
+  selectFile: () => Promise<string | null>;
   selectAppFile: () => Promise<string | null>;
   updateWorkspace: (
     workspaceUpdate: Partial<Workspace> & { id: string },
@@ -88,6 +89,7 @@ interface ElectronApi {
   ) => Promise<{ success: boolean; error?: string }>;
   scanProject: (path: string) => Promise<{ tree: ApiFolder[]; logs: string[] }>; // API Explorer
   runApiRequest: (request: ApiHttpRequest) => Promise<ApiHttpResponse>; // API Explorer
+  detectProjectPort: (path: string) => Promise<number | null>;
 
   // App Picker
   scanApps: () => Promise<DetectedApp[]>;
@@ -125,6 +127,10 @@ interface ElectronApi {
 
   // System Stats
   getSystemStats: () => Promise<SystemStats>;
+
+  // Store Persistence
+  storeGet: (key: string) => Promise<any>;
+  storeSet: (key: string, value: any) => Promise<void>;
 }
 
 // Access the exposed API, handling potential undefined errors during build/lint
@@ -195,6 +201,10 @@ const fallbackApi: ElectronApi = {
     console.warn("API not ready");
     return null;
   },
+  selectFile: async () => {
+    console.warn("API not ready");
+    return null;
+  },
   selectAppFile: async () => {
     console.warn("API not ready");
     return null;
@@ -228,6 +238,10 @@ const fallbackApi: ElectronApi = {
       bodyText: "",
       error: "API not ready (restart the app to load updated preload)",
     };
+  },
+  detectProjectPort: async () => {
+    console.warn("API not ready");
+    return null;
   },
   updateWorkspace: () => console.warn("API not ready"),
 
@@ -312,6 +326,13 @@ const fallbackApi: ElectronApi = {
   getProjectDependencies: async () => {
     console.warn("API not ready");
     return null;
+  },
+  storeGet: async () => {
+    console.warn("API not ready");
+    return null;
+  },
+  storeSet: async () => {
+    console.warn("API not ready");
   },
 };
 

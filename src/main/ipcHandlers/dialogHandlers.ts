@@ -46,4 +46,22 @@ export function registerDialogHandlers(
     }
     return null;
   });
+
+  ipcMain.handle("dialog:selectFile", async () => {
+    const mainWindow = getMainWindow();
+    const options: any = {
+      title: "Select File",
+      buttonLabel: "Select File",
+      properties: ["openFile"],
+    };
+
+    const { canceled, filePaths } = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options);
+
+    if (!canceled && filePaths.length > 0) {
+      return filePaths[0];
+    }
+    return null;
+  });
 }

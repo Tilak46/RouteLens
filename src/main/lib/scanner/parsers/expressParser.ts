@@ -21,6 +21,8 @@ type FileInfo = {
   routerVars: Set<string>;
   importToFile: Map<string, string>; // local identifier -> resolved file
   exportedRouterEntities: EntityId[];
+  reExports: Map<string, { filePath: string; localName: string }>; // exportedName -> { filePath, localName }
+  wildcardReExports: string[]; // filePaths of other files
   routes: Array<{
     owner: EntityId;
     method: Method;
@@ -36,8 +38,8 @@ type FileInfo = {
     mountPath: string; // '/api'
     to:
       | { kind: "local"; varName: string }
-      | { kind: "import"; filePath: string }
-      | { kind: "require"; filePath: string };
+      | { kind: "import"; filePath: string; exportName: string }
+      | { kind: "require"; filePath: string; exportName?: string };
   }>;
 };
 
@@ -916,8 +918,10 @@ function extractPathParams(routePath: string): string[] {
   const segments = routePath.split("/");
   for (const seg of segments) {
     if (seg.startsWith(":")) {
-      const cleaned = seg.slice(1).replace(/[\?\*\+]/g, "");
-      if (cleaned) params.push(cleaned);
+      const match = seg.slice(1).match(/^([a-zA-Z0-9_]+)/);
+      if (match && match[1]) {
+        params.push(match[1]);
+      }
     }
   }
   return params;
@@ -1020,6 +1024,9 @@ function extractExpressInfo(
   const routerVars = new Set<string>();
   const importToFile = new Map<string, string>();
   const exportedRouterEntities: EntityId[] = [];
+  const importSpecifiers = new Map<string, { filePath: string; importedName: string }>();
+  const reExports = new Map<string, { filePath: string; localName: string }>();
+  const wildcardReExports: string[] = [];
 
   const constStrings = new Map<string, string>();
 
@@ -1053,7 +1060,10 @@ function extractExpressInfo(
         if (s.type === "ImportDefaultSpecifier") {
           if (src === "express") expressDefault = s.local.name;
           const resolved = ctx.resolveImport(filePath, src);
-          if (resolved) importToFile.set(s.local.name, resolved);
+          if (resolved) {
+            importToFile.set(s.local.name, resolved);
+            importSpecifiers.set(s.local.name, { filePath: resolved, importedName: "default" });
+          }
         } else if (s.type === "ImportSpecifier") {
           if (
             src === "express" &&
@@ -1063,7 +1073,17 @@ function extractExpressInfo(
             expressRouters.add(s.local.name);
           }
           const resolved = ctx.resolveImport(filePath, src);
-          if (resolved) importToFile.set(s.local.name, resolved);
+          if (resolved) {
+            importToFile.set(s.local.name, resolved);
+            const importedName = s.imported.type === "Identifier" ? s.imported.name : s.local.name;
+            importSpecifiers.set(s.local.name, { filePath: resolved, importedName });
+          }
+        } else if (s.type === "ImportNamespaceSpecifier") {
+          const resolved = ctx.resolveImport(filePath, src);
+          if (resolved) {
+            importToFile.set(s.local.name, resolved);
+            importSpecifiers.set(s.local.name, { filePath: resolved, importedName: "*" });
+          }
         }
       }
     },
@@ -1081,8 +1101,11 @@ function extractExpressInfo(
         for (const prop of p.node.id.properties) {
           if (prop.type !== "ObjectProperty") continue;
           const value = prop.value;
-          if (value.type === "Identifier")
+          if (value.type === "Identifier") {
             importToFile.set(value.name, resolved);
+            const importedName = prop.key.type === "Identifier" ? prop.key.name : value.name;
+            importSpecifiers.set(value.name, { filePath: resolved, importedName });
+          }
         }
         return;
       }
@@ -1095,7 +1118,10 @@ function extractExpressInfo(
         const src = literalString(init.arguments[0] as any);
         if (src === "express") expressDefault = localName;
         const resolved = src ? ctx.resolveImport(filePath, src) : null;
-        if (resolved) importToFile.set(localName, resolved);
+        if (resolved) {
+          importToFile.set(localName, resolved);
+          importSpecifiers.set(localName, { filePath: resolved, importedName: "default" });
+        }
         return;
       }
 
@@ -1145,10 +1171,65 @@ function extractExpressInfo(
       }
     },
 
+    ExportAllDeclaration(p) {
+      const src = p.node.source.value;
+      const resolved = ctx.resolveImport(filePath, src);
+      if (resolved) {
+        wildcardReExports.push(resolved);
+      }
+    },
+
+    ExportNamedDeclaration(p) {
+      const decl = p.node.declaration;
+      if (decl) {
+        if (decl.type === "VariableDeclaration") {
+          for (const d of decl.declarations) {
+            if (d.id.type === "Identifier") {
+              markExported(d.id.name);
+            }
+          }
+        } else if (decl.type === "FunctionDeclaration" && decl.id?.type === "Identifier") {
+          markExported(decl.id.name);
+        }
+      }
+
+      if (p.node.source) {
+        const src = p.node.source.value;
+        const resolved = ctx.resolveImport(filePath, src);
+        if (resolved && Array.isArray(p.node.specifiers)) {
+          for (const spec of p.node.specifiers) {
+            if (spec.type === "ExportSpecifier" && spec.local.type === "Identifier") {
+              const localName = spec.local.name;
+              const exportedName = spec.exported.type === "Identifier" ? spec.exported.name : spec.local.name;
+              reExports.set(exportedName, { filePath: resolved, localName });
+            }
+          }
+        }
+      } else {
+        if (Array.isArray(p.node.specifiers)) {
+          for (const spec of p.node.specifiers) {
+            if (spec.type === "ExportSpecifier" && spec.local.type === "Identifier") {
+              const localName = spec.local.name;
+              const exportedName = spec.exported.type === "Identifier" ? spec.exported.name : spec.local.name;
+              markExported(localName);
+              const imp = importSpecifiers.get(localName);
+              if (imp) {
+                reExports.set(exportedName, { filePath: imp.filePath, localName: imp.importedName });
+              }
+            }
+          }
+        }
+      }
+    },
+
     ExportDefaultDeclaration(p) {
       const decl = p.node.declaration;
       if (decl.type === "Identifier") {
         markExported(decl.name);
+        const imp = importSpecifiers.get(decl.name);
+        if (imp) {
+          reExports.set("default", { filePath: imp.filePath, localName: imp.importedName });
+        }
       } else if (decl.type === "CallExpression") {
         // export default Router() etc. (no named entity)
       }
@@ -1294,19 +1375,30 @@ function extractExpressInfo(
           } else {
             const importedFile = importToFile.get(cand.name);
             if (importedFile) {
-              to = { kind: "import", filePath: importedFile };
+              const imp = importSpecifiers.get(cand.name);
+              to = {
+                kind: "import",
+                filePath: importedFile,
+                exportName: imp ? imp.importedName : "default",
+              };
             }
           }
         } else if (cand.type === "CallExpression" && isIdent(cand.callee)) {
-          // app.use('/x', createRouter()) where createRouter was imported/required
           const importedFile = importToFile.get(cand.callee.name);
           if (importedFile) {
-            to = { kind: "import", filePath: importedFile };
+            const imp = importSpecifiers.get(cand.callee.name);
+            to = {
+              kind: "import",
+              filePath: importedFile,
+              exportName: imp ? imp.importedName : "default",
+            };
           }
         } else if (isRequireCall(cand)) {
           const src = literalString(cand.arguments[0] as any);
           const resolved = src ? ctx.resolveImport(filePath, src) : null;
-          if (resolved) to = { kind: "require", filePath: resolved };
+          if (resolved) {
+            to = { kind: "require", filePath: resolved, exportName: "default" };
+          }
         }
 
         if (!to) return;
@@ -1326,9 +1418,59 @@ function extractExpressInfo(
     routerVars,
     importToFile,
     exportedRouterEntities,
+    reExports,
+    wildcardReExports,
     routes,
     mounts,
   };
+}
+
+function resolveExportedRouterEntity(
+  fileInfos: Map<string, FileInfo>,
+  filePath: string,
+  exportName: string,
+  visited = new Set<string>(),
+): EntityId | null {
+  const key = `${filePath}::${exportName}`;
+  if (visited.has(key)) return null;
+  visited.add(key);
+
+  const info = fileInfos.get(filePath);
+  if (!info) return null;
+
+  if (info.reExports.has(exportName)) {
+    const re = info.reExports.get(exportName)!;
+    return resolveExportedRouterEntity(fileInfos, re.filePath, re.localName, visited);
+  }
+
+  if (info.routerVars.has(exportName)) {
+    return routerEntity(filePath, exportName);
+  }
+
+  if (exportName === "default") {
+    if (info.exportedRouterEntities.length > 0) {
+      return info.exportedRouterEntities[0];
+    }
+    if (info.routerVars.size === 1) {
+      const only = Array.from(info.routerVars)[0];
+      return routerEntity(filePath, only);
+    }
+  }
+
+  for (const wildPath of info.wildcardReExports) {
+    const res = resolveExportedRouterEntity(fileInfos, wildPath, exportName, visited);
+    if (res) return res;
+  }
+
+  if (info.exportedRouterEntities.length > 0) {
+    return info.exportedRouterEntities[0];
+  }
+  if (info.routerVars.size === 1) {
+    const only = Array.from(info.routerVars)[0];
+    return routerEntity(filePath, only);
+  }
+
+  return null;
 }
 
 function computeRouterPrefixes(
@@ -1343,16 +1485,12 @@ function computeRouterPrefixes(
   // Build edge list after resolving import/require targets to router entities
   const edges = new Map<EntityId, Array<{ to: EntityId; mountPath: string }>>();
 
-  const getInfo = (filePath: string): FileInfo | null =>
-    fileInfos.get(filePath) || null;
-
   const resolveToEntity = (
     to: FileInfo["mounts"][number]["to"],
   ): EntityId | null => {
     if (to.kind === "local") return null; // handled at call site
-    const imported = getInfo(to.filePath);
-    if (!imported) return null;
-    return pickDefaultRouterEntity(imported);
+    const exportName = to.exportName || "default";
+    return resolveExportedRouterEntity(fileInfos, to.filePath, exportName);
   };
 
   for (const info of fileInfos.values()) {
@@ -1433,7 +1571,9 @@ export const expressParser: FrameworkParser = {
         info.appVars.size ||
         info.routerVars.size ||
         info.routes.length ||
-        info.mounts.length
+        info.mounts.length ||
+        info.reExports.size ||
+        info.wildcardReExports.length
       ) {
         fileInfos.set(f, info);
       }

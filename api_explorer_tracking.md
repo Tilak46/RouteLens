@@ -2,6 +2,14 @@
 
 **Goal:** a "Zero-Config Postman" that scans your codebase to automatically discover and test API endpoints.
 
+## 🗺️ Product Roadmap & Feature Scope
+
+| Feature Category | What You Have Now (The Core) | Next Milestone (The Product) | The Long-Term Vision (The Postman Killer) |
+| :--- | :--- | :--- | :--- |
+| **Parsing** | Reads nested folders, routes, and basic Zod schemas. | Watcher mode (live-updates the tree view when code changes). | Full cross-language parsing (Go, Python, Java). |
+| **Data Generation** | Accurate JSON structures based on code types. | Smart data generation (real emails, real names instead of placeholders). | Database-aware generation (reading local DB to fetch valid IDs). |
+| **Testing** | Manual trigger and route validation. | Pre-configured environment variables and global auth headers. | AI-driven edge-case testing (automatically trying SQL injection or bad types to break the route). |
+
 **User Experience Target (clarified):**
 
 - When the user opens **API Explorer** from the sidebar, they can **select a project** (from existing DevDash projects or by picking a folder).
@@ -63,6 +71,26 @@ Right now, the renderer uses `fetch(url, ...)`. Next improvements:
 - Persist open tabs + base URLs (electron-store) so API Explorer restores tabs on restart.
 - Allow per-tab environment presets (dev/stage/prod base URLs).
 - Add a small “scan status” and last scanned time per tab.
+
+### 4) Collections, Request & Tab Customization (Reordering, Renaming, Creating)
+- **Goal**: Allow users to customize their workspace tree and tabs, preventing scans from overwriting their layout.
+- **Features to implement**:
+  - **Folder Customization**: Create custom folders in the API tree sidebar, delete folders, and rename them.
+  - **Request Customization**: Create new blank requests, delete requests, and rename them.
+  - **Drag & Drop Reordering**:
+    - Reorder folders and requests in the sidebar tree.
+    - Reorder request tabs at the top of the workspace.
+  - **State Persistence**: Save the customized collection tree, environments, and open tabs to local storage (`electron-store`) on change, restoring them when the app is restarted.
+
+### 5) Incremental Watcher Mode & Smart Merging
+- **Goal**: Automatically update the API tree when backend source code changes without losing the user's manual customization.
+- **Strategy**:
+  - Run a filesystem watcher on the scanned project directories.
+  - On file changes, parse only the modified files to extract the routes.
+  - **Smart Merge Algorithm**:
+    - Match scanned endpoints (method + path) with the user's customized tree.
+    - If a route is updated or newly added, insert/update the endpoint node in its matched folder or root, maintaining all other user-created folders, custom requests, custom names, and drag-and-drop order.
+    - If a route is no longer found in the code, mark it as "orphaned" or prompt/warn the user before deleting.
 
 ---
 

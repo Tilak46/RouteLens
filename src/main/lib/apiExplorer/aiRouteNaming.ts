@@ -28,6 +28,7 @@ function cacheKey(method: string, path: string): string {
 function looksHuman(name: string | undefined): boolean {
   const s = String(name ?? "").trim();
   if (!s) return false;
+  if (s.startsWith(":") || (s.startsWith("[") && s.endsWith("]"))) return false;
   if (s.includes(" ")) return true;
   if (/[A-Z]/.test(s)) return true;
   return false;
@@ -163,7 +164,8 @@ export async function maybeApplyAiRouteNames(
     const withCached = routes.map((r) => {
       const key = cacheKey(r.method, r.path);
       const cached = cachedNames[key];
-      return cached ? { ...r, name: cached } : r;
+      const isOk = cached && !cached.startsWith(":") && !(cached.startsWith("[") && cached.endsWith("]"));
+      return isOk ? { ...r, name: cached } : r;
     });
     log(`[AI] API naming: no pending routes (0 requests).`);
     return withCached;
@@ -293,7 +295,8 @@ ${JSON.stringify(batchInput)}`;
   for (const r of output) {
     const key = cacheKey(r.method, r.path);
     const cached = cachedNames[key];
-    if (cached) r.name = cached;
+    const isOk = cached && !cached.startsWith(":") && !(cached.startsWith("[") && cached.endsWith("]"));
+    if (isOk) r.name = cached;
   }
 
   log(

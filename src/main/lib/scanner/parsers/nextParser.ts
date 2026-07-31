@@ -52,11 +52,15 @@ function fileToNextApiPath(
   );
   if (idx === -1) return null;
 
-  const apiIdx = parts.findIndex((p, i) => i > idx && p === "api");
-  if (apiIdx === -1) return null;
-
-  const sub = parts.slice(apiIdx + 1);
-  if (sub.length === 0) return "/api";
+  let sub: string[];
+  if (kind === "pages") {
+    const apiIdx = parts.findIndex((p, i) => i > idx && p === "api");
+    if (apiIdx === -1) return null;
+    sub = parts.slice(apiIdx + 1);
+  } else {
+    sub = parts.slice(idx + 1);
+  }
+  if (sub.length === 0) return kind === "pages" ? "/api" : "/";
 
   // remove filename
   let last = sub[sub.length - 1];
@@ -73,18 +77,40 @@ function fileToNextApiPath(
   if (sub.length > 0 && sub[sub.length - 1] === "index") sub.pop();
 
   const segs = sub.map((s) => {
-    // [id] -> :id
-    const m1 = s.match(/^\[(.+)\]$/);
+    // Skip Route Groups: (marketing), (auth) etc.
+    if (s.startsWith("(") && s.endsWith(")")) return null;
+    // Skip Parallel Routes: @dashboard etc.
+    if (s.startsWith("@")) return null;
+
+    // [[...slug]] -> :slug* (optional catch-all)
+    const mOpt = s.match(/^\[\[\.\.\.(.+)\]\]$/);
+    if (mOpt) {
+      return `:${mOpt[1]}*`;
+    }
+    // [[slug]] -> :slug? (optional segment)
+    const mOpt2 = s.match(/^\[\[(.+)\]\]$/);
+    if (mOpt2) {
+      return `:${mOpt2[1]}?`;
+    }
+    // [...slug] -> :slug* (catch-all)
+    const m1 = s.match(/^\[\.\.\.(.+)\]$/);
     if (m1) {
-      const inner = m1[1];
-      const catchAll = inner.startsWith("...");
-      const name = catchAll ? inner.slice(3) : inner;
-      return catchAll ? `:${name}*` : `:${name}`;
+      return `:${m1[1]}*`;
+    }
+    // [id] -> :id
+    const m2 = s.match(/^\[(.+)\]$/);
+    if (m2) {
+      return `:${m2[1]}`;
     }
     return s;
   });
 
-  return normalizePath(`/api/${segs.filter(Boolean).join("/")}`);
+  const pathStr = segs.filter(Boolean).join("/");
+  if (kind === "pages") {
+    return normalizePath(`/api/${pathStr}`);
+  } else {
+    return normalizePath(`/${pathStr}`);
+  }
 }
 
 function inferMethodsFromReqMethod(ast: t.File): Method[] {
@@ -205,10 +231,10 @@ export const nextAppParser: FrameworkParser = {
 
     const appRouteFiles = ctx.files.filter((f) => {
       const rel = path.relative(ctx.rootPath, f).replace(/\\/g, "/");
-      return (
-        (rel.includes("app/api/") || rel.startsWith("app/api/")) &&
-        /\/route\.(t|j)sx?$/.test(rel)
-      );
+      const parts = rel.split("/");
+      const appIdx = parts.findIndex((p) => p === "app");
+      if (appIdx === -1) return false;
+      return /\/route\.(t|j)sx?$/.test(rel);
     });
 
     for (const f of appRouteFiles) {

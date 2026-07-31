@@ -101,6 +101,18 @@ const store = new Store<StoreType>({
       workspaceSavePath: null,
     },
     workspaces: [],
+    requestTabs: [],
+    activeRequestTabId: null,
+    environments: [],
+    activeEnvId: null,
+    apiScannerTabs: [],
+    activeApiScannerTabId: null,
+    apiScannerTreeCache: {},
+    expandedFolderIds: {},
+    activeSidebarTab: "explorer",
+    isSidebarExpanded: true,
+    isConsoleOpen: false,
+    consoleProjectId: null,
   },
 });
 

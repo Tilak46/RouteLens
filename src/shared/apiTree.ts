@@ -2,6 +2,57 @@ import type { ApiFolder, ApiRoute } from "../types";
 
 const generateId = () => Math.random().toString(36).substring(7);
 
+function getFunRootName(method: string, file?: string): string {
+  const m = String(method || "GET").toUpperCase();
+  const seed = file ? file.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+  
+  const getNames = [
+    "Welcome Lobby 🛎️",
+    "Home Base 🚀",
+    "Grand Entrance 🌟",
+    "The Front Door 🚪",
+    "Central Hub 🌀",
+    "Basecamp ⛺",
+    "Front Desk 🛎️"
+  ];
+  
+  const postNames = [
+    "Launchpad 🛸",
+    "Grand Entryway 📥",
+    "Portal Intake 🌀",
+    "Creation Chamber 🧪",
+    "Gateway Post 📨"
+  ];
+  
+  const updateNames = [
+    "Control Room 🛰️",
+    "System Refurbish 🔧",
+    "Renovation Desk 🛠️",
+    "Main Overhaul ⚙️"
+  ];
+  
+  const deleteNames = [
+    "Emergency Destruct 🚨",
+    "The Big Eraser 🧹",
+    "Zero Ground 🌋",
+    "Trash Compactor 🗑️"
+  ];
+
+  if (m === "GET") {
+    return getNames[seed % getNames.length]!;
+  }
+  if (m === "POST") {
+    return postNames[seed % postNames.length]!;
+  }
+  if (m === "PUT" || m === "PATCH") {
+    return updateNames[seed % updateNames.length]!;
+  }
+  if (m === "DELETE") {
+    return deleteNames[seed % deleteNames.length]!;
+  }
+  return "Root Gateway 🚪";
+}
+
 export function toTitleCaseFromSlug(slug: string) {
   return slug
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -38,6 +89,7 @@ export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
   const looksHuman = (name: string | undefined) => {
     const s = String(name ?? "").trim();
     if (!s) return false;
+    if (s.startsWith(":") || (s.startsWith("[") && s.endsWith("]"))) return false;
     if (s.includes(" ")) return true;
     if (/[A-Z]/.test(s)) return true;
     return false;
@@ -175,6 +227,17 @@ export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
     });
   }
 
+  const hasNestedRoutes = (routePathSegs: string[]) => {
+    const pathStr = routePathSegs.join("/");
+    return routes.some((other) => {
+      const otherSegs = normalizePathSegments(other.path);
+      return (
+        otherSegs.length > routePathSegs.length &&
+        otherSegs.slice(0, routePathSegs.length).join("/") === pathStr
+      );
+    });
+  };
+
   const getOrCreateFolder = (
     children: (ApiFolder | ApiRoute)[],
     name: string,
@@ -192,67 +255,79 @@ export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
   for (const r of routes) {
     const segments = normalizePathSegments(r.path);
     if (segments.length === 0) {
-      root.children.push(r);
+      root.children.push({
+        ...r,
+        name: looksHuman(r.name) ? r.name : getFunRootName(r.method, r.file),
+      });
       continue;
     }
 
-    // If this is a base route like `/posts` and there are nested routes like
-    // `/posts/:id` (or multiple base methods), put it inside the resource folder.
-    if (segments.length === 1) {
-      const first = segments[0];
-      const stats = firstSegmentStats.get(first);
+    const lastSeg = segments[segments.length - 1];
+    const lastIsDynamic = isDynamicSegment(lastSeg);
 
-      if (stats?.hasNested || (stats?.count ?? 0) > 1) {
-        const folder = getOrCreateFolder(
-          root.children,
-          toTitleCaseFromSlug(first),
-        );
-        const insideFolderName = looksHuman(r.name)
-          ? r.name
-          : humanNameFromContext({
-              method: String((r as any).method ?? ""),
-              resourceSeg: first,
-              leafSegments: [first],
-            });
+    let folderSegs: string[];
+    let leafSegs: string[];
 
-        folder.children.push({ ...r, name: insideFolderName || "/" });
-        continue;
+    if (lastIsDynamic || hasNestedRoutes(segments)) {
+      folderSegs = segments.filter((s) => !isDynamicSegment(s));
+      let lastStaticIdx = -1;
+      for (let i = segments.length - 1; i >= 0; i--) {
+        if (!isDynamicSegment(segments[i])) {
+          lastStaticIdx = i;
+          break;
+        }
       }
-
-      // Singleton segment routes (e.g. `/health`) stay at root.
-      root.children.push(r);
-      continue;
+      if (lastStaticIdx === -1) {
+        leafSegs = segments;
+      } else {
+        leafSegs = segments.slice(lastStaticIdx + 1);
+      }
+    } else {
+      const preceding = segments.slice(0, -1);
+      folderSegs = preceding.filter((s) => !isDynamicSegment(s));
+      leafSegs = [lastSeg];
     }
 
-    // Avoid creating folders for dynamic segments like `:id` / `[id]`.
-    // We only create folders for the leading static prefix up to the first dynamic segment.
-    const firstDynamicIndex = segments.findIndex((s) => isDynamicSegment(s));
-    const folderSegments =
-      firstDynamicIndex === -1
-        ? segments.slice(0, -1)
-        : segments.slice(0, Math.min(firstDynamicIndex, segments.length - 1));
-
-    const leafSegments = segments.slice(folderSegments.length);
-    const leafLabel = leafSegments.join("/");
-
-    let current = root;
-    for (const seg of folderSegments) {
-      current = getOrCreateFolder(current.children, toTitleCaseFromSlug(seg));
-    }
+    const resourceSeg = folderSegs.length
+      ? folderSegs[folderSegs.length - 1]
+      : segments[0];
 
     const computedName = looksHuman(r.name)
       ? r.name
       : humanNameFromContext({
           method: String((r as any).method ?? ""),
-          resourceSeg: folderSegments.length
-            ? folderSegments[folderSegments.length - 1]
-            : segments[0],
-          leafSegments,
+          resourceSeg,
+          leafSegments: leafSegs.length ? leafSegs : [lastSeg],
         });
+
+    if (folderSegs.length === 1) {
+      const first = folderSegs[0];
+      const stats = firstSegmentStats.get(first);
+      if (!stats?.hasNested && (stats?.count ?? 0) <= 1) {
+        root.children.push({
+          ...r,
+          name: computedName || leafSegs.join("/") || lastSeg,
+        });
+        continue;
+      }
+    }
+
+    if (folderSegs.length === 0) {
+      root.children.push({
+        ...r,
+        name: computedName || leafSegs.join("/") || lastSeg,
+      });
+      continue;
+    }
+
+    let current = root;
+    for (const seg of folderSegs) {
+      current = getOrCreateFolder(current.children, toTitleCaseFromSlug(seg));
+    }
 
     current.children.push({
       ...r,
-      name: computedName || leafLabel,
+      name: computedName || leafSegs.join("/") || lastSeg,
     });
   }
 

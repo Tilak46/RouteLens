@@ -1,8 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
+import { toast } from "sonner";
 import apiClient from "@/lib/apiClient";
 import { Sidebar } from "../components/api-explorer/ApiSidebar";
-import { RequestPanel } from "../components/api-explorer/RequestPanel";
-import { ResponsePanel } from "../components/api-explorer/ResponsePanel";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,11 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, RefreshCw, Play, X } from "lucide-react";
+import { Plus, RefreshCw, X, Compass, FolderPlus, FileCode, ChevronDown } from "lucide-react";
+import { ApiRoute, ApiFolder, Project, isRoute, ApiProjectTab } from "../../types";
 
-import { ApiRoute, ApiFolder, Project, ApiHttpResponse } from "../../types";
-
-const API_EXPLORER_TABS_STORAGE_KEY = "devdash.apiExplorer.tabs.v1";
 const API_EXPLORER_SCAN_CACHE_KEY = "devdash.apiExplorer.scanCache.v1";
 
 type ApiExplorerScanCacheEntry = {
@@ -33,15 +31,16 @@ type ApiExplorerScanCacheEntry = {
 
 type ApiExplorerScanCache = Record<string, ApiExplorerScanCacheEntry>;
 
-type ApiProjectTab = {
-  id: string;
-  name: string;
-  path: string;
-  baseUrl: string;
-};
-
-type ApiExplorerViewProps = {
+type ApiExplorerSidebarPanelProps = {
   projects: Project[];
+  projectState?: Record<string, { url?: string }>;
+  onSelectRoute: (route: ApiRoute, baseUrl: string, projectId: string) => void;
+  onBaseUrlChange?: (projectId: string, baseUrl: string) => void;
+  treeCache: ApiExplorerScanCache;
+  setTreeCache: React.Dispatch<React.SetStateAction<ApiExplorerScanCache>>;
+  activeProjectId?: string | null;
+  onActiveProjectIdChange?: (id: string | null) => void;
+  activeRouteKey?: string | null;
 };
 
 function guessNameFromPath(p: string) {
@@ -54,114 +53,89 @@ const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
   return `${String(route.method).toUpperCase()}:${route.path}`;
 };
 
-const findRouteByKey = (
-  tree: ApiFolder[],
-  routeKey: string,
-): ApiRoute | null => {
-  const walk = (nodes: (ApiFolder | ApiRoute)[]): ApiRoute | null => {
-    for (const n of nodes) {
-      if (!n) continue;
-      if ((n as any).method) {
-        const r = n as ApiRoute;
-        if (toRouteKey(r) === routeKey) return r;
-        continue;
-      }
-      const folder = n as ApiFolder;
-      const found = walk(folder.children);
-      if (found) return found;
-    }
-    return null;
-  };
+// Local storage sync removed. Replaced by generic Electron Store getters/setters.
 
-  return walk(tree as any);
-};
-
-const readScanCache = (): ApiExplorerScanCache => {
-  try {
-    if (typeof window === "undefined") return {};
-    const raw = window.localStorage.getItem(API_EXPLORER_SCAN_CACHE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as ApiExplorerScanCache;
-  } catch {
-    return {};
-  }
-};
-
-const writeScanCache = (cache: ApiExplorerScanCache) => {
-  try {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      API_EXPLORER_SCAN_CACHE_KEY,
-      JSON.stringify(cache),
-    );
-  } catch {
-    // ignore
-  }
-};
-
-const getScanCacheEntry = (
-  projectPath: string,
-): ApiExplorerScanCacheEntry | null => {
-  if (!projectPath) return null;
-  const cache = readScanCache();
-  const entry = cache[projectPath];
-  if (!entry || !Array.isArray(entry.tree) || !Array.isArray(entry.logs))
-    return null;
-  return entry;
-};
-
-const upsertScanCacheEntry = (
-  projectPath: string,
-  patch: Partial<ApiExplorerScanCacheEntry>,
-) => {
-  if (!projectPath) return;
-  const cache = readScanCache();
-  const existing = cache[projectPath];
-  cache[projectPath] = {
-    tree: (patch.tree ?? existing?.tree ?? []) as ApiFolder[],
-    logs: (patch.logs ?? existing?.logs ?? []) as string[],
-    cachedAt: patch.cachedAt ?? existing?.cachedAt ?? Date.now(),
-    selectedRouteKey:
-      patch.selectedRouteKey !== undefined
-        ? patch.selectedRouteKey
-        : existing?.selectedRouteKey,
-  };
-  writeScanCache(cache);
-};
-
-export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
-  const [selectedRoute, setSelectedRoute] = useState<ApiRoute | null>(null);
-  const [activeResponse, setActiveResponse] = useState<ApiHttpResponse | null>(
-    null,
-  );
-
-  const handleSelectRoute = (route: ApiRoute) => {
-    setSelectedRoute(route);
-    // Reset response when changing routes
-    setActiveResponse(null);
-
-    if (activeTab?.path) {
-      upsertScanCacheEntry(activeTab.path, {
-        selectedRouteKey: toRouteKey(route),
-      });
-    }
-  };
-
+export function ApiExplorerSidebarPanel({
+  projects,
+  projectState,
+  onSelectRoute,
+  onBaseUrlChange,
+  treeCache,
+  setTreeCache,
+  activeProjectId,
+  onActiveProjectIdChange,
+  activeRouteKey,
+}: ApiExplorerSidebarPanelProps) {
   const [tree, setTree] = useState<ApiFolder[]>([]);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [selectedRouteKey, setSelectedRouteKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedRouteKey(activeRouteKey || null);
+  }, [activeRouteKey]);
 
   const [tabs, setTabs] = useState<ApiProjectTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [addPopoverOpen, setAddPopoverOpen] = useState(false);
   const [addProjectId, setAddProjectId] = useState<string | null>(null);
 
+  const [isScannersExpanded, setIsScannersExpanded] = useState(true);
+  const [isRestored, setIsRestored] = useState(false);
+
+  // Electron Store backed treeCache is now a prop
+  const [expandedFolderMap, setExpandedFolderMap] = useState<Record<string, string[]>>({});
+  const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useState<string | null>(null);
+
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) || null,
     [tabs, activeTabId],
   );
+
+  const saveScanCacheEntry = (
+    projectPath: string,
+    patch: Partial<ApiExplorerScanCacheEntry>,
+  ) => {
+    if (!projectPath) return;
+    setTreeCache((prev) => {
+      const existing = prev[projectPath];
+      const updatedEntry: ApiExplorerScanCacheEntry = {
+        tree: (patch.tree ?? existing?.tree ?? []) as ApiFolder[],
+        logs: (patch.logs ?? existing?.logs ?? []) as string[],
+        cachedAt: patch.cachedAt ?? existing?.cachedAt ?? Date.now(),
+        selectedRouteKey:
+          patch.selectedRouteKey !== undefined
+            ? patch.selectedRouteKey
+            : existing?.selectedRouteKey,
+      };
+      const nextCache = { ...prev, [projectPath]: updatedEntry };
+      apiClient.storeSet("apiScannerTreeCache", nextCache);
+      return nextCache;
+    });
+  };
+
+  const expandedFolderIds = activeTab ? (expandedFolderMap[activeTab.path] || []) : [];
+
+  const handleToggleFolderExpanded = (folderId: string, isOpen: boolean) => {
+    if (!activeTab) return;
+    const currentList = expandedFolderMap[activeTab.path] || [];
+    const nextList = isOpen
+      ? [...currentList.filter((id) => id !== folderId), folderId]
+      : currentList.filter((id) => id !== folderId);
+      
+    const nextMap = {
+      ...expandedFolderMap,
+      [activeTab.path]: nextList,
+    };
+    setExpandedFolderMap(nextMap);
+    apiClient.storeSet("expandedFolderIds", nextMap);
+  };
+
+  const toggleScannersExpanded = () => {
+    const next = !isScannersExpanded;
+    setIsScannersExpanded(next);
+    apiClient.storeSet("scannersPanelExpanded", next);
+  };
 
   const detectedCount = useMemo(() => {
     const countRoutes = (nodes: any[]): number => {
@@ -179,23 +153,22 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
       }
       return count;
     };
-
     return countRoutes(tree as any);
   }, [tree]);
 
+  // Restore state from Electron Store on mount
   useEffect(() => {
-    // Restore tabs from previous session.
-    // Important: do NOT auto-open any project by default; user chooses.
-    try {
-      if (typeof window === "undefined") return;
-      const raw = window.localStorage.getItem(API_EXPLORER_TABS_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        tabs?: ApiProjectTab[];
-        activeTabId?: string | null;
-      };
-      const restoredTabs = Array.isArray(parsed?.tabs)
-        ? parsed.tabs.filter(
+    apiClient.storeGet("expandedFolderIds").then((val) => {
+      if (val && typeof val === "object") setExpandedFolderMap(val);
+    });
+
+    apiClient.storeGet("scannersPanelExpanded").then((val) => {
+      if (typeof val === "boolean") setIsScannersExpanded(val);
+    });
+
+    apiClient.storeGet("apiScannerTabs").then((restoredTabsVal) => {
+      const restoredTabs = Array.isArray(restoredTabsVal)
+        ? restoredTabsVal.filter(
             (t) =>
               t &&
               typeof t.id === "string" &&
@@ -205,35 +178,40 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
           )
         : [];
 
-      if (restoredTabs.length === 0) return;
+      if (restoredTabs.length === 0) {
+        setIsRestored(true);
+        return;
+      }
 
       setTabs(restoredTabs);
-      const restoredActive =
-        typeof parsed.activeTabId === "string" ? parsed.activeTabId : null;
-      setActiveTabId(
-        restoredActive && restoredTabs.some((t) => t.id === restoredActive)
-          ? restoredActive
-          : restoredTabs[0].id,
-      );
-    } catch {
-      // ignore
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      apiClient.storeGet("activeApiScannerTabId").then((restoredActiveVal) => {
+        const restoredActive = typeof restoredActiveVal === "string" ? restoredActiveVal : null;
+        setActiveTabId(
+          restoredActive && restoredTabs.some((t) => t.id === restoredActive)
+            ? restoredActive
+            : restoredTabs[0].id,
+        );
+        setIsRestored(true);
+      });
+    });
   }, []);
 
+  // Sync tabs changes to Electron Store
   useEffect(() => {
-    // Keep persisted state in sync so switching views doesn't reset the tabs.
-    try {
-      if (typeof window === "undefined") return;
-      const payload = JSON.stringify({ tabs, activeTabId });
-      window.localStorage.setItem(API_EXPLORER_TABS_STORAGE_KEY, payload);
-    } catch {
-      // ignore
-    }
-  }, [tabs, activeTabId]);
+    if (!isRestored) return;
+    apiClient.storeSet("apiScannerTabs", tabs);
+    apiClient.storeSet("activeApiScannerTabId", activeTabId);
+  }, [tabs, activeTabId, isRestored]);
 
+  // Propagate active project selection up to parent App
   useEffect(() => {
-    // If a tab corresponds to a known DevDash project, keep its name/path fresh.
+    if (onActiveProjectIdChange) {
+      onActiveProjectIdChange(activeTabId);
+    }
+  }, [activeTabId, onActiveProjectIdChange]);
+
+  // Keep project names/paths in sync with DevDash project configuration updates
+  useEffect(() => {
     if (!projects.length) return;
     setTabs((prev) =>
       prev.map((t) => {
@@ -248,36 +226,51 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
     );
   }, [projects]);
 
+  // Run scan when switching scanned project tab
   useEffect(() => {
     if (!activeTab) return;
-    setSelectedRoute(null);
-    setActiveResponse(null);
+    setSelectedRouteKey(null);
+    setTree([]);
+    setLogs([]);
 
-    // Prefer cached scan results so revisiting the view doesn't trigger a full rescan.
-    const cached = getScanCacheEntry(activeTab.path);
+    // Check if we can resolve/update the baseUrl from projectState if it's currently localhost:3000 or empty
+    const runningUrl = projectState?.[activeTab.id]?.url;
+    if (runningUrl) {
+      const cleanRunning = runningUrl.replace(/\/+$/, "");
+      if (activeTab.baseUrl === "http://localhost:3000" || !activeTab.baseUrl) {
+        updateActiveBaseUrl(cleanRunning);
+      }
+    } else {
+      // Try to detect the port using the file scanner if the baseUrl is still 3000
+      if (activeTab.baseUrl === "http://localhost:3000" || !activeTab.baseUrl) {
+        apiClient.detectProjectPort(activeTab.path).then((port) => {
+          if (port && port !== 3000) {
+            updateActiveBaseUrl(`http://localhost:${port}`);
+          }
+        });
+      }
+    }
+
+    const cached = treeCache[activeTab.path];
     if (cached) {
       setTree(cached.tree || []);
       setLogs(cached.logs || []);
       setLoading(false);
-
-      if (cached.selectedRouteKey) {
-        const restored = findRouteByKey(
-          cached.tree || [],
-          cached.selectedRouteKey,
-        );
-        if (restored) setSelectedRoute(restored);
+      if (activeRouteKey) {
+        setSelectedRouteKey(activeRouteKey);
+      } else if (cached.selectedRouteKey) {
+        setSelectedRouteKey(cached.selectedRouteKey);
       }
       return;
     }
 
     void scan(activeTab, { force: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabId]);
 
   const scan = async (tab: ApiProjectTab, opts?: { force?: boolean }) => {
     const force = Boolean(opts?.force);
     if (!force) {
-      const cached = getScanCacheEntry(tab.path);
+      const cached = treeCache[tab.path];
       if (cached) {
         setTree(cached.tree || []);
         setLogs(cached.logs || []);
@@ -292,9 +285,8 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
       setTree(result.tree || []);
       setLogs(result.logs || []);
 
-      // Persist scan results so returning to the screen doesn't rescan.
-      const existing = getScanCacheEntry(tab.path);
-      upsertScanCacheEntry(tab.path, {
+      const existing = treeCache[tab.path];
+      saveScanCacheEntry(tab.path, {
         tree: result.tree || [],
         logs: result.logs || [],
         cachedAt: Date.now(),
@@ -308,7 +300,28 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
     }
   };
 
-  const addTabFromProject = (p: Project) => {
+  const addTabFromProject = async (p: Project) => {
+    let port: number | null = null;
+    
+    // 1. Check if running in DevDash
+    try {
+      const runningPorts = await window.api.getRunningProjectPorts().catch(() => []);
+      const match = runningPorts.find((r) => r.projectId === p.id);
+      if (match && match.ports && match.ports.length > 0) {
+        port = match.ports[0];
+      }
+    } catch (e) {
+      console.warn("Failed to query running project ports:", e);
+    }
+
+    // 2. Fall back to static config scan
+    if (!port) {
+      port = await apiClient.detectProjectPort(p.path).catch(() => null);
+    }
+
+    const finalPort = port || 3000;
+    const baseUrl = `http://localhost:${finalPort}`;
+
     setTabs((prev) => {
       if (prev.some((t) => t.id === p.id)) return prev;
       return [
@@ -317,7 +330,7 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
           id: p.id,
           name: p.name,
           path: p.path,
-          baseUrl: "http://localhost:3000",
+          baseUrl,
         },
       ];
     });
@@ -331,9 +344,15 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
     if (!folder) return;
     const id = `folder_${Date.now()}`;
     const name = guessNameFromPath(folder);
+
+    // Detect port from files
+    const port = await apiClient.detectProjectPort(folder).catch(() => null);
+    const finalPort = port || 3000;
+    const baseUrl = `http://localhost:${finalPort}`;
+
     setTabs((prev) => [
       ...prev,
-      { id, name, path: folder, baseUrl: "http://localhost:3000" },
+      { id, name, path: folder, baseUrl },
     ]);
     setActiveTabId(id);
     setAddPopoverOpen(false);
@@ -345,8 +364,7 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
       const next = prev.filter((t) => t.id !== id);
       if (activeTabId === id) {
         setActiveTabId(next[0]?.id ?? null);
-        setSelectedRoute(null);
-        setActiveResponse(null);
+        setSelectedRouteKey(null);
         setTree([]);
         setLogs([]);
       }
@@ -359,258 +377,518 @@ export function ApiExplorerView({ projects }: ApiExplorerViewProps) {
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTabId ? { ...t, baseUrl } : t)),
     );
+    if (onBaseUrlChange) {
+      onBaseUrlChange(activeTabId, baseUrl);
+    }
+  };
+
+  const handleRouteClick = (route: ApiRoute) => {
+    const routeKey = route.id && route.id.startsWith("request_") ? route.id : toRouteKey(route);
+    setSelectedRouteKey(routeKey);
+
+    if (activeTab?.path) {
+      saveScanCacheEntry(activeTab.path, {
+        selectedRouteKey: routeKey,
+      });
+    }
+    
+    // Bubble route click up to parent tabbed workspace container
+    onSelectRoute(route, activeTab?.baseUrl ?? "http://localhost:3000", activeTab?.id || "");
+  };
+
+  const saveTreeCache = (newTree: ApiFolder[]) => {
+    if (activeTab) {
+      saveScanCacheEntry(activeTab.path, {
+        tree: newTree,
+        cachedAt: Date.now(),
+      });
+    }
+  };
+
+  const handleRenameNode = (nodeId: string, newName: string) => {
+    const renameRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+      return nodes.map((n) => {
+        if (n.id === nodeId) {
+          return { ...n, name: newName };
+        }
+        if (!isRoute(n) && Array.isArray(n.children)) {
+          return { ...n, children: renameRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+        }
+        return n;
+      });
+    };
+    setTree((prev) => {
+      const next = renameRecursive(prev) as ApiFolder[];
+      saveTreeCache(next);
+      return next;
+    });
+  };
+
+  const handleDeleteNode = (nodeId: string) => {
+    const deleteRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+      return nodes
+        .filter((n) => n.id !== nodeId)
+        .map((n) => {
+          if (!isRoute(n) && Array.isArray(n.children)) {
+            return { ...n, children: deleteRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+          }
+          return n;
+        });
+    };
+    setTree((prev) => {
+      const next = deleteRecursive(prev) as ApiFolder[];
+      saveTreeCache(next);
+      return next;
+    });
+  };
+
+  const handleDuplicateNode = (nodeId: string) => {
+    let duplicatedRequest: ApiRoute | null = null;
+
+    const findAndDuplicateRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+      const result: (ApiFolder | ApiRoute)[] = [];
+      for (const n of nodes) {
+        if (n.id === nodeId && isRoute(n)) {
+          result.push(n);
+          duplicatedRequest = {
+            ...n,
+            id: `request_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            name: `${n.name} Copy`,
+            isNew: true,
+          };
+          result.push(duplicatedRequest);
+        } else if (!isRoute(n) && Array.isArray(n.children)) {
+          result.push({
+            ...n,
+            children: findAndDuplicateRecursive(n.children) as (ApiFolder | ApiRoute)[],
+          });
+        } else {
+          result.push(n);
+        }
+      }
+      return result;
+    };
+
+    setTree((prev) => {
+      const next = findAndDuplicateRecursive(prev) as ApiFolder[];
+      saveTreeCache(next);
+      return next;
+    });
+
+    if (duplicatedRequest) {
+      handleRouteClick(duplicatedRequest);
+      toast.success("Request duplicated successfully!");
+    }
+  };
+
+  const handleCopyNode = (route: ApiRoute) => {
+    const fullUrl = route.path ? `${(activeTab?.baseUrl || "http://localhost:3000").replace(/\/+$/, "")}${route.path}` : "";
+    navigator.clipboard.writeText(fullUrl || route.name);
+    toast.success("Request URL copied to clipboard!");
+  };
+
+  const handleAddFolder = (parentFolderId: string | null) => {
+    const newFolder: ApiFolder = {
+      id: `folder_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: "New Folder",
+      children: [],
+    };
+    setNewlyCreatedNodeId(newFolder.id);
+
+    if (parentFolderId === null) {
+      setTree((prev) => {
+        const next = [...prev, newFolder];
+        saveTreeCache(next);
+        return next;
+      });
+      return;
+    }
+
+    const addRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+      return nodes.map((n) => {
+        if (n.id === parentFolderId && !isRoute(n)) {
+          return { ...n, children: [...(n.children || []), newFolder] };
+        }
+        if (!isRoute(n) && Array.isArray(n.children)) {
+          return { ...n, children: addRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+        }
+        return n;
+      });
+    };
+    setTree((prev) => {
+      const next = addRecursive(prev) as ApiFolder[];
+      saveTreeCache(next);
+      return next;
+    });
+  };
+
+  const handleAddRequest = (parentFolderId: string | null) => {
+    const newRequest: ApiRoute & { isNew?: boolean } = {
+      id: `request_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: "New Request",
+      method: "GET",
+      path: "",
+      isNew: true,
+    };
+
+    if (parentFolderId === null) {
+      setTree((prev) => {
+        const next = [...prev, newRequest as any];
+        saveTreeCache(next);
+        return next;
+      });
+      handleRouteClick(newRequest);
+      return;
+    }
+
+    const addRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+      return nodes.map((n) => {
+        if (n.id === parentFolderId && !isRoute(n)) {
+          return { ...n, children: [...(n.children || []), newRequest] };
+        }
+        if (!isRoute(n) && Array.isArray(n.children)) {
+          return { ...n, children: addRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+        }
+        return n;
+      });
+    };
+    setTree((prev) => {
+      const next = addRecursive(prev) as ApiFolder[];
+      saveTreeCache(next);
+      return next;
+    });
+    handleRouteClick(newRequest);
+  };
+
+  const findNode = (id: string, nodes: (ApiFolder | ApiRoute)[]): ApiFolder | ApiRoute | null => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (!isRoute(n) && Array.isArray(n.children)) {
+        const found = findNode(id, n.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const isDescendant = (parentId: string, childId: string, nodes: (ApiFolder | ApiRoute)[]): boolean => {
+    const parentNode = findNode(parentId, nodes);
+    if (!parentNode || isRoute(parentNode)) return false;
+    
+    const checkChildren = (children: (ApiFolder | ApiRoute)[]): boolean => {
+      for (const c of children) {
+        if (c.id === childId) return true;
+        if (!isRoute(c) && Array.isArray(c.children) && checkChildren(c.children)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    return checkChildren(parentNode.children);
+  };
+
+  const handleMoveNode = (
+    draggedId: string,
+    targetNodeId: string | null,
+    position: "inside" | "before" | "after" = "inside"
+  ) => {
+    if (draggedId === targetNodeId) return;
+    if (isDescendant(draggedId, targetNodeId || "", tree)) return;
+
+    let draggedNode: ApiFolder | ApiRoute | null = null;
+    const removeNode = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+      const filtered = nodes.filter((n) => {
+        if (n.id === draggedId) {
+          draggedNode = n;
+          return false;
+        }
+        return true;
+      });
+      return filtered.map((n) => {
+        if (!isRoute(n) && Array.isArray(n.children)) {
+          return { ...n, children: removeNode(n.children) as (ApiFolder | ApiRoute)[] };
+        }
+        return n;
+      });
+    };
+
+    setTree((prev) => {
+      const treeWithoutDragged = removeNode(prev) as ApiFolder[];
+      if (!draggedNode) return prev;
+
+      const insertNode = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+        const idx = nodes.findIndex((n) => n.id === targetNodeId);
+        if (idx !== -1) {
+          const result = [...nodes];
+          if (position === "inside" && !isRoute(result[idx])) {
+            const folder = result[idx] as ApiFolder;
+            result[idx] = {
+              ...folder,
+              children: [...(folder.children || []), draggedNode!],
+            };
+          } else if (position === "before") {
+            result.splice(idx, 0, draggedNode!);
+          } else {
+            result.splice(idx + 1, 0, draggedNode!);
+          }
+          return result;
+        }
+
+        return nodes.map((n) => {
+          if (!isRoute(n) && Array.isArray(n.children)) {
+            return { ...n, children: insertNode(n.children) as (ApiFolder | ApiRoute)[] };
+          }
+          return n;
+        });
+      };
+
+      let next: ApiFolder[];
+      if (targetNodeId === null) {
+        next = [...treeWithoutDragged, draggedNode as ApiFolder];
+      } else {
+        next = insertNode(treeWithoutDragged) as ApiFolder[];
+      }
+
+      saveTreeCache(next);
+      return next;
+    });
   };
 
   return (
-    <div className="flex h-full w-full bg-[#0a0a0a] text-white overflow-hidden font-sans select-none">
-      {/* SIDEBAR */}
-      <div className="w-64 bg-[#0f0f0f] border-r border-white/5 flex flex-col shrink-0">
-        <div
-          className="h-12 border-b border-white/5 flex items-center px-4 justify-between"
-          style={{ WebkitAppRegion: "drag" } as any}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-400">DevDash</span>
-          </div>
-        </div>
-
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="text-xs font-semibold text-gray-500 mb-2 tracking-wider">
-            PROJECTS
-          </div>
+    <div className="flex flex-col h-full space-y-4">
+      {/* 1. PROJECT SCAN SELECTOR */}
+      <div className="flex flex-col gap-2 shrink-0">
+        <div className="flex items-center justify-between mb-1 select-none">
+          <button
+            onClick={toggleScannersExpanded}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground tracking-wider uppercase flex items-center gap-1.5 transition-colors focus:outline-none"
+          >
+            <ChevronDown
+              className={cn(
+                "w-3 h-3 transition-transform duration-200",
+                !isScannersExpanded && "-rotate-90"
+              )}
+            />
+            <span>Route Scanners</span>
+          </button>
+          
           <Popover open={addPopoverOpen} onOpenChange={setAddPopoverOpen}>
             <PopoverTrigger asChild>
-              <button className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors mb-4">
-                <span className="text-sm font-medium">Add Backend</span>
-                <Plus size={14} />
+              <button
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/80 border border-border/80 rounded transition-all"
+                title="Add API Project Folder to scan"
+              >
+                <Plus size={12} />
+                <span>Link API</span>
               </button>
             </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              className="w-[320px] bg-[#121212] border-white/10"
-            >
-              <div className="space-y-3">
-                <div className="text-sm font-medium text-white">
-                  Add project to API Explorer
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">
-                    From DevDash projects
-                  </div>
-                  <Select
-                    value={addProjectId ?? ""}
-                    onValueChange={(v) => setAddProjectId(v)}
-                  >
-                    <SelectTrigger className="bg-black/30 border-white/10 text-white">
-                      <SelectValue placeholder="Select project..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#121212] border-white/10 text-white">
-                      {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      disabled={!addProjectId}
-                      onClick={() => {
-                        const p = projects.find((x) => x.id === addProjectId);
-                        if (p) addTabFromProject(p);
-                      }}
-                      className="bg-primary text-white"
-                    >
-                      Open
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="h-px bg-white/10" />
-
-                <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">
-                    Or browse a folder
-                  </div>
+            <PopoverContent align="end" className="w-[280px] bg-popover border-border text-foreground p-3 space-y-3 z-50 shadow-xl">
+              <div className="text-xs font-semibold text-foreground">
+                Link Backend Route Scanner
+              </div>
+              <div className="space-y-2">
+                <div className="text-[10px] text-muted-foreground">Select local server project</div>
+                <Select
+                  value={addProjectId ?? ""}
+                  onValueChange={(v) => setAddProjectId(v)}
+                >
+                  <SelectTrigger className="bg-input border-border/80 text-xs text-foreground h-8">
+                    <SelectValue placeholder="Choose project..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border text-foreground">
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-end">
                   <Button
-                    variant="secondary"
                     size="sm"
-                    className="w-full bg-white/10 hover:bg-white/20 text-white border-transparent"
-                    onClick={addTabFromFolderPick}
+                    disabled={!addProjectId}
+                    onClick={() => {
+                      const p = projects.find((x) => x.id === addProjectId);
+                      if (p) addTabFromProject(p);
+                    }}
+                    className="h-7 text-xs bg-primary text-primary-foreground font-semibold"
                   >
-                    Choose Folder...
+                    Open
                   </Button>
                 </div>
               </div>
+              <div className="h-px bg-border/50" />
+              <div className="space-y-1.5">
+                <div className="text-[10px] text-muted-foreground">Or pick directories manually</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full bg-transparent border-border hover:bg-white/5 text-xs h-8"
+                  onClick={addTabFromFolderPick}
+                >
+                  Browse Folder...
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
-
-          <div className="flex flex-col gap-1">
-            {tabs.map((t) => {
-              const active = t.id === activeTabId;
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => setActiveTabId(t.id)}
-                  className={
-                    "group px-3 py-2 rounded-lg border flex items-center justify-between cursor-pointer transition-colors " +
-                    (active
-                      ? "bg-white/5 border-white/10"
-                      : "bg-transparent border-transparent hover:bg-white/5")
-                  }
-                  title={t.path}
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="text-sm text-gray-300 truncate">
-                      {t.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {loading && active ? (
-                      <RefreshCw
-                        size={14}
-                        className="animate-spin text-blue-400"
-                      />
-                    ) : active ? (
-                      <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]"></div>
-                    ) : (
-                      <span
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeTab(t.id);
-                        }}
-                      >
-                        <X size={14} />
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
+
+        {/* List of scanned projects */}
+        {isScannersExpanded && (
+          <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto pr-1 animate-in fade-in slide-in-from-top-1 duration-200">
+            {tabs.length === 0 ? (
+              <div className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border rounded-lg p-2 select-none">
+                No API directories linked.
+              </div>
+            ) : (
+              tabs.map((t) => {
+                const active = t.id === activeTabId;
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => setActiveTabId(t.id)}
+                    className={cn(
+                       "group px-2.5 py-1.5 rounded-lg border flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
+                      active
+                        ? "bg-card border-border/80 text-foreground"
+                        : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    )}
+                    title={t.path}
+                  >
+                    <span className="truncate max-w-[160px] font-medium">{t.name}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {active ? (
+                        <div className="relative w-4 h-4 flex items-center justify-center">
+                          {loading ? (
+                            <RefreshCw size={11} className="animate-spin text-primary group-hover:hidden" />
+                          ) : (
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary group-hover:hidden" />
+                          )}
+                          <button
+                            className="hidden group-hover:flex items-center justify-center text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeTab(t.id);
+                            }}
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeTab(t.id);
+                          }}
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col relative min-w-0">
-        <div className="h-12 border-b border-white/5 bg-[#0a0a0a] flex items-center px-4 justify-between shrink-0">
-          <div className="flex gap-4 text-sm font-medium text-gray-400 h-full">
-            <span className="text-white border-b-2 border-white pt-3">
-              API Explorer
+      <div className="h-px bg-border/50 shrink-0" />
+
+      {/* 2. DETECTED ROUTES */}
+      <div className="flex-1 flex flex-col min-h-0 select-none">
+        <div className="flex items-center justify-between mb-2 shrink-0">
+          <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
+            Detected Endpoints
+            <span className="px-1.5 py-0.5 text-[9px] font-bold bg-muted-foreground/15 text-muted-foreground rounded-full leading-none font-mono">
+              {detectedCount}
             </span>
-            <span className="pt-3">Logs</span>
-            <span className="pt-3">Git</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
+              onClick={() => activeTab && scan(activeTab, { force: true })}
+              disabled={loading || !activeTab}
+              title="Rescan project routes"
+            >
+              <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
+            </button>
           </div>
         </div>
 
-        <div className="flex-1 flex bg-[#050505] min-h-0">
-          {/* API TREE */}
-          <div className="w-72 border-r border-white/5 bg-[#0a0a0a] flex flex-col shrink-0">
-            <div className="p-4 border-b border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-500 tracking-wider">
-                  DETECTED ROUTES ({detectedCount})
-                </span>
-                <button
-                  className="text-gray-400 hover:text-white"
-                  onClick={() => activeTab && scan(activeTab, { force: true })}
-                  disabled={loading || !activeTab}
-                  title="Refresh Scan"
-                >
-                  <RefreshCw
-                    size={14}
-                    className={loading ? "animate-spin" : ""}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Input
-                  value={activeTab?.baseUrl ?? ""}
-                  onChange={(e) => updateActiveBaseUrl(e.target.value)}
-                  placeholder="Base URL (e.g. http://localhost:3000)"
-                  className="h-8 bg-black border-white/10 text-xs text-gray-300"
-                  disabled={!activeTab}
-                />
-              </div>
+        {activeTab && (
+          <div className="space-y-3 shrink-0 mb-3">
+            <div className="space-y-1">
+              {/* <div className="text-[9px] font-bold text-muted-foreground tracking-wider uppercase">
+                Base URL for request paths
+              </div> */}
+              <Input
+                value={activeTab.baseUrl}
+                onChange={(e) => updateActiveBaseUrl(e.target.value)}
+                placeholder="Base URL (e.g. http://localhost:3000)"
+                className="h-8 bg-input border-border text-xs text-foreground font-mono focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+              />
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {loading ? (
-                <div className="p-4 text-xs text-blue-400 flex items-center justify-center gap-2">
-                  <RefreshCw size={14} className="animate-spin" /> Scanning...
-                </div>
-              ) : tree.length > 0 ? (
-                <Sidebar
-                  tree={tree}
-                  selectedKey={
-                    selectedRoute ? toRouteKey(selectedRoute) : undefined
-                  }
-                  onSelect={handleSelectRoute}
-                />
-              ) : (
-                <div className="p-4 space-y-2">
-                  <p className="text-xs text-gray-500 text-center">
-                    No APIs found.
-                  </p>
-                  {logs.length > 0 && (
-                    <div className="bg-black/40 rounded p-2 text-[10px] font-mono text-gray-500 overflow-x-auto whitespace-pre-wrap">
-                      {logs.map((log, i) => (
-                        <div key={i}>{log}</div>
-                      ))}
-                    </div>
-                  )}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddRequest(null)}
+                className="h-8 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/15 hover:border-emerald-500/30 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1.5 rounded-md transition-all shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                title="Add a new custom request at the root level"
+              >
+                <FileCode size={11} className="text-emerald-400" />
+                New Request
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddFolder(null)}
+                className="h-8 bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/15 hover:border-blue-500/30 text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1.5 rounded-md transition-all shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                title="Add a new folder at the root level"
+              >
+                <FolderPlus size={11} className="text-blue-400" />
+                New Folder
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-grow overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2">
+          {loading ? (
+            <div className="p-4 text-xs text-primary flex items-center justify-center gap-2">
+              <RefreshCw size={12} className="animate-spin" /> Scanning files...
+            </div>
+          ) : tree.length > 0 ? (
+            <Sidebar
+              tree={tree}
+              selectedKey={selectedRouteKey || undefined}
+              onSelect={handleRouteClick}
+              onRenameNode={handleRenameNode}
+              onDeleteNode={handleDeleteNode}
+              onAddFolder={handleAddFolder}
+              onAddRequest={handleAddRequest}
+              onMoveNode={handleMoveNode}
+              expandedFolderIds={expandedFolderIds}
+              onToggleFolderExpanded={handleToggleFolderExpanded}
+              newlyCreatedNodeId={newlyCreatedNodeId}
+              onClearNewlyCreatedNodeId={() => setNewlyCreatedNodeId(null)}
+              onDuplicateNode={handleDuplicateNode}
+              onCopyNode={handleCopyNode}
+            />
+          ) : (
+            <div className="p-4 space-y-2 select-none text-center">
+              <p className="text-xs text-muted-foreground">No APIs detected.</p>
+              {logs.length > 0 && (
+                <div className="bg-black/30 rounded p-2 text-[9px] font-mono text-muted-foreground overflow-x-auto text-left whitespace-pre-wrap select-text max-h-32">
+                  {logs.map((log, i) => (
+                    <div key={i}>{log}</div>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* RIGHT PANEL - REQUEST/RESPONSE */}
-          <div className="flex-1 p-6 flex flex-col gap-6 min-w-0 overflow-y-auto">
-            {!activeTab ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                <div className="mb-4 opacity-50 relative">
-                  <RefreshCw size={48} className="text-gray-400" />
-                </div>
-                <h3 className="text-xl text-white mb-2">No Project Selected</h3>
-                <p>
-                  Add or select a backend project from the sidebar to scan for
-                  APIs.
-                </p>
-              </div>
-            ) : loading ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center text-blue-400">
-                <RefreshCw size={48} className="mb-4 animate-spin" />
-                <h3 className="text-xl text-white mb-2">Scanning AST...</h3>
-                <p className="font-mono text-sm text-gray-500">
-                  Parsing Express/Next.js routes in real-time
-                </p>
-              </div>
-            ) : !selectedRoute ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                <div className="h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center mb-4 border border-white/10 text-gray-400">
-                  <Play size={24} />
-                </div>
-                <h3 className="text-xl text-white mb-2">Select an Endpoint</h3>
-                <p>
-                  Choose an API endpoint from the detected routes tree to start
-                  testing.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col h-full gap-4">
-                <RequestPanel
-                  route={selectedRoute}
-                  baseUrl={activeTab?.baseUrl ?? "http://localhost:3000"}
-                  draftKey={`${activeTab?.path ?? ""}::${selectedRoute.path}`}
-                  onRun={(res) => setActiveResponse(res)}
-                />
-                <ResponsePanel response={activeResponse} />
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
