@@ -78,34 +78,6 @@ export function AddProjectModal({
           />
         </div>
 
-        {/* 6. ADD GROUP SELECT DROPDOWN */}
-        <div className="grid w-full items-center gap-2.5">
-          <Label htmlFor="groupSelect" className="text-text-main">
-            Assign to Group (Optional)
-          </Label>
-          <Select
-            value={selectedGroupId ?? "ungrouped"} // Use 'ungrouped' value for null
-            onValueChange={(value) =>
-              setSelectedGroupId(value === "ungrouped" ? null : value)
-            }
-          >
-            <SelectTrigger
-              id="groupSelect"
-              className="w-full bg-bg border-border-main text-text-main"
-            >
-              <SelectValue placeholder="Select a group..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ungrouped">-- Ungrouped --</SelectItem>
-              {groups.map((group) => (
-                <SelectItem key={group.id} value={group.id}>
-                  {group.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex justify-end gap-3 mt-8">
           <Button variant="secondary" onClick={onClose}>
             Cancel

@@ -1111,17 +1111,73 @@ function App() {
 
           {/* Center Request Workspace Area */}
           {!activeTab ? (
-            <div className="flex-grow flex flex-col items-center justify-center text-center p-8 select-none">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
-                <Compass size={28} />
+            <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
+              <div className="max-w-2xl w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-300">
+                <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-5 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
+                  <Compass size={24} />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground tracking-tight mb-2">Welcome to RouteLens</h2>
+                <p className="text-sm text-muted-foreground max-w-lg mx-auto mb-8 leading-relaxed">
+                  RouteLens automatically parses your codebase to discover, execute, and monitor API routes. Zero manual collection setups, zero manual syncs.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left mb-8">
+                  {/* Step 1 */}
+                  <div className="flex flex-col p-4 bg-muted/20 border border-border/30 rounded-xl hover:border-primary/20 transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 shrink-0">
+                      <Server size={16} />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground mb-1">1. Add Local Project</h3>
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Go to <strong>Local Servers</strong> and import your folder. RouteLens supports Next.js, Express, etc.
+                    </p>
+                    <button
+                      onClick={() => setActiveSidebarTab("servers")}
+                      className="mt-auto pt-3 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors text-left focus:outline-none"
+                    >
+                      Go to Servers &rarr;
+                    </button>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="flex flex-col p-4 bg-muted/20 border border-border/30 rounded-xl hover:border-primary/20 transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 shrink-0">
+                      <Compass size={16} />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground mb-1">2. Auto-Scan Routes</h3>
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Switch back to <strong>API Discovery</strong>. Your project routes will scan and render instantly.
+                    </p>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="flex flex-col p-4 bg-muted/20 border border-border/30 rounded-xl hover:border-primary/20 transition-colors">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3 shrink-0">
+                      <Zap size={16} />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground mb-1">3. Start & Request</h3>
+                    <p className="text-[11px] text-muted-foreground leading-normal">
+                      Click the Play icon on your server in the sidebar, select any endpoint, and hit Send!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Button 
+                    onClick={() => setActiveSidebarTab("servers")} 
+                    className="bg-primary text-primary-foreground font-semibold px-5 h-9"
+                  >
+                    <Plus size={14} className="mr-1.5" /> Add Project to Start
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={handleNewTab} 
+                    className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-5 h-9"
+                  >
+                    Create Manual Request
+                  </Button>
+                </div>
               </div>
-              <h2 className="text-xl font-bold text-foreground mb-1.5">Welcome to RouteLens</h2>
-              <p className="text-sm text-muted-foreground max-w-sm mb-6 leading-normal">
-                Explore automatically discovered project routes, run test requests, and manage local server stacks.
-              </p>
-              <Button onClick={handleNewTab} className="bg-primary text-primary-foreground font-semibold">
-                <Plus size={14} className="mr-1.5" /> Create New Request
-              </Button>
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
