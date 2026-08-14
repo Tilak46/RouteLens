@@ -76,7 +76,7 @@ export function ApiExplorerSidebarPanel({
   }, [activeRouteKey]);
 
   const [tabs, setTabs] = useState<ApiProjectTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [activeTabId, setActiveTabId] = useState<string | null>(activeProjectId || null);
   const [addPopoverOpen, setAddPopoverOpen] = useState(false);
   const [addProjectId, setAddProjectId] = useState<string | null>(null);
 
@@ -86,6 +86,7 @@ export function ApiExplorerSidebarPanel({
   // Electron Store backed treeCache is now a prop
   const [expandedFolderMap, setExpandedFolderMap] = useState<Record<string, string[]>>({});
   const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useState<string | null>(null);
+  const [hiddenProjectIds, setHiddenProjectIds] = useState<string[]>([]);
 
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) || null,
@@ -162,6 +163,10 @@ export function ApiExplorerSidebarPanel({
       if (val && typeof val === "object") setExpandedFolderMap(val);
     });
 
+    apiClient.storeGet("hiddenProjectIds").then((val) => {
+      if (Array.isArray(val)) setHiddenProjectIds(val);
+    });
+
     apiClient.storeGet("scannersPanelExpanded").then((val) => {
       if (typeof val === "boolean") setIsScannersExpanded(val);
     });
@@ -210,7 +215,7 @@ export function ApiExplorerSidebarPanel({
     }
   }, [activeTabId, onActiveProjectIdChange]);
 
-  // Sync projects with tabs: auto-add missing projects, update existing project names/paths, and remove deleted projects
+  // Sync projects with tabs: auto-add missing projects (except hidden ones), update existing project names/paths, and remove deleted projects
   useEffect(() => {
     if (!isRestored) return;
     setTabs((prev) => {
@@ -229,8 +234,8 @@ export function ApiExplorerSidebarPanel({
         };
       });
 
-      // Add missing projects
-      const missing = projects.filter((p) => !updated.some((t) => t.id === p.id));
+      // Add missing projects (excluding hidden ones)
+      const missing = projects.filter((p) => !updated.some((t) => t.id === p.id) && !hiddenProjectIds.includes(p.id));
       if (missing.length === 0) {
         // Compare to see if updated is actually different from prev
         const isSame = prev.length === updated.length && prev.every((t, i) => t.id === updated[i].id && t.name === updated[i].name && t.path === updated[i].path && t.baseUrl === updated[i].baseUrl);
@@ -248,9 +253,13 @@ export function ApiExplorerSidebarPanel({
         };
       });
 
+      if (added.length > 0) {
+        setTimeout(() => setActiveTabId(added[added.length - 1].id), 50);
+      }
+
       return [...updated, ...added];
     });
-  }, [projects, isRestored]);
+  }, [projects, isRestored, hiddenProjectIds]);
 
   // Auto-select first tab if none is active
   useEffect(() => {
@@ -261,7 +270,12 @@ export function ApiExplorerSidebarPanel({
 
   // Run scan when switching scanned project tab
   useEffect(() => {
-    if (!activeTab) return;
+    if (!activeTab) {
+      setSelectedRouteKey(null);
+      setTree([]);
+      setLogs([]);
+      return;
+    }
     setSelectedRouteKey(null);
     setTree([]);
     setLogs([]);
@@ -298,7 +312,7 @@ export function ApiExplorerSidebarPanel({
     }
 
     void scan(activeTab, { force: false });
-  }, [activeTabId]);
+  }, [activeTabId, activeTab?.path, activeRouteKey, treeCache]);
 
   const scan = async (tab: ApiProjectTab, opts?: { force?: boolean }) => {
     const force = Boolean(opts?.force);
@@ -334,6 +348,11 @@ export function ApiExplorerSidebarPanel({
   };
 
   const addTabFromProject = async (p: Project) => {
+    setHiddenProjectIds((prev) => {
+      const next = prev.filter((x) => x !== p.id);
+      apiClient.storeSet("hiddenProjectIds", next);
+      return next;
+    });
     let port: number | null = null;
     
     // 1. Check if running in DevDash
@@ -393,6 +412,16 @@ export function ApiExplorerSidebarPanel({
   };
 
   const removeTab = (id: string) => {
+    const tabToRemove = tabs.find((t) => t.id === id);
+    if (tabToRemove) {
+      setTreeCache((prev) => {
+        const next = { ...prev };
+        delete next[tabToRemove.path];
+        apiClient.storeSet("apiScannerTreeCache", next);
+        return next;
+      });
+    }
+
     setTabs((prev) => {
       const next = prev.filter((t) => t.id !== id);
       if (activeTabId === id) {
@@ -403,6 +432,13 @@ export function ApiExplorerSidebarPanel({
       }
       return next;
     });
+    if (!id.startsWith("folder_")) {
+      setHiddenProjectIds((prev) => {
+        const next = [...prev.filter((x) => x !== id), id];
+        apiClient.storeSet("hiddenProjectIds", next);
+        return next;
+      });
+    }
   };
 
   const updateActiveBaseUrl = (baseUrl: string) => {
@@ -729,7 +765,7 @@ export function ApiExplorerSidebarPanel({
                     <SelectValue placeholder="Choose project..." />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border text-foreground">
-                    {projects.map((p) => (
+                    {projects.filter((p) => !tabs.some((t) => t.id === p.id)).map((p) => (
                       <SelectItem key={p.id} value={p.id} className="text-xs">
                         {p.name}
                       </SelectItem>
@@ -814,43 +850,30 @@ export function ApiExplorerSidebarPanel({
                           <span className="truncate max-w-[130px] font-medium">{t.name}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Server controls for registered projects */}
-                          {project && (
-                            <div className="flex items-center shrink-0">
-                              {isStarting || isStopping ? (
-                                <RefreshCw size={10} className="animate-spin text-amber-400" />
+                          {active ? (
+                            <div className="relative w-4 h-4 flex items-center justify-center">
+                              {loading ? (
+                                <RefreshCw size={11} className="animate-spin text-primary group-hover:hidden" />
                               ) : (
-                                <button
-                                  className={cn(
-                                    "flex items-center justify-center p-0.5 rounded hover:bg-white/5 transition-all text-muted-foreground",
-                                    isRunning ? "hover:text-rose-400" : "hover:text-emerald-400",
-                                    isRunning ? "opacity-60 group-hover:opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                  )}
-                                  title={isRunning ? "Stop Server" : "Start Server"}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    apiClient.toggleServer(project);
-                                  }}
-                                >
-                                  {isRunning ? (
-                                    <Square size={10} fill="currentColor" />
-                                  ) : (
-                                    <Play size={10} fill="currentColor" />
-                                  )}
-                                </button>
+                                !project && <div className="w-1.5 h-1.5 rounded-full bg-primary group-hover:hidden" />
                               )}
+                              <button
+                                className="hidden group-hover:flex items-center justify-center text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeTab(t.id);
+                                }}
+                              >
+                                <X size={11} />
+                              </button>
                             </div>
-                          )}
-
-                          {/* Delete button (only show for manual folders) */}
-                          {!project && (
+                          ) : (
                             <button
                               className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 removeTab(t.id);
                               }}
-                              title="Unlink Folder"
                             >
                               <X size={10} />
                             </button>

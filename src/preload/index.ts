@@ -222,6 +222,15 @@ export const api = {
   gitCommit: (projectPath: string, message: string) => {
     return ipcRenderer.invoke("git:commit", projectPath, message);
   },
+  gitClone: (parentDir: string, repoUrl: string, targetName: string): Promise<{ code: number; stdout: string; stderr: string }> => {
+    return ipcRenderer.invoke("git:clone", parentDir, repoUrl, targetName);
+  },
+  gitCloneCancel: (): Promise<boolean> => {
+    return ipcRenderer.invoke("git:clone-cancel");
+  },
+  onGitCloneLog: (callback: (log: string) => void) => {
+    ipcRenderer.on("git:clone-log", (_event, log) => callback(log));
+  },
   onGitSummaryUpdated: (
     callback: (args: { projectId: string; summary: GitSummary }) => void,
   ) => {
