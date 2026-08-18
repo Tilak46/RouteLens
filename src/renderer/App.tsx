@@ -75,7 +75,8 @@ const defaultTab = (projectId?: string | null): RequestTab => ({
 const BETA_EXPIRY_DATE_STR = "2026-08-28T23:59:59Z"; // GMT / UTC time format
 
 function App() {
-  const isBetaExpired = Date.now() > new Date(BETA_EXPIRY_DATE_STR).getTime();
+  const [testForceExpired, setTestForceExpired] = useState(false);
+  const isBetaExpired = (Date.now() > new Date(BETA_EXPIRY_DATE_STR).getTime()) || testForceExpired;
   const [projects, setProjects] = useState<Project[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -1064,8 +1065,16 @@ function App() {
               <div>• Or contact Tilak via Email: <span className="text-primary font-semibold">tilakbuilds@gmail.com</span></div>
             </div>
 
-            <div className="text-[10px] text-muted-foreground">
-              Build expiration: {new Date(BETA_EXPIRY_DATE_STR).toLocaleDateString()}
+            <div className="text-[10px] text-muted-foreground flex justify-between items-center px-1">
+              <span>Build expiration: {new Date(BETA_EXPIRY_DATE_STR).toLocaleDateString()}</span>
+              {testForceExpired && (
+                <button
+                  onClick={() => setTestForceExpired(false)}
+                  className="text-rose-500 hover:text-rose-400 font-semibold underline underline-offset-2 cursor-pointer"
+                >
+                  Close Preview
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1080,6 +1089,7 @@ function App() {
           sidebarWidth={sidebarWidth}
           onSidebarResizeStart={startSidebarResize}
           onDevToolsClick={() => setIsDevToolsModalOpen(true)}
+          onTestExpiryClick={() => setTestForceExpired(true)}
           consoleDrawer={
             <ConsoleLogsDrawer
               isOpen={isConsoleOpen}

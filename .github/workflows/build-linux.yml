@@ -1,0 +1,38 @@
+name: Build Linux AppImage
+
+on:
+  push:
+    branches:
+      - tilak
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Package AppImage
+        run: npx electron-builder --linux --x64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RouteLens-Linux-AppImage
+          path: release/1.0.1/RouteLens-Linux-1.0.1.AppImage
+          if-no-files-found: error

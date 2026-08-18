@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderCode,
-  Terminal
+  Terminal,
+  Lock
 } from "lucide-react";
 import apiClient from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ type DashboardLayoutProps = {
   sidebarWidth?: number;
   onSidebarResizeStart?: (e: React.MouseEvent) => void;
   onDevToolsClick?: () => void;
+  onTestExpiryClick?: () => void;
 };
 
 export function DashboardLayout({
@@ -45,6 +47,7 @@ export function DashboardLayout({
   sidebarWidth,
   onSidebarResizeStart,
   onDevToolsClick,
+  onTestExpiryClick,
 }: DashboardLayoutProps) {
   // Helper for leftmost toolbar icons
   const ToolbarButton = ({
@@ -131,6 +134,20 @@ export function DashboardLayout({
               </TooltipTrigger>
               <TooltipContent side="right" className="bg-popover border-border text-xs">
                 Developer Panel
+              </TooltipContent>
+            </Tooltip>
+            {/* Expiry Test Button (Temporary) */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onTestExpiryClick}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200"
+                >
+                  <Lock size={15} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-popover border-border text-xs">
+                Test Expiry Screen
               </TooltipContent>
             </Tooltip>
           </div>
