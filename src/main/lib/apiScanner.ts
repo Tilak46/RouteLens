@@ -1,7 +1,7 @@
 import path from "node:path";
 import { ApiFolder, ApiRoute } from "../../types";
 import { scanProjectAst } from "./scanner/core/scanner";
-import { expressParser, nextAppParser, nextParser } from "./scanner/parsers";
+import { expressParser, nextAppParser, nextParser, nestParser } from "./scanner/parsers";
 import type { DetectedRoute } from "./scanner/core/types";
 
 import { buildTreeFromRoutePaths } from "../../shared/apiTree";
@@ -103,6 +103,7 @@ export async function scanProjectForRoutes(
       expressParser,
       nextParser,
       nextAppParser,
+      nestParser,
     ]);
 
     const apiRoutes = result.routes.map((r) =>

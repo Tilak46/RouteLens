@@ -1,7 +1,7 @@
 import type { File } from "@babel/types";
 import type { Method } from "../../../../types";
 
-export type FrameworkId = "express" | "next-pages" | "next-app";
+export type FrameworkId = "express" | "next-pages" | "next-app" | "nest";
 
 export type DetectedRoute = {
   id: string;
