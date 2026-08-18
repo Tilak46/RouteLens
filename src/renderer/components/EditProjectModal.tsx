@@ -54,7 +54,7 @@ export function EditProjectModal({
         ...project,
         name: name.trim(),
         startCommand: command.trim(),
-        groupId: selectedGroupId,
+        groupId: null,
       };
       onSave(updatedProject); // Send the full updated project object back to App.tsx
       onClose(); // Close the modal
@@ -97,39 +97,6 @@ export function EditProjectModal({
               className="font-mono bg-bg border-border-main text-text-main"
             />
           </div>
-
-          {/* === THIS IS THE MISSING DROPDOWN === */}
-          <div className="grid w-full items-center gap-2.5">
-            <Label htmlFor="editGroupSelect" className="text-text-main">
-              Assign to Group
-            </Label>
-            <Select
-              // Ensure value is correctly handled whether groupId is null/undefined or a string
-              value={selectedGroupId ?? "ungrouped"}
-              onValueChange={(value) =>
-                setSelectedGroupId(value === "ungrouped" ? null : value)
-              }
-            >
-              <SelectTrigger
-                id="editGroupSelect"
-                className="w-full bg-bg border-border-main text-text-main"
-              >
-                {/* Placeholder shows when value is null/undefined */}
-                <SelectValue placeholder="Select a group..." />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Option for Ungrouped */}
-                <SelectItem value="ungrouped">-- Ungrouped --</SelectItem>
-                {/* List all available groups */}
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* === END OF MISSING DROPDOWN === */}
         </div>
         <DialogFooter>
           <DialogClose asChild>

@@ -468,19 +468,66 @@ export function RequestPanel({
     }
 
     if (conflictingProject) {
-      return (
-        <span>
-          <strong>Port Conflict:</strong> The target server <strong>{ownerProject.name}</strong> is offline, but port <strong>{targetPort}</strong> is occupied by another running server: <strong>{conflictingProject.name}</strong>. Your requests will hit the wrong backend!
-        </span>
-      );
+      return {
+        message: (
+          <span>
+            <strong>Port Conflict:</strong> The target server <strong>{ownerProject.name}</strong> is offline, but port <strong>{targetPort}</strong> is occupied by another running server: <strong>{conflictingProject.name}</strong>. Your requests will hit the wrong backend!
+          </span>
+        ),
+      };
+    }
+
+    if (ownerState?.status === "starting") {
+      return {
+        message: (
+          <span>
+            <strong>Server Starting:</strong> The target server <strong>{ownerProject.name}</strong> is starting up...
+          </span>
+        ),
+        action: (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 text-amber-400 font-medium bg-amber-500/5 rounded border border-amber-500/20">
+            <Loader2 className="animate-spin" size={12} />
+            <span>Starting</span>
+          </div>
+        )
+      };
+    }
+
+    if (ownerState?.status === "stopping") {
+      return {
+        message: (
+          <span>
+            <strong>Server Stopping:</strong> The target server <strong>{ownerProject.name}</strong> is shutting down...
+          </span>
+        ),
+        action: (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 text-amber-400 font-medium bg-amber-500/5 rounded border border-amber-500/20">
+            <Loader2 className="animate-spin" size={12} />
+            <span>Stopping</span>
+          </div>
+        )
+      };
     }
 
     if (!isOwnerRunning) {
-      return (
-        <span>
-          <strong>Server Offline:</strong> The target server <strong>{ownerProject.name}</strong> is not running. Requests to this URL may fail.
-        </span>
-      );
+      return {
+        message: (
+          <span>
+            <strong>Server Offline:</strong> The target server <strong>{ownerProject.name}</strong> is not running. Requests to this URL may fail.
+          </span>
+        ),
+        action: (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => apiClient.toggleServer(ownerProject)}
+            className="h-7 text-[11px] px-3 font-semibold bg-amber-500 text-black hover:bg-amber-400 border border-amber-600/30 shadow hover:shadow-md transition-all shrink-0 flex items-center gap-1.5 rounded"
+          >
+            <Play size={10} fill="currentColor" className="shrink-0" />
+            Start Server
+          </Button>
+        )
+      };
     }
 
     return null;
@@ -1168,11 +1215,18 @@ export function RequestPanel({
       </div>
 
       {warningBanner && (
-        <div className="flex items-start gap-2.5 p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-md mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
-          <span className="mt-0.5 font-bold">⚠️</span>
-          <div className="flex-1 leading-normal">
-            {warningBanner}
+        <div className="flex items-center justify-between gap-3 p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-md mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-start gap-2.5 flex-1 min-w-0">
+            <span className="mt-0.5 font-bold shrink-0">⚠️</span>
+            <div className="leading-normal flex-1 text-left">
+              {warningBanner.message}
+            </div>
           </div>
+          {warningBanner.action && (
+            <div className="shrink-0">
+              {warningBanner.action}
+            </div>
+          )}
         </div>
       )}
 

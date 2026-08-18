@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, RefreshCw, X, Compass, FolderPlus, FileCode, ChevronDown } from "lucide-react";
+import { Plus, RefreshCw, X, Compass, FolderPlus, FileCode, ChevronDown, Play, Square } from "lucide-react";
 import { ApiRoute, ApiFolder, Project, isRoute, ApiProjectTab } from "../../types";
 
 const API_EXPLORER_SCAN_CACHE_KEY = "devdash.apiExplorer.scanCache.v1";
@@ -76,7 +76,7 @@ export function ApiExplorerSidebarPanel({
   }, [activeRouteKey]);
 
   const [tabs, setTabs] = useState<ApiProjectTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [activeTabId, setActiveTabId] = useState<string | null>(activeProjectId || null);
   const [addPopoverOpen, setAddPopoverOpen] = useState(false);
   const [addProjectId, setAddProjectId] = useState<string | null>(null);
 
@@ -86,6 +86,7 @@ export function ApiExplorerSidebarPanel({
   // Electron Store backed treeCache is now a prop
   const [expandedFolderMap, setExpandedFolderMap] = useState<Record<string, string[]>>({});
   const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useState<string | null>(null);
+  const [hiddenProjectIds, setHiddenProjectIds] = useState<string[]>([]);
 
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) || null,
@@ -162,6 +163,10 @@ export function ApiExplorerSidebarPanel({
       if (val && typeof val === "object") setExpandedFolderMap(val);
     });
 
+    apiClient.storeGet("hiddenProjectIds").then((val) => {
+      if (Array.isArray(val)) setHiddenProjectIds(val);
+    });
+
     apiClient.storeGet("scannersPanelExpanded").then((val) => {
       if (typeof val === "boolean") setIsScannersExpanded(val);
     });
@@ -210,25 +215,67 @@ export function ApiExplorerSidebarPanel({
     }
   }, [activeTabId, onActiveProjectIdChange]);
 
-  // Keep project names/paths in sync with DevDash project configuration updates
+  // Sync projects with tabs: auto-add missing projects (except hidden ones), update existing project names/paths, and remove deleted projects
   useEffect(() => {
-    if (!projects.length) return;
-    setTabs((prev) =>
-      prev.map((t) => {
+    if (!isRestored) return;
+    setTabs((prev) => {
+      // Clean up tabs whose projects no longer exist (ignore custom folders starting with "folder_")
+      const cleaned = prev.filter((t) => t.id.startsWith("folder_") || projects.some((p) => p.id === t.id));
+      
+      // Map existing project tabs to update names/paths in case they changed
+      const updated = cleaned.map((t) => {
         const p = projects.find((x) => x.id === t.id);
         if (!p) return t;
         return {
           ...t,
           name: p.name,
           path: p.path,
+          baseUrl: t.baseUrl === "http://localhost:3000" && p.url ? p.url : t.baseUrl,
         };
-      }),
-    );
-  }, [projects]);
+      });
+
+      // Add missing projects (excluding hidden ones)
+      const missing = projects.filter((p) => !updated.some((t) => t.id === p.id) && !hiddenProjectIds.includes(p.id));
+      if (missing.length === 0) {
+        // Compare to see if updated is actually different from prev
+        const isSame = prev.length === updated.length && prev.every((t, i) => t.id === updated[i].id && t.name === updated[i].name && t.path === updated[i].path && t.baseUrl === updated[i].baseUrl);
+        if (isSame) return prev;
+        return updated;
+      }
+
+      const added = missing.map((p) => {
+        let baseUrl = p.url || "http://localhost:3000";
+        return {
+          id: p.id,
+          name: p.name,
+          path: p.path,
+          baseUrl,
+        };
+      });
+
+      if (added.length > 0) {
+        setTimeout(() => setActiveTabId(added[added.length - 1].id), 50);
+      }
+
+      return [...updated, ...added];
+    });
+  }, [projects, isRestored, hiddenProjectIds]);
+
+  // Auto-select first tab if none is active
+  useEffect(() => {
+    if (isRestored && tabs.length > 0 && !activeTabId) {
+      setActiveTabId(tabs[0].id);
+    }
+  }, [tabs, activeTabId, isRestored]);
 
   // Run scan when switching scanned project tab
   useEffect(() => {
-    if (!activeTab) return;
+    if (!activeTab) {
+      setSelectedRouteKey(null);
+      setTree([]);
+      setLogs([]);
+      return;
+    }
     setSelectedRouteKey(null);
     setTree([]);
     setLogs([]);
@@ -265,7 +312,7 @@ export function ApiExplorerSidebarPanel({
     }
 
     void scan(activeTab, { force: false });
-  }, [activeTabId]);
+  }, [activeTabId, activeTab?.path, activeRouteKey, treeCache]);
 
   const scan = async (tab: ApiProjectTab, opts?: { force?: boolean }) => {
     const force = Boolean(opts?.force);
@@ -301,6 +348,11 @@ export function ApiExplorerSidebarPanel({
   };
 
   const addTabFromProject = async (p: Project) => {
+    setHiddenProjectIds((prev) => {
+      const next = prev.filter((x) => x !== p.id);
+      apiClient.storeSet("hiddenProjectIds", next);
+      return next;
+    });
     let port: number | null = null;
     
     // 1. Check if running in DevDash
@@ -360,6 +412,16 @@ export function ApiExplorerSidebarPanel({
   };
 
   const removeTab = (id: string) => {
+    const tabToRemove = tabs.find((t) => t.id === id);
+    if (tabToRemove) {
+      setTreeCache((prev) => {
+        const next = { ...prev };
+        delete next[tabToRemove.path];
+        apiClient.storeSet("apiScannerTreeCache", next);
+        return next;
+      });
+    }
+
     setTabs((prev) => {
       const next = prev.filter((t) => t.id !== id);
       if (activeTabId === id) {
@@ -370,6 +432,13 @@ export function ApiExplorerSidebarPanel({
       }
       return next;
     });
+    if (!id.startsWith("folder_")) {
+      setHiddenProjectIds((prev) => {
+        const next = [...prev.filter((x) => x !== id), id];
+        apiClient.storeSet("hiddenProjectIds", next);
+        return next;
+      });
+    }
   };
 
   const updateActiveBaseUrl = (baseUrl: string) => {
@@ -696,7 +765,7 @@ export function ApiExplorerSidebarPanel({
                     <SelectValue placeholder="Choose project..." />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border text-foreground">
-                    {projects.map((p) => (
+                    {projects.filter((p) => !tabs.some((t) => t.id === p.id)).map((p) => (
                       <SelectItem key={p.id} value={p.id} className="text-xs">
                         {p.name}
                       </SelectItem>
@@ -741,54 +810,78 @@ export function ApiExplorerSidebarPanel({
                 No API directories linked.
               </div>
             ) : (
-              tabs.map((t) => {
-                const active = t.id === activeTabId;
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => setActiveTabId(t.id)}
-                    className={cn(
-                       "group px-2.5 py-1.5 rounded-lg border flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
-                      active
-                        ? "bg-card border-border/80 text-foreground"
-                        : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
-                    )}
-                    title={t.path}
-                  >
-                    <span className="truncate max-w-[160px] font-medium">{t.name}</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {active ? (
-                        <div className="relative w-4 h-4 flex items-center justify-center">
-                          {loading ? (
-                            <RefreshCw size={11} className="animate-spin text-primary group-hover:hidden" />
-                          ) : (
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary group-hover:hidden" />
+                  tabs.map((t) => {
+                    const active = t.id === activeTabId;
+                    const project = projects.find((p) => p.id === t.id);
+                    const pState = projectState?.[t.id];
+                    const serverStatus = pState?.status || "stopped";
+                    const isRunning = serverStatus === "running";
+                    const isStarting = serverStatus === "starting";
+                    const isStopping = serverStatus === "stopping";
+
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setActiveTabId(t.id)}
+                        className={cn(
+                           "group px-2.5 py-1.5 rounded-lg border flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
+                          active
+                            ? "bg-card border-border/80 text-foreground"
+                            : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        )}
+                        title={t.path}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {project && (
+                            <div
+                              className={cn(
+                                "w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300",
+                                isRunning
+                                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"
+                                  : isStarting
+                                  ? "bg-amber-500 animate-pulse"
+                                  : isStopping
+                                  ? "bg-rose-500 animate-pulse"
+                                  : "bg-zinc-500"
+                              )}
+                              title={`Server: ${serverStatus}`}
+                            />
                           )}
-                          <button
-                            className="hidden group-hover:flex items-center justify-center text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeTab(t.id);
-                            }}
-                          >
-                            <X size={11} />
-                          </button>
+                          <span className="truncate max-w-[130px] font-medium">{t.name}</span>
                         </div>
-                      ) : (
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeTab(t.id);
-                          }}
-                        >
-                          <X size={10} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {active ? (
+                            <div className="relative w-4 h-4 flex items-center justify-center">
+                              {loading ? (
+                                <RefreshCw size={11} className="animate-spin text-primary group-hover:hidden" />
+                              ) : (
+                                !project && <div className="w-1.5 h-1.5 rounded-full bg-primary group-hover:hidden" />
+                              )}
+                              <button
+                                className="hidden group-hover:flex items-center justify-center text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeTab(t.id);
+                                }}
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeTab(t.id);
+                              }}
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
             )}
           </div>
         )}

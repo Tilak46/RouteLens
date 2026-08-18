@@ -13,7 +13,9 @@ import {
   Ghost,
   ChevronLeft,
   ChevronRight,
-  FolderCode
+  FolderCode,
+  Terminal,
+  Lock
 } from "lucide-react";
 import apiClient from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
@@ -30,6 +32,8 @@ type DashboardLayoutProps = {
   onToggleSidebar: () => void;
   sidebarWidth?: number;
   onSidebarResizeStart?: (e: React.MouseEvent) => void;
+  onDevToolsClick?: () => void;
+  onTestExpiryClick?: () => void;
 };
 
 export function DashboardLayout({
@@ -42,6 +46,8 @@ export function DashboardLayout({
   onToggleSidebar,
   sidebarWidth,
   onSidebarResizeStart,
+  onDevToolsClick,
+  onTestExpiryClick,
 }: DashboardLayoutProps) {
   // Helper for leftmost toolbar icons
   const ToolbarButton = ({
@@ -99,7 +105,6 @@ export function DashboardLayout({
             {/* Tabs */}
             <ToolbarButton tabId="explorer" icon={Compass} label="API Discovery" />
             <ToolbarButton tabId="servers" icon={Server} label="Local Servers" />
-            <ToolbarButton tabId="automations" icon={Zap} label="Stack Automations" />
           </div>
 
           <div className="flex flex-col items-center gap-3 w-full">
@@ -117,9 +122,34 @@ export function DashboardLayout({
                 Ghost Mode Widget
               </TooltipContent>
             </Tooltip>
-
-            {/* Settings */}
-            <ToolbarButton tabId="settings" icon={Settings} label="RouteLens Settings" />
+            {/* Dev Tools */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onDevToolsClick}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-200"
+                >
+                  <Terminal size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-popover border-border text-xs">
+                Developer Panel
+              </TooltipContent>
+            </Tooltip>
+            {/* Expiry Test Button (Temporary) */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onTestExpiryClick}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200"
+                >
+                  <Lock size={15} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-popover border-border text-xs">
+                Test Expiry Screen
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 

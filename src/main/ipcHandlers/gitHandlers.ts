@@ -3,9 +3,11 @@ import type Store from "electron-store";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import treeKill from "tree-kill";
 import type { GitSummary, StoreType } from "../../types";
 
 let getMainWindow: () => BrowserWindow | null;
+let activeCloneChild: any = null;
 
 type GitExecResult = {
   code: number;
@@ -33,27 +35,64 @@ function runGit(
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "echo" },
     });
+
+    if (args[0] === "clone") {
+      activeCloneChild = child;
+    }
 
     let stdout = "";
     let stderr = "";
 
     const timeoutMs = opts?.timeoutMs ?? 30_000;
     const timeout = setTimeout(() => {
-      child.kill();
+      if (child.pid) {
+        treeKill(child.pid, "SIGKILL");
+      } else {
+        child.kill();
+      }
+      if (args[0] === "clone") {
+        activeCloneChild = null;
+      }
       reject(new Error(`git ${args.join(" ")} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
-    child.stdout?.on("data", (d) => (stdout += d.toString()));
-    child.stderr?.on("data", (d) => (stderr += d.toString()));
+    child.stdout?.on("data", (d) => {
+      const str = d.toString();
+      stdout += str;
+      if (args[0] === "clone") {
+        const mainWindow = getMainWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send("git:clone-log", str);
+        }
+      }
+    });
+
+    child.stderr?.on("data", (d) => {
+      const str = d.toString();
+      stderr += str;
+      if (args[0] === "clone") {
+        const mainWindow = getMainWindow();
+        if (mainWindow) {
+          mainWindow.webContents.send("git:clone-log", str);
+        }
+      }
+    });
 
     child.on("error", (err) => {
       clearTimeout(timeout);
+      if (args[0] === "clone") {
+        activeCloneChild = null;
+      }
       reject(err);
     });
 
     child.on("close", (code) => {
       clearTimeout(timeout);
+      if (args[0] === "clone") {
+        activeCloneChild = null;
+      }
       resolve({ code: code ?? 0, stdout, stderr });
     });
   });
@@ -379,6 +418,49 @@ export function registerGitHandlers(
       return res;
     },
   );
+
+  ipcMain.handle(
+    "git:clone",
+    async (_event, parentDir: string, repoUrl: string, targetName: string) => {
+      const url = (repoUrl || "").trim();
+      const name = (targetName || "").trim();
+      const dir = (parentDir || "").trim();
+      if (!url || !name || !dir) {
+        return { code: 1, stdout: "", stderr: "All fields are required" };
+      }
+
+      try {
+        if (!fs.existsSync(dir)) {
+          return { code: 1, stdout: "", stderr: "Parent directory does not exist" };
+        }
+
+        const targetPath = path.join(dir, name);
+        if (fs.existsSync(targetPath)) {
+          return { code: 1, stdout: "", stderr: "Target directory already exists" };
+        }
+
+        const res = await runGit(dir, ["clone", "--depth", "1", url, name], { timeoutMs: 90_000 });
+        return res;
+      } catch (err: any) {
+        return { code: 1, stdout: "", stderr: err?.message || "Clone failed" };
+      }
+    },
+  );
+
+  ipcMain.handle("git:clone-cancel", async () => {
+    if (activeCloneChild) {
+      try {
+        if (activeCloneChild.pid) {
+          treeKill(activeCloneChild.pid, "SIGKILL");
+        } else {
+          activeCloneChild.kill();
+        }
+      } catch (err) {}
+      activeCloneChild = null;
+      return true;
+    }
+    return false;
+  });
 
   // Background refresh every 45 minutes
   const refreshAll = async () => {

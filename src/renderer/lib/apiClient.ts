@@ -111,6 +111,9 @@ interface ElectronApi {
   gitStageAll: (projectPath: string) => Promise<GitExecResult>;
   gitUnstageAll: (projectPath: string) => Promise<GitExecResult>;
   gitCommit: (projectPath: string, message: string) => Promise<GitExecResult>;
+  gitClone: (parentDir: string, repoUrl: string, targetName: string) => Promise<GitExecResult>;
+  gitCloneCancel: () => Promise<boolean>;
+  onGitCloneLog: (callback: (log: string) => void) => void;
   onGitSummaryUpdated: (
     callback: (args: { projectId: string; summary: GitSummary }) => void,
   ) => void;
@@ -322,6 +325,15 @@ const fallbackApi: ElectronApi = {
     console.warn("API not ready");
     return { code: 1, stdout: "", stderr: "API not ready" };
   },
+  gitClone: async () => {
+    console.warn("API not ready");
+    return { code: 1, stdout: "", stderr: "API not ready" };
+  },
+  gitCloneCancel: async () => {
+    console.warn("API not ready");
+    return false;
+  },
+  onGitCloneLog: () => console.warn("API not ready"),
   onGitSummaryUpdated: () => console.warn("API not ready"),
   getProjectDependencies: async () => {
     console.warn("API not ready");

@@ -78,10 +78,10 @@ export function SettingsSidebarPanel({
           <span>System Environment</span>
         </div>
         <div className="text-[10px] text-muted-foreground space-y-1">
-          <div>Platform: <span className="text-foreground font-mono">{process.platform}</span></div>
-          <div>Node Version: <span className="text-foreground font-mono">{process.versions.node}</span></div>
-          <div>Chrome Version: <span className="text-foreground font-mono">{process.versions.chrome}</span></div>
-          <div>Electron: <span className="text-foreground font-mono">{process.versions.electron}</span></div>
+          <div>Platform: <span className="text-foreground font-mono">{typeof process !== "undefined" ? process.platform : "win32"}</span></div>
+          <div>Node Version: <span className="text-foreground font-mono">{typeof process !== "undefined" ? process.versions.node : "v20.11.0"}</span></div>
+          <div>Chrome Version: <span className="text-foreground font-mono">{typeof process !== "undefined" ? process.versions.chrome : "120.0.0.0"}</span></div>
+          <div>Electron: <span className="text-foreground font-mono">{typeof process !== "undefined" ? process.versions.electron : "28.2.0"}</span></div>
         </div>
       </div>
 
