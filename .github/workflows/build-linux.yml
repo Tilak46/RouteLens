@@ -1,4 +1,4 @@
-name: Build Linux AppImage
+name: Build Linux and Mac Installers
 
 on:
   push:
@@ -7,7 +7,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - name: Checkout Code
@@ -25,14 +28,30 @@ jobs:
       - name: Build Application
         run: npm run build
 
-      - name: Package AppImage
+      - name: Package Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
         run: npx electron-builder --linux --x64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload AppImage Artifact
+      - name: Package Mac DMG
+        if: matrix.os == 'macos-latest'
+        run: npx electron-builder --mac --universal
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux Artifact
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: RouteLens-Linux-AppImage
           path: release/1.0.1/RouteLens-Linux-1.0.1.AppImage
+          if-no-files-found: error
+
+      - name: Upload Mac Artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RouteLens-Mac-Installer
+          path: release/1.0.1/RouteLens-Mac-1.0.1-Installer.dmg
           if-no-files-found: error

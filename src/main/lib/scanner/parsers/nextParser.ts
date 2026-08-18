@@ -158,7 +158,16 @@ function exportedAppRouterMethods(ast: t.File): Method[] {
   for (const stmt of ast.program.body) {
     if (stmt.type === "ExportNamedDeclaration") {
       const decl = stmt.declaration;
-      if (!decl) continue;
+      if (!decl) {
+        // Handle export { GET, POST } from './handler' or export { GET, POST }
+        for (const spec of stmt.specifiers) {
+          if (spec.type === "ExportSpecifier" && spec.exported.type === "Identifier") {
+            const name = spec.exported.name.toUpperCase() as Method;
+            if (HTTP_METHODS.includes(name)) found.add(name);
+          }
+        }
+        continue;
+      }
 
       if (
         decl.type === "FunctionDeclaration" &&
@@ -170,10 +179,17 @@ function exportedAppRouterMethods(ast: t.File): Method[] {
 
       if (decl.type === "VariableDeclaration") {
         for (const d of decl.declarations) {
-          if (d.id.type !== "Identifier") continue;
-          const name = d.id.name.toUpperCase() as Method;
-          if (!HTTP_METHODS.includes(name)) continue;
-          found.add(name);
+          if (d.id.type === "Identifier") {
+            const name = d.id.name.toUpperCase() as Method;
+            if (HTTP_METHODS.includes(name)) found.add(name);
+          } else if (d.id.type === "ObjectPattern") {
+            for (const prop of d.id.properties) {
+              if (prop.type === "ObjectProperty" && prop.key.type === "Identifier") {
+                const name = prop.key.name.toUpperCase() as Method;
+                if (HTTP_METHODS.includes(name)) found.add(name);
+              }
+            }
+          }
         }
       }
     }
