@@ -15,6 +15,8 @@ export type DetectedRoute = {
   pathParams?: string[];
   inferredBodyFields?: string[];
   inferredQueryFields?: string[];
+  confidence?: "high" | "medium" | "low";
+  bodyConfidence?: "high" | "medium" | "low";
 };
 
 export type AstCacheStats = {

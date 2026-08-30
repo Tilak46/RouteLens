@@ -47,7 +47,16 @@ export type StoreType = {
   activeEnvId?: string | null;
   apiScannerTabs?: ApiProjectTab[];
   activeApiScannerTabId?: string | null;
-  apiScannerTreeCache?: Record<string, { tree: ApiFolder[]; logs: string[]; selectedRouteKey?: string | null }>;
+  apiScannerTreeCache?: Record<
+    string,
+    {
+      tree: ApiFolder[];
+      logs: string[];
+      selectedRouteKey?: string | null;
+      potentialRoutesCount?: number;
+      detectedRoutesCount?: number;
+    }
+  >;
   expandedFolderIds?: Record<string, string[]>;
   activeSidebarTab?: string;
   isSidebarExpanded?: boolean;
@@ -148,6 +157,8 @@ export type SystemStats = {
 
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "ALL";
 
+export type ConfidenceLevel = "high" | "medium" | "low";
+
 export type ApiRoute = {
   id: string;
   name: string;
@@ -162,6 +173,8 @@ export type ApiRoute = {
   pathParams?: string[];
   inferredBodyFields?: string[];
   inferredQueryFields?: string[];
+  confidence?: ConfidenceLevel;
+  bodyConfidence?: ConfidenceLevel;
 };
 
 export type ApiFolder = {

@@ -87,7 +87,9 @@ interface ElectronApi {
   launchAppWorkspace: (
     id: string,
   ) => Promise<{ success: boolean; error?: string }>;
-  scanProject: (path: string) => Promise<{ tree: ApiFolder[]; logs: string[] }>; // API Explorer
+  scanProject: (
+    path: string,
+  ) => Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number }>; // API Explorer
   runApiRequest: (request: ApiHttpRequest) => Promise<ApiHttpResponse>; // API Explorer
   detectProjectPort: (path: string) => Promise<number | null>;
 
@@ -227,7 +229,7 @@ const fallbackApi: ElectronApi = {
   },
   scanProject: async () => {
     console.warn("API not ready");
-    return { tree: [], logs: [] };
+    return { tree: [], logs: [], potentialRoutesCount: 0, detectedRoutesCount: 0 };
   },
   runApiRequest: async () => {
     console.warn("API not ready");

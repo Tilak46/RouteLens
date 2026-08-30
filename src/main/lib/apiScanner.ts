@@ -76,6 +76,18 @@ function mapDetectedToApiRoute(
 ): ApiRoute {
   const fileRel = path.relative(projectPath, r.file).replace(/\\/g, "/");
   const middlewares = Array.isArray(r.middlewares) ? r.middlewares : [];
+
+  let confidence = r.confidence;
+  if (!confidence) {
+    // Treat catch-alls or custom regex as medium, standard paths (static or dynamic :id) as high
+    confidence = r.path.includes("*") ? "medium" : "high";
+  }
+
+  let bodyConfidence = r.bodyConfidence;
+  if (!bodyConfidence && ["POST", "PUT", "PATCH"].includes(r.method)) {
+    bodyConfidence = r.inferredBodyFields && r.inferredBodyFields.length > 0 ? "high" : "medium";
+  }
+
   return {
     id: r.id,
     name: toDisplayName(r.method, r.path),
@@ -88,12 +100,14 @@ function mapDetectedToApiRoute(
     pathParams: r.pathParams,
     inferredBodyFields: r.inferredBodyFields,
     inferredQueryFields: r.inferredQueryFields,
+    confidence,
+    bodyConfidence,
   };
 }
 
 export async function scanProjectForRoutes(
   projectPath: string,
-): Promise<{ tree: ApiFolder[]; logs: string[] }> {
+): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number }> {
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
 
@@ -125,11 +139,19 @@ export async function scanProjectForRoutes(
 
     const tree = buildTreeFromRoutePaths(namedRoutes);
 
-    return { tree, logs: [...logs, ...result.logs] };
+    // Make sure we don't return fewer potential routes than actually detected
+    const potentialRoutesCount = Math.max(result.potentialRoutesCount, apiRoutes.length);
+
+    return { 
+      tree, 
+      logs: [...logs, ...result.logs],
+      potentialRoutesCount,
+      detectedRoutesCount: apiRoutes.length
+    };
   } catch (error) {
     const errorMsg = `Failed to scan project: ${error}`;
     console.error(errorMsg);
     logs.push(errorMsg);
-    return { tree: [], logs };
+    return { tree: [], logs, potentialRoutesCount: 0, detectedRoutesCount: 0 };
   }
 }

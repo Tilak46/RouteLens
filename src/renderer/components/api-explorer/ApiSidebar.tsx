@@ -285,6 +285,19 @@ function TreeNode({
         )}
 
         <MethodBadge method={node.method} />
+        {!node.id.startsWith("request_") && (
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0 ml-2 mr-2",
+              node.confidence === "low"
+                ? "bg-red-500"
+                : node.confidence === "medium"
+                  ? "bg-yellow-500"
+                  : "bg-green-500"
+            )}
+            title={`Scanner Confidence: ${node.confidence === "low" ? "Low (Manual Verification)" : node.confidence === "medium" ? "Medium" : "High (100% Correct)"}`}
+          />
+        )}
         
         {isRenaming ? (
           <input
@@ -667,7 +680,7 @@ function MethodBadge({ method }: { method: string }) {
   return (
     <span
       className={cn(
-        "text-[10px] font-bold w-8 shrink-0 text-left",
+        "text-[10px] font-bold w-10 shrink-0 text-right",
         colors[method] || "text-gray-400",
       )}
     >

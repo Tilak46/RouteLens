@@ -158,7 +158,16 @@ function exportedAppRouterMethods(ast: t.File): Method[] {
   for (const stmt of ast.program.body) {
     if (stmt.type === "ExportNamedDeclaration") {
       const decl = stmt.declaration;
-      if (!decl) continue;
+      if (!decl) {
+        // Handle export { GET, POST } from './handler' or export { GET, POST }
+        for (const spec of stmt.specifiers) {
+          if (spec.type === "ExportSpecifier" && spec.exported.type === "Identifier") {
+            const name = spec.exported.name.toUpperCase() as Method;
+            if (HTTP_METHODS.includes(name)) found.add(name);
+          }
+        }
+        continue;
+      }
 
       if (
         decl.type === "FunctionDeclaration" &&
@@ -170,10 +179,17 @@ function exportedAppRouterMethods(ast: t.File): Method[] {
 
       if (decl.type === "VariableDeclaration") {
         for (const d of decl.declarations) {
-          if (d.id.type !== "Identifier") continue;
-          const name = d.id.name.toUpperCase() as Method;
-          if (!HTTP_METHODS.includes(name)) continue;
-          found.add(name);
+          if (d.id.type === "Identifier") {
+            const name = d.id.name.toUpperCase() as Method;
+            if (HTTP_METHODS.includes(name)) found.add(name);
+          } else if (d.id.type === "ObjectPattern") {
+            for (const prop of d.id.properties) {
+              if (prop.type === "ObjectProperty" && prop.key.type === "Identifier") {
+                const name = prop.key.name.toUpperCase() as Method;
+                if (HTTP_METHODS.includes(name)) found.add(name);
+              }
+            }
+          }
         }
       }
     }
@@ -223,6 +239,42 @@ export const nextParser: FrameworkParser = {
   },
 };
 
+function inferNextAppBodyFields(ast: t.File): string[] {
+  const fields = new Set<string>();
+
+  traverse(ast, {
+    VariableDeclarator(p) {
+      const init = p.node.init;
+      if (!init) return;
+
+      let isRequestJsonCall = false;
+
+      // Handle await request.json() or await req.json()
+      if (init.type === "AwaitExpression") {
+        const arg = init.argument;
+        if (
+          arg.type === "CallExpression" &&
+          arg.callee.type === "MemberExpression" &&
+          arg.callee.property.type === "Identifier" &&
+          arg.callee.property.name === "json"
+        ) {
+          isRequestJsonCall = true;
+        }
+      }
+
+      if (isRequestJsonCall && p.node.id.type === "ObjectPattern") {
+        for (const prop of p.node.id.properties) {
+          if (prop.type === "ObjectProperty" && prop.key.type === "Identifier") {
+            fields.add(prop.key.name);
+          }
+        }
+      }
+    }
+  });
+
+  return Array.from(fields);
+}
+
 export const nextAppParser: FrameworkParser = {
   id: "next-app",
   detectProject: (ctx) => hasNextProjectMarkers(ctx.rootPath, ctx.files),
@@ -245,7 +297,10 @@ export const nextAppParser: FrameworkParser = {
       if (!ast) continue;
 
       const methods = exportedAppRouterMethods(ast as any);
+      const bodyFields = inferNextAppBodyFields(ast as any);
+
       for (const m of methods) {
+        const isMutation = ["POST", "PUT", "PATCH"].includes(m);
         out.push({
           id: "",
           framework: "next-app",
@@ -254,6 +309,9 @@ export const nextAppParser: FrameworkParser = {
           file: f,
           handler: m,
           middlewares: [],
+          inferredBodyFields: isMutation ? bodyFields : [],
+          confidence: "high",
+          bodyConfidence: isMutation ? (bodyFields.length > 0 ? "high" : "medium") : undefined,
         });
       }
     }

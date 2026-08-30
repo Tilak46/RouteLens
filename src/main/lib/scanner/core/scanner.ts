@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import { indexProjectFiles } from "./fileIndex";
 import { parseFileAstCached, getAstCacheStats } from "./astCache";
 import { resolveImportToFile } from "./resolveImport";
@@ -7,11 +8,69 @@ import type { DetectedRoute, FrameworkParser, ScannerContext } from "./types";
 export type ScanResult = {
   routes: DetectedRoute[];
   logs: string[];
+  potentialRoutesCount: number;
 };
 
 function stableId(parts: string[]): string {
   const raw = parts.join("|");
   return `route_${Buffer.from(raw).toString("base64url")}`;
+}
+
+async function estimatePotentialRoutes(files: string[], rootPath: string): Promise<number> {
+  let count = 0;
+  for (const f of files) {
+    const rel = path.relative(rootPath, f).replace(/\\/g, "/");
+    if (
+      rel.includes("node_modules") ||
+      rel.includes(".next") ||
+      rel.includes("dist") ||
+      rel.includes("build") ||
+      rel.includes(".git")
+    ) {
+      continue;
+    }
+
+    try {
+      const code = await fs.promises.readFile(f, "utf-8");
+      
+      if (/\/route\.(t|j)sx?$/.test(rel) && rel.split("/").includes("app")) {
+        const nextHttpRegex = /\bexport\s+(?:async\s+)?(?:function|const|let|var)\s+(GET|POST|PUT|DELETE|PATCH)\b/g;
+        const matches = code.match(nextHttpRegex);
+        if (matches) {
+          count += matches.length;
+        } else {
+          const destructuringRegex = /\bexport\s+const\s*\{\s*([^}]+)\}\s*=/g;
+          let destMatch;
+          let foundDest = false;
+          while ((destMatch = destructuringRegex.exec(code)) !== null) {
+            const inner = destMatch[1];
+            const parts = inner.split(",").map(p => p.trim());
+            const methods = parts.filter(p => ["GET", "POST", "PUT", "DELETE", "PATCH"].includes(p.toUpperCase()));
+            if (methods.length > 0) {
+              count += methods.length;
+              foundDest = true;
+            }
+          }
+          if (!foundDest) {
+            count += 1;
+          }
+        }
+      }
+      else if (rel.includes("pages/api/") && !/\/route\.(t|j)sx?$/.test(rel)) {
+        count += 1;
+      }
+      else {
+        const expressHttpRegex = /\b(?:app|router|route)\.(?:get|post|put|delete|patch)\s*\(/gi;
+        const matches = code.match(expressHttpRegex);
+        if (matches) {
+          count += matches.length;
+        }
+      }
+    } catch {
+      // Ignore read/permission errors
+    }
+  }
+  return count;
 }
 
 export async function scanProjectAst(
@@ -98,5 +157,8 @@ export async function scanProjectAst(
     `[ASTScanner] AST cache hits=${stats.hits} misses=${stats.misses} errors=${stats.errors}`,
   );
 
-  return { routes: deduped, logs };
+  const potentialCount = await estimatePotentialRoutes(files, rootPath);
+  log(`[ASTScanner] Found ${potentialCount} potential routes in codebase.`);
+
+  return { routes: deduped, logs, potentialRoutesCount: potentialCount };
 }

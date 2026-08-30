@@ -72,7 +72,7 @@ const defaultTab = (projectId?: string | null): RequestTab => ({
 // State variables initialTabs and initialActiveId removed. Persisted in Electron Store.
 
 // Early Access Beta Expiration Configuration
-const BETA_EXPIRY_DATE_STR = "2026-08-28T23:59:59Z"; // GMT / UTC time format
+const BETA_EXPIRY_DATE_STR = "2026-10-30T23:59:59Z"; // GMT / UTC time format
 
 function App() {
   const [testForceExpired, setTestForceExpired] = useState(false);
@@ -1155,6 +1155,8 @@ function App() {
             isOpen={isDevToolsModalOpen}
             onClose={() => setIsDevToolsModalOpen(false)}
             onProjectAdded={() => {}}
+            projects={projects}
+            treeCache={treeCache}
           />
 
           {/* Center Request Workspace Area */}
