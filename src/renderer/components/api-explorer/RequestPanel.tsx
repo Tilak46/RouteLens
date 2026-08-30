@@ -336,6 +336,43 @@ export function RequestPanel({
   const projectName = resolvedPathInfo?.projectName || null;
   const resolvedPath = resolvedPathInfo?.path || null;
 
+  const activeRouteNode = useMemo(() => {
+    if (!treeCache) return null;
+    const findRoute = (nodes: any[]): ApiRoute | null => {
+      for (const node of nodes) {
+        if (!node) continue;
+        if (node.method && (node.id === tab.routeId || node.id === tab.id || node.path === tab.routePath)) {
+          return node as ApiRoute;
+        }
+        if (node.children) {
+          const found = findRoute(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    if (tab.projectId) {
+      const proj = projects.find(p => p.id === tab.projectId);
+      if (proj && proj.path) {
+        const cached = treeCache[proj.path];
+        if (cached) {
+          const found = findRoute(cached.tree);
+          if (found) return found;
+        }
+      }
+    }
+
+    for (const projectPath of Object.keys(treeCache)) {
+      const cached = treeCache[projectPath];
+      if (cached) {
+        const found = findRoute(cached.tree);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, [treeCache, tab.projectId, tab.routeId, tab.id, tab.routePath, projects]);
+
   const handleSave = () => {
     toast.success(`Saved "${tab.name}" successfully!`);
   };
@@ -1260,9 +1297,23 @@ export function RequestPanel({
           </TabsTrigger>
           <TabsTrigger
             value="body"
-            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
+            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium flex items-center gap-1"
           >
-            Body {bodyMode !== "none" && "•"}
+            Body
+            {["POST", "PUT", "PATCH"].includes(method) && bodyMode !== "none" && activeRouteNode?.bodyConfidence && (
+              <span
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full shrink-0",
+                  activeRouteNode.bodyConfidence === "high" 
+                    ? "bg-green-500" 
+                    : activeRouteNode.bodyConfidence === "medium" 
+                      ? "bg-yellow-500" 
+                      : "bg-red-500"
+                )}
+                title={`Body Confidence: ${activeRouteNode.bodyConfidence === "high" ? "100% Correct" : activeRouteNode.bodyConfidence === "medium" ? "70% Correct" : "Low"}`}
+              />
+            )}
+            {bodyMode !== "none" && !activeRouteNode?.bodyConfidence && "•"}
           </TabsTrigger>
           <TabsTrigger
             value="scripts"
@@ -1763,6 +1814,18 @@ export function RequestPanel({
               )}
             </div>
           </div>
+
+          {activeRouteNode && ["POST", "PUT", "PATCH"].includes(activeRouteNode.method) && bodyMode !== "none" && activeRouteNode.bodyConfidence !== "high" && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 border border-border/40 rounded text-[10px] text-muted-foreground shrink-0 select-none">
+              <span className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                activeRouteNode.bodyConfidence === "medium" ? "bg-yellow-500" : "bg-red-500"
+              )} />
+              <span>
+                Body Confidence: {activeRouteNode.bodyConfidence === "medium" ? "70% Correct" : "Low"}. Verify request parameters manually.
+              </span>
+            </div>
+          )}
 
           {method === "GET" || method === "HEAD" ? (
             <div className="text-xs text-muted-foreground italic py-2">

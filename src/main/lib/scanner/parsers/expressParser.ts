@@ -519,6 +519,8 @@ async function resolveImportedIdentifier(
           importSource = p.node.source.value;
           if (spec.type === "ImportSpecifier" && spec.imported.type === "Identifier") {
             localName = spec.imported.name;
+          } else if (spec.type === "ImportNamespaceSpecifier") {
+            localName = "*";
           }
           p.stop();
         }
@@ -570,12 +572,14 @@ async function resolveImportedIdentifier(
 
       for (const spec of stmt.specifiers) {
         if (
-          spec.type === "ExportSpecifier" &&
+          (spec.type === "ExportSpecifier" || spec.type === "ExportNamespaceSpecifier") &&
           spec.exported.type === "Identifier" &&
           spec.exported.name === identifierName
         ) {
           const innerLocal =
-            spec.local.type === "Identifier" ? spec.local.name : identifierName;
+            spec.type === "ExportSpecifier" && spec.local.type === "Identifier"
+              ? spec.local.name
+              : "*";
           return (
             (await resolveImportedIdentifier(innerLocal, resolved, ctx, visited)) || {
               filePath: resolved,
@@ -1033,6 +1037,8 @@ function extractExpressInfo(
   const routes: FileInfo["routes"] = [];
   const mounts: FileInfo["mounts"] = [];
 
+  const activeMiddlewares = new Map<string, string[]>();
+
   let expressDefault: string | null = null;
   const expressRouters = new Set<string>();
 
@@ -1040,6 +1046,29 @@ function extractExpressInfo(
     if (!routerVars.has(varName)) return;
     const ent = routerEntity(filePath, varName);
     if (!exportedRouterEntities.includes(ent)) exportedRouterEntities.push(ent);
+  }
+
+  function isRouterMountTarget(node: any): boolean {
+    if (!node) return false;
+    if (node.type === "Identifier" && routerVars.has(node.name)) {
+      return true;
+    }
+    let importedFile: string | undefined;
+    if (node.type === "Identifier") {
+      importedFile = importToFile.get(node.name);
+    } else if (node.type === "CallExpression" && isIdent(node.callee)) {
+      importedFile = importToFile.get(node.callee.name);
+    } else if (isRequireCall(node)) {
+      const src = literalString(node.arguments[0] as any);
+      if (src) {
+        importedFile = ctx.resolveImport(filePath, src) || undefined;
+      }
+    }
+    if (importedFile) {
+      const lower = importedFile.toLowerCase();
+      return lower.includes("route") || lower.includes("router");
+    }
+    return false;
   }
 
   traverse(ast, {
@@ -1271,15 +1300,19 @@ function extractExpressInfo(
           const handlerNode = args.length > 0 ? args[args.length - 1] : null;
           const middlewareNodes = args.slice(0, Math.max(0, args.length - 1));
 
-          const middlewares = middlewareNodes
+          const ownerIdent = base.ownerIdent;
+          const inlineMiddlewares = middlewareNodes
             .map((a) => exprToString(a as any))
             .filter(Boolean);
+          const middlewares = [
+            ...(activeMiddlewares.get(ownerIdent) || []),
+            ...inlineMiddlewares
+          ];
           const handler = handlerNode
             ? exprToString(handlerNode as any)
             : undefined;
 
           const method = methodToUpper(prop) as Method;
-          const ownerIdent = base.ownerIdent;
           const owner = appVars.has(ownerIdent)
             ? appEntity(filePath, ownerIdent)
             : routerEntity(filePath, ownerIdent);
@@ -1315,9 +1348,13 @@ function extractExpressInfo(
         const handlerNode = rest.length > 0 ? rest[rest.length - 1] : null;
         const middlewareNodes = rest.slice(0, Math.max(0, rest.length - 1));
 
-        const middlewares = middlewareNodes
+        const inlineMiddlewares = middlewareNodes
           .map((a) => exprToString(a as any))
           .filter(Boolean);
+        const middlewares = [
+          ...(activeMiddlewares.get(ownerIdent) || []),
+          ...inlineMiddlewares
+        ];
         const handler = handlerNode
           ? exprToString(handlerNode as any)
           : undefined;
@@ -1361,6 +1398,27 @@ function extractExpressInfo(
         if (maybePath) {
           mountPath = maybePath;
           rest = args.slice(1);
+        }
+
+        // Extract active middlewares from rest
+        let middlewareCount = rest.length;
+        if (middlewareCount > 0) {
+          const lastArg = rest[middlewareCount - 1];
+          if (isRouterMountTarget(lastArg)) {
+            middlewareCount--;
+          }
+        }
+
+        const fileLevelMws = rest
+          .slice(0, middlewareCount)
+          .map((a) => exprToString(a as any))
+          .filter(Boolean);
+
+        if (fileLevelMws.length > 0) {
+          if (!activeMiddlewares.has(ownerIdent)) {
+            activeMiddlewares.set(ownerIdent, []);
+          }
+          activeMiddlewares.get(ownerIdent)!.push(...fileLevelMws);
         }
 
         if (rest.length === 0) return;

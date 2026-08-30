@@ -239,6 +239,42 @@ export const nextParser: FrameworkParser = {
   },
 };
 
+function inferNextAppBodyFields(ast: t.File): string[] {
+  const fields = new Set<string>();
+
+  traverse(ast, {
+    VariableDeclarator(p) {
+      const init = p.node.init;
+      if (!init) return;
+
+      let isRequestJsonCall = false;
+
+      // Handle await request.json() or await req.json()
+      if (init.type === "AwaitExpression") {
+        const arg = init.argument;
+        if (
+          arg.type === "CallExpression" &&
+          arg.callee.type === "MemberExpression" &&
+          arg.callee.property.type === "Identifier" &&
+          arg.callee.property.name === "json"
+        ) {
+          isRequestJsonCall = true;
+        }
+      }
+
+      if (isRequestJsonCall && p.node.id.type === "ObjectPattern") {
+        for (const prop of p.node.id.properties) {
+          if (prop.type === "ObjectProperty" && prop.key.type === "Identifier") {
+            fields.add(prop.key.name);
+          }
+        }
+      }
+    }
+  });
+
+  return Array.from(fields);
+}
+
 export const nextAppParser: FrameworkParser = {
   id: "next-app",
   detectProject: (ctx) => hasNextProjectMarkers(ctx.rootPath, ctx.files),
@@ -261,7 +297,10 @@ export const nextAppParser: FrameworkParser = {
       if (!ast) continue;
 
       const methods = exportedAppRouterMethods(ast as any);
+      const bodyFields = inferNextAppBodyFields(ast as any);
+
       for (const m of methods) {
+        const isMutation = ["POST", "PUT", "PATCH"].includes(m);
         out.push({
           id: "",
           framework: "next-app",
@@ -270,6 +309,9 @@ export const nextAppParser: FrameworkParser = {
           file: f,
           handler: m,
           middlewares: [],
+          inferredBodyFields: isMutation ? bodyFields : [],
+          confidence: "high",
+          bodyConfidence: isMutation ? (bodyFields.length > 0 ? "high" : "medium") : undefined,
         });
       }
     }

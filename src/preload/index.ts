@@ -182,7 +182,7 @@ export const api = {
   // API Explorer
   scanProject: (
     path: string,
-  ): Promise<{ tree: ApiFolder[]; logs: string[] }> => {
+  ): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number }> => {
     return ipcRenderer.invoke("api-explorer:scan-project", path);
   },
 

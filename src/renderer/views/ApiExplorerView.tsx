@@ -27,6 +27,8 @@ type ApiExplorerScanCacheEntry = {
   logs: string[];
   cachedAt: number;
   selectedRouteKey?: string | null;
+  potentialRoutesCount?: number;
+  detectedRoutesCount?: number;
 };
 
 type ApiExplorerScanCache = Record<string, ApiExplorerScanCacheEntry>;
@@ -366,6 +368,14 @@ export function ApiExplorerSidebarPanel({
           patch.selectedRouteKey !== undefined
             ? patch.selectedRouteKey
             : existing?.selectedRouteKey,
+        potentialRoutesCount:
+          patch.potentialRoutesCount !== undefined
+            ? patch.potentialRoutesCount
+            : existing?.potentialRoutesCount,
+        detectedRoutesCount:
+          patch.detectedRoutesCount !== undefined
+            ? patch.detectedRoutesCount
+            : existing?.detectedRoutesCount,
       };
       const nextCache = { ...prev, [projectPath]: updatedEntry };
       apiClient.storeSet("apiScannerTreeCache", nextCache);
@@ -414,6 +424,12 @@ export function ApiExplorerSidebarPanel({
     };
     return countRoutes(tree as any);
   }, [tree]);
+
+  const potentialCount = useMemo(() => {
+    if (!activeTab) return 0;
+    const entry = treeCache[activeTab.path];
+    return entry?.potentialRoutesCount ?? detectedCount;
+  }, [activeTab, treeCache, detectedCount]);
 
   // Restore state from Electron Store on mount
   useEffect(() => {
@@ -601,6 +617,8 @@ export function ApiExplorerSidebarPanel({
         logs: result.logs || [],
         cachedAt: Date.now(),
         selectedRouteKey: existing?.selectedRouteKey,
+        potentialRoutesCount: result.potentialRoutesCount,
+        detectedRoutesCount: result.detectedRoutesCount,
       });
     } catch (err) {
       console.error("Scan failed", err);
@@ -1158,7 +1176,7 @@ export function ApiExplorerSidebarPanel({
           <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
             Detected Endpoints
             <span className="px-1.5 py-0.5 text-[9px] font-bold bg-muted-foreground/15 text-muted-foreground rounded-full leading-none font-mono">
-              {detectedCount}
+              {activeTab ? `${detectedCount}/${potentialCount}` : detectedCount}
             </span>
           </span>
           <div className="flex items-center gap-1.5">
