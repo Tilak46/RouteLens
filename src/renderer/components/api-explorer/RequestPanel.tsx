@@ -449,6 +449,7 @@ export function RequestPanel({
   }, [urlPathParams]);
 
   const warningBanner = useMemo(() => {
+    return null;
     if (!tab.projectId || !projects || !projectState) return null;
     const ownerProject = projects.find((p) => p.id === tab.projectId);
     if (!ownerProject) return null;
