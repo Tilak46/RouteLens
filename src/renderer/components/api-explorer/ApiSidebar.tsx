@@ -285,19 +285,6 @@ function TreeNode({
         )}
 
         <MethodBadge method={node.method} />
-        {!node.id.startsWith("request_") && (
-          <span
-            className={cn(
-              "w-1.5 h-1.5 rounded-full shrink-0 ml-2 mr-2",
-              node.confidence === "low"
-                ? "bg-red-500"
-                : node.confidence === "medium"
-                  ? "bg-yellow-500"
-                  : "bg-green-500"
-            )}
-            title={`Scanner Confidence: ${node.confidence === "low" ? "Low (Manual Verification)" : node.confidence === "medium" ? "Medium" : "High (100% Correct)"}`}
-          />
-        )}
         
         {isRenaming ? (
           <input
@@ -331,6 +318,20 @@ function TreeNode({
           />
         ) : (
           <span className="flex-1 min-w-0 truncate text-left">{node.name}</span>
+        )}
+
+        {!node.id.startsWith("request_") && !isRenaming && (
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0 ml-2 mr-1.5 transition-opacity duration-200 group-hover:opacity-0 opacity-60",
+              node.confidence === "low"
+                ? "bg-rose-500"
+                : node.confidence === "medium"
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
+            )}
+            title={`Scanner Confidence: ${node.confidence === "low" ? "Low (Manual Verification)" : node.confidence === "medium" ? "Medium" : "High (100% Correct)"}`}
+          />
         )}
 
         {!isRenaming && (
