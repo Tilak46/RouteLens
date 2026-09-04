@@ -13,6 +13,7 @@ import type {
   ApiFolder,
   ApiHttpRequest,
   ApiHttpResponse,
+  CookieItem,
 } from "../types"; // Use WorkspaceSettings
 
 export const api = {
@@ -192,6 +193,32 @@ export const api = {
 
   detectProjectPort: (path: string): Promise<number | null> => {
     return ipcRenderer.invoke("api-explorer:detect-port", path);
+  },
+
+  // --- Cookie Management ---
+  getCookies: (): Promise<Record<string, CookieItem[]>> => {
+    return ipcRenderer.invoke("cookies:get-all");
+  },
+  getCookiesForUrl: (url: string): Promise<CookieItem[]> => {
+    return ipcRenderer.invoke("cookies:get-for-url", url);
+  },
+  setCookie: (cookie: CookieItem): Promise<boolean> => {
+    return ipcRenderer.invoke("cookies:set-cookie", cookie);
+  },
+  deleteCookie: (domain: string, name: string): Promise<boolean> => {
+    return ipcRenderer.invoke("cookies:delete-cookie", domain, name);
+  },
+  deleteDomainCookies: (domain: string): Promise<boolean> => {
+    return ipcRenderer.invoke("cookies:delete-domain", domain);
+  },
+  clearAllCookies: (): Promise<boolean> => {
+    return ipcRenderer.invoke("cookies:clear-all");
+  },
+  getCookieAllowlist: (): Promise<string[]> => {
+    return ipcRenderer.invoke("cookies:get-allowlist");
+  },
+  setCookieAllowlist: (domains: string[]): Promise<boolean> => {
+    return ipcRenderer.invoke("cookies:set-allowlist", domains);
   },
 
   // --- Git Management ---

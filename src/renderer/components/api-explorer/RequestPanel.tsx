@@ -7,7 +7,8 @@ import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
 import { postmanTheme, jsonCommentsPlugin } from "./codemirrorTheme";
 import { Button } from "@/components/ui/button";
-import { Loader2, Play, Plus, Trash2, Sparkles, Save, ChevronDown, Share2, Copy, Globe, Link } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Sparkles, Save, ChevronDown, Share2, Copy, Globe, Link, Cookie } from "lucide-react";
+import { ManageCookiesModal } from "./ManageCookiesModal";
 import {
   ApiAuth,
   ApiBody,
@@ -252,6 +253,7 @@ export function RequestPanel({
   const [method, setMethod] = useState<Method>(tab.method);
 
   const [nameInput, setNameInput] = useState(tab.name);
+  const [isCookiesModalOpen, setIsCookiesModalOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -1277,51 +1279,63 @@ export function RequestPanel({
         }}
         className="flex-grow flex flex-col min-h-0 w-full"
       >
-        <TabsList className="bg-transparent border-b border-border/80 w-full justify-start rounded-none h-9 p-0 gap-4">
-          <TabsTrigger
-            value="params"
-            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
+        <TabsList className="bg-transparent border-b border-border/80 w-full justify-between rounded-none h-9 p-0">
+          <div className="flex items-center gap-4 h-full">
+            <TabsTrigger
+              value="params"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
+            >
+              Params
+            </TabsTrigger>
+            <TabsTrigger
+              value="auth"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
+            >
+              Authorization {auth.type !== "none" && "•"}
+            </TabsTrigger>
+            <TabsTrigger
+              value="headers"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
+            >
+              Headers {headers.filter(h => h.enabled && h.key).length > 0 && `(${headers.filter(h => h.enabled && h.key).length})`}
+            </TabsTrigger>
+            <TabsTrigger
+              value="body"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium flex items-center gap-1"
+            >
+              Body
+              {["POST", "PUT", "PATCH"].includes(method) && bodyMode !== "none" && activeRouteNode?.bodyConfidence && (
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full shrink-0",
+                    activeRouteNode.bodyConfidence === "high" 
+                      ? "bg-green-500" 
+                      : activeRouteNode.bodyConfidence === "medium" 
+                        ? "bg-yellow-500" 
+                        : "bg-red-500"
+                  )}
+                  title={`Body Confidence: ${activeRouteNode.bodyConfidence === "high" ? "100% Correct" : activeRouteNode.bodyConfidence === "medium" ? "70% Correct" : "Low"}`}
+                />
+              )}
+              {bodyMode !== "none" && !activeRouteNode?.bodyConfidence && "•"}
+            </TabsTrigger>
+            <TabsTrigger
+              value="scripts"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
+            >
+              Scripts {((preRequestScript || "").trim() || (postResponseScript || "").trim()) ? "•" : ""}
+            </TabsTrigger>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCookiesModalOpen(true)}
+            className="text-xs font-semibold text-primary hover:text-primary/80 flex items-center gap-1.5 px-2 py-1 rounded hover:bg-primary/10 transition-colors select-none mb-0.5"
+            title="Manage Cookies"
           >
-            Params
-          </TabsTrigger>
-          <TabsTrigger
-            value="auth"
-            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
-          >
-            Authorization {auth.type !== "none" && "•"}
-          </TabsTrigger>
-          <TabsTrigger
-            value="headers"
-            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
-          >
-            Headers {headers.filter(h => h.enabled && h.key).length > 0 && `(${headers.filter(h => h.enabled && h.key).length})`}
-          </TabsTrigger>
-          <TabsTrigger
-            value="body"
-            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium flex items-center gap-1"
-          >
-            Body
-            {["POST", "PUT", "PATCH"].includes(method) && bodyMode !== "none" && activeRouteNode?.bodyConfidence && (
-              <span
-                className={cn(
-                  "w-1.5 h-1.5 rounded-full shrink-0",
-                  activeRouteNode.bodyConfidence === "high" 
-                    ? "bg-green-500" 
-                    : activeRouteNode.bodyConfidence === "medium" 
-                      ? "bg-yellow-500" 
-                      : "bg-red-500"
-                )}
-                title={`Body Confidence: ${activeRouteNode.bodyConfidence === "high" ? "100% Correct" : activeRouteNode.bodyConfidence === "medium" ? "70% Correct" : "Low"}`}
-              />
-            )}
-            {bodyMode !== "none" && !activeRouteNode?.bodyConfidence && "•"}
-          </TabsTrigger>
-          <TabsTrigger
-            value="scripts"
-            className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1.5 h-full font-medium"
-          >
-            Scripts {((preRequestScript || "").trim() || (postResponseScript || "").trim()) ? "•" : ""}
-          </TabsTrigger>
+            <Cookie size={13} />
+            <span>Cookies</span>
+          </button>
         </TabsList>
 
         {/* PARAMS */}
@@ -1999,6 +2013,12 @@ export function RequestPanel({
           </div>
         </TabsContent>
       </Tabs>
+
+      <ManageCookiesModal
+        isOpen={isCookiesModalOpen}
+        onClose={() => setIsCookiesModalOpen(false)}
+        initialDomain={url}
+      />
     </div>
   );
 }

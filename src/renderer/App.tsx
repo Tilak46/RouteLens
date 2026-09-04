@@ -13,8 +13,6 @@ import {
 } from "@/../types";
 import { AddProjectModal } from "@/components/AddProjectModal";
 import { EditProjectModal } from "@/components/EditProjectModal";
-import { AddGroupModal } from "@/components/AddGroupModal";
-import { ManageGroupsModal } from "@/components/ManageGroupsModal";
 import { EditWorkspaceNameModal } from "@/components/EditWorkspaceNameModal";
 import { AppWorkspaceConfigModal as CreateAppWorkspaceModal } from "@/components/CreateAppWorkspaceModal";
 import { DevToolsModal } from "@/components/DevToolsModal";
@@ -67,6 +65,7 @@ const defaultTab = (projectId?: string | null): RequestTab => ({
   postResponseScript: "",
   activeScriptSubTab: "prerequest",
   pathVariables: [],
+  splitPercent: 50,
 });
 
 // State variables initialTabs and initialActiveId removed. Persisted in Electron Store.
@@ -118,6 +117,11 @@ function App() {
     return tabs[0]?.id || null;
   }, [projectActiveTabIdMap, currentProjId, tabs]);
 
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.id === activeTabId) || null,
+    [tabs, activeTabId]
+  );
+
   const setTabs = (updater: RequestTab[] | ((prev: RequestTab[]) => RequestTab[])) => {
     setProjectTabsMap((prevMap) => {
       const prevTabs = prevMap[currentProjId] || [defaultTab(currentProjId)];
@@ -144,11 +148,6 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = localStorage.getItem("devdash.sidebarWidth");
     return saved ? Math.max(270, parseInt(saved, 10)) : 270;
-  });
-
-  const [requestHeight, setRequestHeight] = useState<number>(() => {
-    const saved = localStorage.getItem("devdash.requestHeight");
-    return saved ? Math.max(220, parseInt(saved, 10)) : 320;
   });
 
   const [consoleHeight, setConsoleHeight] = useState<number>(() => {
@@ -181,15 +180,20 @@ function App() {
 
   const startRequestResize = (e: React.MouseEvent) => {
     e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = requestHeight;
-    const totalHeight = workspaceRef.current ? workspaceRef.current.getBoundingClientRect().height : 600;
+    if (!workspaceRef.current || !activeTabId) return;
+    const rect = workspaceRef.current.getBoundingClientRect();
+    const containerTop = rect.top;
+    const containerHeight = rect.height;
+    if (containerHeight <= 0) return;
+
+    const targetTabId = activeTabId;
 
     const doDrag = (moveEvent: MouseEvent) => {
-      const deltaY = moveEvent.clientY - startY;
-      const newHeight = Math.max(220, Math.min(totalHeight - 180 - 6, startHeight + deltaY));
-      setRequestHeight(newHeight);
-      localStorage.setItem("devdash.requestHeight", String(newHeight));
+      const offsetY = moveEvent.clientY - containerTop;
+      const newPercent = Math.max(20, Math.min(80, (offsetY / containerHeight) * 100));
+      setTabs((prev) =>
+        prev.map((t) => (t.id === targetTabId ? { ...t, splitPercent: newPercent } : t))
+      );
     };
 
     const stopDrag = () => {
@@ -199,6 +203,13 @@ function App() {
 
     document.addEventListener("mousemove", doDrag);
     document.addEventListener("mouseup", stopDrag);
+  };
+
+  const resetRequestSplit = () => {
+    if (!activeTabId) return;
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTabId ? { ...t, splitPercent: 50 } : t))
+    );
   };
 
   const startConsoleResize = (e: React.MouseEvent) => {
@@ -224,10 +235,8 @@ function App() {
 
   // Modals state
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
-  const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
   const [isCreateAppWorkspaceModalOpen, setIsCreateAppWorkspaceModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [isManageGroupsModalOpen, setIsManageGroupsModalOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [editingAppWorkspace, setEditingAppWorkspace] = useState<AppWorkspace | null>(null);
   const [isDevToolsModalOpen, setIsDevToolsModalOpen] = useState(false);
@@ -295,9 +304,8 @@ function App() {
       if (typeof storedSidebarExpanded === "boolean") {
         setIsSidebarExpanded(storedSidebarExpanded);
       }
-      if (typeof storedConsoleOpen === "boolean") {
-        setIsConsoleOpen(storedConsoleOpen);
-      }
+      // Console drawer starts cleanly collapsed on cold launch
+      setIsConsoleOpen(false);
       if (storedConsoleProjectId !== undefined) {
         setConsoleProjectId(storedConsoleProjectId);
       }
@@ -404,14 +412,28 @@ function App() {
     apiClient.onWorkspacesLoaded(setWorkspaces);
     apiClient.onAppWorkspacesLoaded(setAppWorkspaces);
     apiClient.onServerStatusChanged(({ projectId, status }) => {
-      setProjectState((prevState) => ({
-        ...prevState,
-        [projectId]: {
-          ...prevState[projectId],
-          status: status,
-          url: status === "stopped" ? undefined : prevState[projectId]?.url,
-        },
-      }));
+      setProjectState((prevState) => {
+        const nextState = {
+          ...prevState,
+          [projectId]: {
+            ...prevState[projectId],
+            status: status,
+            url: status === "stopped" ? undefined : prevState[projectId]?.url,
+          },
+        };
+
+        // If a server stopped, auto-close console if no servers are currently running
+        if (status === "stopped") {
+          const hasRunningServers = Object.values(nextState).some(
+            (p) => p.status === "running" || p.status === "starting"
+          );
+          if (!hasRunningServers) {
+            setIsConsoleOpen(false);
+          }
+        }
+
+        return nextState;
+      });
     });
     apiClient.onTerminalLog(({ projectId, log }) => {
       setProjectState((prevState) => {
@@ -424,6 +446,18 @@ function App() {
           },
         };
       });
+
+      // Auto-open terminal console drawer on errors
+      if (
+        log.includes("RouteLens Error") ||
+        log.includes("Error starting server") ||
+        log.includes("exited unexpectedly") ||
+        log.includes("Cannot find package.json") ||
+        log.includes("Project folder does not exist")
+      ) {
+        setConsoleProjectId(projectId);
+        setIsConsoleOpen(true);
+      }
     });
     apiClient.onServerUrlFound(({ projectId, url }) => {
       setProjectState((prevState) => ({
@@ -479,30 +513,21 @@ function App() {
   };
 
   // --- Projects View Event Handlers ---
-  const handleSaveProject = async (
+  const handleSaveProject = (
     projectName: string,
     startCommand: string,
-    groupId: string | null,
+    projectPath: string,
   ) => {
-    try {
-      const path = await apiClient.openDirectoryDialog();
-      if (path) {
-        const newProject: Project = {
-          id: `proj_${Date.now()}`,
-          name: projectName,
-          path: path,
-          startCommand: startCommand,
-          groupId: groupId,
-        };
-        apiClient.addProject(newProject);
-        setIsAddProjectModalOpen(false);
-        toast.success("Project added", { description: newProject.name });
-      }
-    } catch (error) {
-      console.error("Failed to open directory dialog:", error);
-      alert("Failed to open folder picker. Please try again.");
-      toast.error("Failed to add project");
-    }
+    const newProject: Project = {
+      id: `proj_${Date.now()}`,
+      name: projectName,
+      path: projectPath,
+      startCommand: startCommand,
+      groupId: null,
+    };
+    apiClient.addProject(newProject);
+    setIsAddProjectModalOpen(false);
+    toast.success("Project added", { description: newProject.name });
   };
 
   const handleUpdateProject = (project: Project) => {
@@ -516,19 +541,12 @@ function App() {
   };
 
   const handleViewLogs = (project: Project) => {
-    setConsoleProjectId(project.id);
-    setIsConsoleOpen(true);
-  };
-
-  const handleSaveGroup = (groupName: string) => {
-    apiClient.addGroup(groupName);
-    setIsAddGroupModalOpen(false);
-    toast.success("Group added", { description: groupName });
-  };
-
-  const handleDeleteGroup = (groupId: string) => {
-    apiClient.deleteGroup(groupId);
-    toast.success("Group deleted");
+    if (isConsoleOpen && (consoleProjectId === project.id || consoleProjectId === null)) {
+      setIsConsoleOpen(false);
+    } else {
+      setConsoleProjectId(project.id);
+      setIsConsoleOpen(true);
+    }
   };
 
   const handleOpenWorkspace = (workspacePath: string) => {
@@ -545,13 +563,6 @@ function App() {
       setSettings((prev) => ({ ...prev, workspaceSavePath: newPath }));
       toast.success("Workspace save path set");
     }
-  };
-
-  const handleAssignProjectGroup = (
-    projectId: string,
-    groupId: string | null,
-  ) => {
-    apiClient.assignProjectToGroup(projectId, groupId);
   };
 
   const handleAddWorkspaceFile = async () => {
@@ -848,6 +859,7 @@ function App() {
       postResponseScript: "",
       activeScriptSubTab: "prerequest",
       pathVariables: [],
+      splitPercent: 50,
     };
 
     setTabs((prev) => [...prev, newTab]);
@@ -866,11 +878,6 @@ function App() {
       })
     );
   };
-
-  const activeTab = useMemo(
-    () => tabs.find((t) => t.id === activeTabId) || null,
-    [tabs, activeTabId]
-  );
 
   const activeRouteKey = useMemo(() => {
     if (!activeTab) return null;
@@ -1108,25 +1115,11 @@ function App() {
             isOpen={isAddProjectModalOpen}
             onClose={() => setIsAddProjectModalOpen(false)}
             onSave={handleSaveProject}
-            groups={groups}
           />
           <EditProjectModal
             project={editingProject}
             onClose={() => setEditingProject(null)}
             onSave={handleUpdateProject}
-            groups={groups}
-          />
-          <AddGroupModal
-            isOpen={isAddGroupModalOpen}
-            onClose={() => setIsAddGroupModalOpen(false)}
-            onSave={handleSaveGroup}
-          />
-          <ManageGroupsModal
-            isOpen={isManageGroupsModalOpen}
-            onClose={() => setIsManageGroupsModalOpen(false)}
-            projects={projects}
-            groups={groups}
-            onAssignProjectGroup={handleAssignProjectGroup}
           />
           <EditWorkspaceNameModal
             workspace={editingWorkspace}
@@ -1312,8 +1305,8 @@ function App() {
               >
                 {/* Top Request Panel */}
                 <div 
-                  style={{ height: `${requestHeight}px` }} 
-                  className="flex flex-col shrink-0 min-h-[220px] overflow-hidden"
+                  style={{ height: `${activeTab?.splitPercent ?? 50}%`, flexBasis: `${activeTab?.splitPercent ?? 50}%` }} 
+                  className="flex flex-col shrink-0 min-h-[200px] overflow-hidden"
                 >
                   <RequestPanel
                     tab={activeTab}
@@ -1331,8 +1324,9 @@ function App() {
                 {/* Horizontal Drag Handle */}
                 <div
                   onMouseDown={startRequestResize}
+                  onDoubleClick={resetRequestSplit}
                   className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-border/40"
-                  title="Drag to resize panels"
+                  title="Drag to resize panels (Double-click to reset 50/50)"
                 />
 
                 {/* Bottom Response Panel */}

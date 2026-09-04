@@ -116,10 +116,15 @@ export function ConsoleLogsDrawer({
       {/* HEADERBAR */}
       <div className="h-10 border-b border-border bg-card px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4 overflow-x-auto scrollbar-none">
-          <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase shrink-0 flex items-center gap-1.5">
-            <Terminal size={12} />
-            Console
-          </span>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground tracking-wider uppercase shrink-0 transition-colors px-2 py-1 -ml-1 rounded hover:bg-white/5 cursor-pointer group"
+            title="Click to collapse console"
+          >
+            <Terminal size={12} className="text-muted-foreground group-hover:text-primary transition-colors" />
+            <span>Console</span>
+            <ChevronDown size={12} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+          </button>
 
           <div className="h-4 w-px bg-border shrink-0" />
 

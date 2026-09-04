@@ -482,9 +482,16 @@ export function ApiExplorerSidebarPanel({
     apiClient.storeSet("activeApiScannerTabId", activeTabId);
   }, [tabs, activeTabId, isRestored]);
 
+  // Sync internal active tab with activeProjectId prop restored from App
+  useEffect(() => {
+    if (activeProjectId && activeProjectId !== activeTabId && tabs.some((t) => t.id === activeProjectId)) {
+      setActiveTabId(activeProjectId);
+    }
+  }, [activeProjectId, tabs]);
+
   // Propagate active project selection up to parent App
   useEffect(() => {
-    if (onActiveProjectIdChange) {
+    if (onActiveProjectIdChange && activeTabId) {
       onActiveProjectIdChange(activeTabId);
     }
   }, [activeTabId, onActiveProjectIdChange]);
@@ -527,20 +534,19 @@ export function ApiExplorerSidebarPanel({
         };
       });
 
-      if (added.length > 0) {
-        setTimeout(() => setActiveTabId(added[added.length - 1].id), 50);
-      }
-
       return [...updated, ...added];
     });
   }, [projects, isRestored, hiddenProjectIds]);
 
-  // Auto-select first tab if none is active
+  // Auto-select tab if none is active
   useEffect(() => {
     if (isRestored && tabs.length > 0 && !activeTabId) {
-      setActiveTabId(tabs[0].id);
+      const preferred = (activeProjectId && tabs.some((t) => t.id === activeProjectId))
+        ? activeProjectId
+        : tabs[0].id;
+      setActiveTabId(preferred);
     }
-  }, [tabs, activeTabId, isRestored]);
+  }, [tabs, activeTabId, isRestored, activeProjectId]);
 
   // Run scan when switching scanned project tab
   useEffect(() => {
@@ -1045,7 +1051,7 @@ export function ApiExplorerSidebarPanel({
                   <SelectTrigger className="bg-input border-border/80 text-xs text-foreground h-8">
                     <SelectValue placeholder="Choose project..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-popover border-border text-foreground">
+                  <SelectContent className="bg-popover border-border text-foreground max-h-56 overflow-y-auto">
                     {projects.filter((p) => !tabs.some((t) => t.id === p.id)).map((p) => (
                       <SelectItem key={p.id} value={p.id} className="text-xs">
                         {p.name}

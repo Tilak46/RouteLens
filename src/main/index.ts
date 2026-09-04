@@ -164,9 +164,12 @@ async function updateWorkspaceFile(group: Group, projectsInGroup: Project[]) {
 }
 
 function createWindow(): void {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width,
+    height,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === "linux" ? { icon } : {}),
@@ -177,8 +180,18 @@ function createWindow(): void {
     },
   });
 
+  mainWindow.maximize();
+
   mainWindow.on("ready-to-show", () => {
     mainWindow.show();
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    if (ghostWindow && !ghostWindow.isDestroyed()) {
+      ghostWindow.destroy();
+      ghostWindow = null;
+    }
   });
 
   mainWindow.webContents.on("did-finish-load", () => {
@@ -338,23 +351,34 @@ function toggleGhostWindow() {
   }
 }
 
-// ... existing createWindow ...
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-app.whenReady().then(() => {
-  // ... existing setup ...
+if (!gotSingleInstanceLock) {
+  console.log("[App] Another instance of RouteLens is already running. Quitting.");
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
 
-  // Register all IPC handlers, passing dependencies
-  try {
-    console.log("Registering Project Handlers...");
-    registerProjectHandlers(store, getMainWindow, updateWorkspaceFile);
+  app.whenReady().then(() => {
+    // ... existing setup ...
 
-    console.log("Registering Group Handlers...");
-    registerGroupHandlers(store, getMainWindow, updateWorkspaceFile);
+    // Register all IPC handlers, passing dependencies
+    try {
+      console.log("Registering Project Handlers...");
+      registerProjectHandlers(store, getMainWindow, updateWorkspaceFile);
 
-    console.log("Registering Workspace Handlers...");
-    console.log("Registering Workspace Handlers...");
-    registerWorkspaceHandlers(store, getMainWindow);
-    registerAppWorkspaceHandlers(store, getMainWindow);
+      console.log("Registering Group Handlers...");
+      registerGroupHandlers(store, getMainWindow, updateWorkspaceFile);
+
+      console.log("Registering Workspace Handlers...");
+      registerWorkspaceHandlers(store, getMainWindow);
+      registerAppWorkspaceHandlers(store, getMainWindow);
 
     console.log("Registering Settings Handlers...");
     registerSettingsHandlers(store, getMainWindow, updateWorkspaceFile);
@@ -404,6 +428,7 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+}
 
 ipcMain.on("app:toggle-ghost-mode", () => {
   toggleGhostWindow();

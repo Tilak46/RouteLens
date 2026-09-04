@@ -5,10 +5,12 @@ import {
   ApiHttpRequest,
   ApiHttpResponse,
   ApiKeyValueRow,
+  CookieItem,
 } from "../../types";
 import { performance } from "node:perf_hooks";
 import fs from "node:fs";
 import path from "node:path";
+import { CookieJarService } from "../services/cookieJar";
 
 export function registerApiExplorerHandlers() {
   ipcMain.handle(
@@ -136,7 +138,16 @@ export function registerApiExplorerHandlers() {
 
         const method = String(request.method || "GET").toUpperCase();
 
-        const url = new URL(String(request.url));
+        // Enable self-signed certificates for local HTTPS development
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+        // Safely normalize URL (auto-prepend http:// if scheme is missing)
+        let rawUrl = String(request.url || "").trim();
+        if (!/^https?:\/\//i.test(rawUrl)) {
+          rawUrl = `http://${rawUrl}`;
+        }
+
+        const url = new URL(rawUrl);
         const addQueryRows = (rows: ApiKeyValueRow[] | undefined) => {
           if (!Array.isArray(rows)) return;
           for (const row of rows) {
@@ -303,6 +314,19 @@ export function registerApiExplorerHandlers() {
           delete headers["content-type"];
         }
 
+        // Auto-inject matching cookies from CookieJar
+        const jarCookieStr = CookieJarService.getCookieHeader(url.toString());
+        if (jarCookieStr) {
+          const userCookieKey = Object.keys(headers).find(
+            (k) => k.toLowerCase() === "cookie"
+          );
+          if (userCookieKey) {
+            headers[userCookieKey] = `${headers[userCookieKey]}; ${jarCookieStr}`;
+          } else {
+            headers["Cookie"] = jarCookieStr;
+          }
+        }
+
         const controller = new AbortController();
         const timeoutMs =
           typeof request.timeoutMs === "number" && request.timeoutMs > 0
@@ -331,6 +355,20 @@ export function registerApiExplorerHandlers() {
           responseHeaders[String(k)] = String(v);
         }
 
+        // Extract and store Set-Cookie headers into CookieJar
+        let rawSetCookies: string[] = [];
+        if (typeof (res.headers as any).getSetCookie === "function") {
+          rawSetCookies = (res.headers as any).getSetCookie();
+        } else {
+          const single = res.headers.get("set-cookie");
+          if (single) rawSetCookies = [single];
+        }
+
+        const responseCookies = CookieJarService.saveSetCookieHeaders(
+          rawSetCookies,
+          url.toString()
+        );
+
         const contentType = String(res.headers.get("content-type") || "");
         let parsedJson: unknown | undefined;
         if (contentType.toLowerCase().includes("application/json")) {
@@ -350,6 +388,7 @@ export function registerApiExplorerHandlers() {
           headers: responseHeaders,
           bodyText,
           parsedJson,
+          cookies: responseCookies,
         };
       } catch (err: any) {
         const ended = performance.now();
@@ -366,4 +405,37 @@ export function registerApiExplorerHandlers() {
       }
     },
   );
+
+  // --- Cookie Jar IPC Handlers ---
+  ipcMain.handle("cookies:get-all", async () => {
+    return CookieJarService.getAllCookies();
+  });
+
+  ipcMain.handle("cookies:get-for-url", async (_, targetUrl: string) => {
+    return CookieJarService.getCookiesForUrl(targetUrl);
+  });
+
+  ipcMain.handle("cookies:set-cookie", async (_, cookie: CookieItem) => {
+    return CookieJarService.setCookie(cookie);
+  });
+
+  ipcMain.handle("cookies:delete-cookie", async (_, domain: string, name: string) => {
+    return CookieJarService.deleteCookie(domain, name);
+  });
+
+  ipcMain.handle("cookies:delete-domain", async (_, domain: string) => {
+    return CookieJarService.deleteDomain(domain);
+  });
+
+  ipcMain.handle("cookies:clear-all", async () => {
+    return CookieJarService.clearAll();
+  });
+
+  ipcMain.handle("cookies:get-allowlist", async () => {
+    return CookieJarService.getAllowlist();
+  });
+
+  ipcMain.handle("cookies:set-allowlist", async (_, domains: string[]) => {
+    return CookieJarService.setAllowlist(domains);
+  });
 }

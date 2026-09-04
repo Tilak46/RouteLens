@@ -228,6 +228,19 @@ export type ApiHttpRequest = {
   timeoutMs?: number;
 };
 
+export type CookieItem = {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires?: string | null;
+  maxAge?: number | null;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Strict" | "Lax" | "None" | string | null;
+  raw?: string;
+};
+
 export type ApiHttpResponse = {
   ok: boolean;
   status: number;
@@ -238,6 +251,7 @@ export type ApiHttpResponse = {
   bodyText: string;
   parsedJson?: unknown;
   error?: string;
+  cookies?: CookieItem[];
 };
 
 export type ApiProjectTab = {
@@ -272,4 +286,5 @@ export interface RequestTab {
   postResponseScript?: string;
   activeScriptSubTab?: string;
   pathVariables?: any[];
+  splitPercent?: number;
 }

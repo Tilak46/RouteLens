@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertCircle, Terminal, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, Terminal, Loader2, Copy, Check, Cookie } from "lucide-react";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiHttpResponse } from "../../../types";
 import CodeMirror from "@uiw/react-codemirror";
@@ -51,6 +52,8 @@ function highlightJson(jsonStr: string): string {
 export function ResponsePanel({ response, loading = false, tabId, lastCompletedAt }: ResponsePanelProps) {
   const [blink, setBlink] = useState<"success" | "error" | null>(null);
   const [blinkTrigger, setBlinkTrigger] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [copiedCookie, setCopiedCookie] = useState<string | null>(null);
   const prevLastCompletedAtRef = useRef<number | undefined>(undefined);
   const prevTabIdRef = useRef<string | undefined>(undefined);
 
@@ -98,8 +101,20 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
     ? (hasJson ? JSON.stringify(response.parsedJson, null, 2) : response.bodyText)
     : "";
 
+  const handleCopy = () => {
+    if (!response) return;
+    const textToCopy = prettyBody || response.bodyText || "";
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    toast.success("Response copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // Format headers counts
   const headerCount = response ? Object.keys(response.headers || {}).length : 0;
+  const responseCookies = response?.cookies || [];
+  const cookieCount = responseCookies.length;
   const shouldFade = loading && !!response;
 
   return (
@@ -123,7 +138,7 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
           Response Console
         </span>
 
-        {/* Status Indicators */}
+        {/* Status Indicators & Actions */}
         <div className="flex items-center gap-3 text-xs">
           {loading ? (
             <span className="flex items-center gap-1.5 font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 animate-pulse">
@@ -155,6 +170,26 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
               {sizeLabel}
             </span>
           )}
+
+          {response && !loading && (
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary/40 hover:bg-secondary/70 border border-border/40 px-2 py-0.5 rounded transition-all cursor-pointer select-none"
+              title="Copy Response JSON to Clipboard"
+            >
+              {copied ? (
+                <>
+                  <Check size={12} className="text-emerald-400" />
+                  <span className="text-emerald-400 font-semibold">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={12} />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -179,6 +214,12 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
               className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1 h-full font-medium"
             >
               Headers {headerCount > 0 && `(${headerCount})`}
+            </TabsTrigger>
+            <TabsTrigger
+              value="cookies"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1 h-full font-medium"
+            >
+              Cookies {cookieCount > 0 && `(${cookieCount})`}
             </TabsTrigger>
             {(hasJson || (loading && !response)) && (
               <TabsTrigger
@@ -264,6 +305,105 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
                     </tbody>
                   </table>
                 ) : null}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* COOKIES */}
+          <TabsContent value="cookies" className="flex-grow flex flex-col min-h-0 mt-3 focus-visible:outline-none select-text">
+            {loading && !response ? (
+              <div className="flex-grow flex flex-col gap-2.5 p-4 border border-border/40 rounded-lg bg-input/50 animate-pulse">
+                <div className="h-3 bg-muted/40 rounded w-1/3" />
+                <div className="h-3 bg-muted/40 rounded w-2/3" />
+              </div>
+            ) : (
+              <div className="flex-grow bg-input border border-border/40 rounded-lg overflow-auto p-4 scrollbar-thin">
+                {cookieCount === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center py-8 text-center">
+                    <Cookie size={28} className="text-muted-foreground/30 mb-2" />
+                    <div className="text-xs text-muted-foreground font-medium">
+                      No cookies returned in this response
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/60 max-w-xs mt-1 leading-relaxed">
+                      When an endpoint responds with <code>Set-Cookie</code> headers, they are parsed, displayed here, and automatically stored in the Cookie Jar for future requests.
+                    </p>
+                  </div>
+                ) : (
+                  <table className="w-full text-xs font-mono select-text border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/30 text-left text-muted-foreground font-sans text-[11px]">
+                        <th className="pb-2 font-semibold">Name</th>
+                        <th className="pb-2 font-semibold pl-3">Value</th>
+                        <th className="pb-2 font-semibold pl-3">Domain</th>
+                        <th className="pb-2 font-semibold pl-3">Path</th>
+                        <th className="pb-2 font-semibold pl-3">Expires</th>
+                        <th className="pb-2 font-semibold pl-3 text-right">Flags</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/20">
+                      {responseCookies.map((c, i) => {
+                        const isCopied = copiedCookie === c.name;
+                        return (
+                          <tr key={`${c.name}-${i}`} className="hover:bg-white/5 transition-colors">
+                            <td className="py-2.5 pr-3 font-semibold text-primary select-all truncate max-w-[140px]">
+                              {c.name}
+                            </td>
+                            <td className="py-2.5 pl-3 text-foreground/85 select-all max-w-[200px]">
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate">{c.value}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(c.value);
+                                    setCopiedCookie(c.name);
+                                    toast.success(`Cookie "${c.name}" copied to clipboard`);
+                                    setTimeout(() => setCopiedCookie(null), 2000);
+                                  }}
+                                  className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                                  title="Copy cookie value"
+                                >
+                                  {isCopied ? (
+                                    <Check size={11} className="text-emerald-400" />
+                                  ) : (
+                                    <Copy size={11} />
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-2.5 pl-3 text-muted-foreground select-all font-mono text-[11px]">
+                              {c.domain}
+                            </td>
+                            <td className="py-2.5 pl-3 text-muted-foreground select-all font-mono text-[11px]">
+                              {c.path || "/"}
+                            </td>
+                            <td className="py-2.5 pl-3 text-muted-foreground select-all text-[11px]">
+                              {c.expires ? new Date(c.expires).toLocaleDateString() : "Session"}
+                            </td>
+                            <td className="py-2.5 pl-3 text-right">
+                              <div className="flex items-center justify-end gap-1 font-sans">
+                                {c.httpOnly && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    HttpOnly
+                                  </span>
+                                )}
+                                {c.secure && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    Secure
+                                  </span>
+                                )}
+                                {c.sameSite && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                    {c.sameSite}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
           </TabsContent>

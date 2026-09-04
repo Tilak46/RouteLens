@@ -2,6 +2,8 @@ import { ipcMain, BrowserWindow } from "electron";
 import Store from "electron-store";
 import kill from "tree-kill";
 import { spawn, ChildProcess } from "node:child_process";
+import fs from "node:fs";
+import { join } from "node:path";
 import AnsiToHtml from "ansi-to-html";
 import si from "systeminformation";
 import type { Project, Group, StoreType } from "../../types"; // Adjust path as needed
@@ -75,6 +77,7 @@ async function getListeningPortsForPids(pids: number[]): Promise<number[]> {
 
 // Manage runningProcesses HERE
 const runningProcesses: Record<string, ChildProcess> = {};
+const stoppingProcesses = new Set<string>();
 const convert = new AnsiToHtml({ fg: "#c0caf5", bg: "#1a1b26" });
 
 // Store references passed from main.ts
@@ -308,6 +311,7 @@ export function registerProjectHandlers(
     if (!mainWindow) return;
 
     if (runningProcesses[id]) {
+      stoppingProcesses.add(id);
       mainWindow.webContents.send("server-status-changed", {
         projectId: id,
         status: "stopping",
@@ -324,6 +328,59 @@ export function registerProjectHandlers(
       status: "starting",
     });
     mainWindow.webContents.send("terminal-log-clear", { projectId: id }); // Clear logs on start
+
+    // Pre-flight check 1: Verify folder exists
+    if (!fs.existsSync(path)) {
+      mainWindow.webContents.send("server-status-changed", {
+        projectId: id,
+        status: "stopped",
+      });
+      mainWindow.webContents.send("terminal-log", {
+        projectId: id,
+        log: convert.toHtml(`\n\x1b[31m[RouteLens Error]\x1b[0m Project folder does not exist:\n  "${path}"\n`),
+      });
+      return;
+    }
+
+    // Pre-flight check 2: Monorepo / package.json check for node-based projects
+    const isNodeBased = /^(?:npm|yarn|pnpm|bun|node)\b/i.test(startCommand.trim());
+    if (isNodeBased) {
+      const rootPkg = join(path, "package.json");
+      if (!fs.existsSync(rootPkg)) {
+        const candidateSubdirs = ["backend", "server", "api", "services/api", "packages/backend", "packages/server"];
+        let foundSubdir: string | null = null;
+        for (const sub of candidateSubdirs) {
+          if (fs.existsSync(join(path, sub, "package.json"))) {
+            foundSubdir = sub;
+            break;
+          }
+        }
+
+        let errorMsg = `\n\x1b[31m[RouteLens Error]\x1b[0m Cannot find \x1b[1mpackage.json\x1b[0m in root folder:\n  "${path}"\n\n`;
+        if (foundSubdir) {
+          const suggestedPath = join(path, foundSubdir).replace(/\\/g, "/");
+          errorMsg +=
+            `\x1b[33m[Monorepo Detected]\x1b[0m Found a backend project inside "\x1b[36m${foundSubdir}/\x1b[0m".\n` +
+            `\x1b[32m[Solution]\x1b[0m Please update this project's folder path:\n` +
+            `  1. Click the Settings (⚙) icon on "${name}" in Local Servers.\n` +
+            `  2. Set the directory path directly to:\n` +
+            `     \x1b[1m${suggestedPath}\x1b[0m\n`;
+        } else {
+          errorMsg +=
+            `\x1b[33m[Recommendation]\x1b[0m Please make sure this folder contains a package.json file before running "${startCommand}".\n`;
+        }
+
+        mainWindow.webContents.send("server-status-changed", {
+          projectId: id,
+          status: "stopped",
+        });
+        mainWindow.webContents.send("terminal-log", {
+          projectId: id,
+          log: convert.toHtml(errorMsg),
+        });
+        return;
+      }
+    }
 
     const [command, ...args] = startCommand.split(" ");
     try {
@@ -384,13 +441,15 @@ export function registerProjectHandlers(
         console.log(
           `Server process for ${name} closed with code ${code}, signal ${signal}`,
         );
+        const wasIntentionallyStopped = stoppingProcesses.has(id);
+        stoppingProcesses.delete(id);
         delete runningProcesses[id]; // Clean up on close
         mainWindow.webContents.send("server-status-changed", {
           projectId: id,
           status: "stopped",
         });
-        if (code !== 0 && code !== null) {
-          // Log non-zero exit codes
+        if (!wasIntentionallyStopped && code !== 0 && code !== null) {
+          // Log non-zero exit codes only on unexpected exit, not intentional stop
           mainWindow.webContents.send("terminal-log", {
             projectId: id,
             log: `\n<span style="color: #f7768e">Server process exited unexpectedly with code ${code} (signal: ${signal})</span>\n`,
@@ -417,6 +476,7 @@ export function registerProjectHandlers(
     if (!mainWindow) return;
 
     if (runningProcesses[id]) {
+      stoppingProcesses.add(id);
       mainWindow.webContents.send("server-status-changed", {
         projectId: id,
         status: "stopping",

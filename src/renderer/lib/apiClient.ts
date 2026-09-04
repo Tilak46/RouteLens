@@ -12,6 +12,7 @@ import type {
   ApiFolder,
   ApiHttpRequest,
   ApiHttpResponse,
+  CookieItem,
 } from "@/../types"; // Corrected path alias
 
 type GitExecResult = { code: number; stdout: string; stderr: string };
@@ -92,6 +93,16 @@ interface ElectronApi {
   ) => Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number }>; // API Explorer
   runApiRequest: (request: ApiHttpRequest) => Promise<ApiHttpResponse>; // API Explorer
   detectProjectPort: (path: string) => Promise<number | null>;
+
+  // Cookie Management
+  getCookies: () => Promise<Record<string, CookieItem[]>>;
+  getCookiesForUrl: (url: string) => Promise<CookieItem[]>;
+  setCookie: (cookie: CookieItem) => Promise<boolean>;
+  deleteCookie: (domain: string, name: string) => Promise<boolean>;
+  deleteDomainCookies: (domain: string) => Promise<boolean>;
+  clearAllCookies: () => Promise<boolean>;
+  getCookieAllowlist: () => Promise<string[]>;
+  setCookieAllowlist: (domains: string[]) => Promise<boolean>;
 
   // App Picker
   scanApps: () => Promise<DetectedApp[]>;
@@ -247,6 +258,38 @@ const fallbackApi: ElectronApi = {
   detectProjectPort: async () => {
     console.warn("API not ready");
     return null;
+  },
+  getCookies: async () => {
+    console.warn("API not ready");
+    return {};
+  },
+  getCookiesForUrl: async () => {
+    console.warn("API not ready");
+    return [];
+  },
+  setCookie: async () => {
+    console.warn("API not ready");
+    return false;
+  },
+  deleteCookie: async () => {
+    console.warn("API not ready");
+    return false;
+  },
+  deleteDomainCookies: async () => {
+    console.warn("API not ready");
+    return false;
+  },
+  clearAllCookies: async () => {
+    console.warn("API not ready");
+    return false;
+  },
+  getCookieAllowlist: async () => {
+    console.warn("API not ready");
+    return [];
+  },
+  setCookieAllowlist: async () => {
+    console.warn("API not ready");
+    return false;
   },
   updateWorkspace: () => console.warn("API not ready"),
 

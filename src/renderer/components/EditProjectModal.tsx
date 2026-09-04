@@ -1,15 +1,8 @@
 import { useState, useEffect } from "react";
-import { Project, Group } from "@/../types"; // Import Group
+import { Project } from "@/../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"; // Import Select
 import {
   Dialog,
   DialogContent,
@@ -23,41 +16,35 @@ type ModalProps = {
   project: Project | null;
   onClose: () => void;
   onSave: (project: Project) => void;
-  groups: Group[]; // Accept groups list
 };
 
 export function EditProjectModal({
   project,
   onClose,
   onSave,
-  groups,
 }: ModalProps) {
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null); // State for group
 
   // When the 'project' prop changes (modal opens), update the form's state
   useEffect(() => {
     if (project) {
       setName(project.name);
       setCommand(project.startCommand);
-      setSelectedGroupId(project.groupId ?? null); // Set initial group based on project
     }
   }, [project]);
 
   const handleSave = () => {
-    if (!project) return; // Should not happen if modal is open, but good practice
+    if (!project) return;
 
     if (name.trim() && command.trim()) {
-      // Create the updated project object, including the selected groupId
       const updatedProject: Project = {
         ...project,
         name: name.trim(),
         startCommand: command.trim(),
-        groupId: null,
       };
-      onSave(updatedProject); // Send the full updated project object back to App.tsx
-      onClose(); // Close the modal
+      onSave(updatedProject);
+      onClose();
     }
   };
 
