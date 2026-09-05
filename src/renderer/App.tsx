@@ -1452,90 +1452,14 @@ function App() {
           )}
 
           {/* Center Request Workspace Area */}
-          {!activeTab ? (
+          {projects.length === 0 && tabs.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
-              {activeProjectId && projects.find((p) => p.id === activeProjectId) ? (
-                // Clean project overview command center
-                (() => {
-                  const activeProject = projects.find((p) => p.id === activeProjectId)!;
-                  const isScanning = scanningProjectId === activeProject.id;
-                  const projectTree = treeCache[activeProject.path]?.tree || [];
-                  const countRoutes = (nodes: any[]): number => {
-                    let count = 0;
-                    for (const n of nodes) {
-                      if (!n) continue;
-                      if ((n as any).method) count++;
-                      else if (Array.isArray(n.children)) count += countRoutes(n.children);
-                    }
-                    return count;
-                  };
-                  const totalEndpoints = countRoutes(projectTree);
-
-                  return (
-                    <div className="max-w-lg w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-300">
-                      <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
-                        <FolderCode size={26} />
-                      </div>
-                      <h2 className="text-xl font-bold text-foreground tracking-tight mb-2">
-                        {activeProject.name}
-                      </h2>
-                      <div className="flex items-center justify-center gap-2 mb-4">
-                        <div className="text-xs text-muted-foreground font-mono bg-background/60 px-3 py-1.5 rounded-lg border border-border/40 max-w-sm truncate">
-                          <span className="text-foreground">{activeProject.path}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-center gap-2 mb-6">
-                        <span className="text-xs px-2.5 py-1 rounded-full bg-muted/40 border border-border/40 text-muted-foreground font-mono">
-                          {totalEndpoints} Endpoints Discovered
-                        </span>
-                        {activeProject.url && (
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono">
-                            {activeProject.url}
-                          </span>
-                        )}
-                        {isScanning && (
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono animate-pulse">
-                            Scanning AST...
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-center gap-3">
-                        <Button
-                          onClick={handleNewTab}
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 h-8 cursor-pointer shadow-sm"
-                        >
-                          + Manual Request
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleRescanProject(activeProject)}
-                          disabled={isScanning}
-                          className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
-                        >
-                          {isScanning ? "Scanning..." : "Rescan AST"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => apiClient.showItemInFolder(activeProject.path)}
-                          className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
-                        >
-                          Reveal in Folder
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                // Modern Onboarding View for fresh users with 0 projects
-                <OnboardingView
-                  onOpenFolder={handleAddBackendFolder}
-                  onQuickRequest={handleQuickRequest}
-                  onLoadDemo={handleLoadDemoProject}
-                  onOpenManualModal={handleAddBackendFolder}
-                />
-              )}
+              <OnboardingView
+                onOpenFolder={handleAddBackendFolder}
+                onQuickRequest={handleQuickRequest}
+                onLoadDemo={handleLoadDemoProject}
+                onOpenManualModal={handleAddBackendFolder}
+              />
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
@@ -1600,6 +1524,81 @@ function App() {
                     />
                   </div>
                 </div>
+              ) : activeProjectId && projects.find((p) => p.id === activeProjectId) ? (
+                // Clean project overview command center when all tabs are closed
+                (() => {
+                  const activeProject = projects.find((p) => p.id === activeProjectId)!;
+                  const isScanning = scanningProjectId === activeProject.id;
+                  const projectTree = treeCache[activeProject.path]?.tree || [];
+                  const countRoutes = (nodes: any[]): number => {
+                    let count = 0;
+                    for (const n of nodes) {
+                      if (!n) continue;
+                      if ((n as any).method) count++;
+                      else if (Array.isArray(n.children)) count += countRoutes(n.children);
+                    }
+                    return count;
+                  };
+                  const totalEndpoints = countRoutes(projectTree);
+
+                  return (
+                    <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
+                      <div className="max-w-lg w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-300">
+                        <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
+                          <FolderCode size={26} />
+                        </div>
+                        <h2 className="text-xl font-bold text-foreground tracking-tight mb-2">
+                          {activeProject.name}
+                        </h2>
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                          <div className="text-xs text-muted-foreground font-mono bg-background/60 px-3 py-1.5 rounded-lg border border-border/40 max-w-sm truncate">
+                            <span className="text-foreground">{activeProject.path}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-2 mb-6">
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-muted/40 border border-border/40 text-muted-foreground font-mono">
+                            {totalEndpoints} Endpoints Discovered
+                          </span>
+                          {activeProject.url && (
+                            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono">
+                              {activeProject.url}
+                            </span>
+                          )}
+                          {isScanning && (
+                            <span className="text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono animate-pulse">
+                              Scanning AST...
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3">
+                          <Button
+                            onClick={handleNewTab}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 h-8 cursor-pointer shadow-sm"
+                          >
+                            + Manual Request
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleRescanProject(activeProject)}
+                            disabled={isScanning}
+                            className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
+                          >
+                            {isScanning ? "Scanning..." : "Rescan AST"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => apiClient.showItemInFolder(activeProject.path)}
+                            className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
+                          >
+                            Reveal in Folder
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/5 select-none">
                   <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 shadow-lg shadow-primary/5">
