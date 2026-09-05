@@ -33,8 +33,11 @@ const GhostHunter = ({
 
   const spotlightBg = useTransform(
     [mouseX, mouseY],
-    ([x, y]) =>
-      `radial-gradient(circle ${SPOTLIGHT_RADIUS}px at ${x}px ${y}px, transparent 0%, rgba(0,0,0,0.25) 100%)`,
+    ([x, y]) => {
+      const safeX = typeof x === "number" && Number.isFinite(x) ? x : 0;
+      const safeY = typeof y === "number" && Number.isFinite(y) ? y : 0;
+      return `radial-gradient(circle ${SPOTLIGHT_RADIUS}px at ${safeX}px ${safeY}px, transparent 0%, rgba(0,0,0,0.25) 100%)`;
+    },
   );
 
   // Scoped cursor hide style only inside #scan-game-container
@@ -140,24 +143,24 @@ const GhostHunter = ({
               animate={{ opacity: 0.4 }}
               exit={{ opacity: 0 }}
               style={{
-                x: mouseX as any,
-                y: mouseY as any,
-                translateX: -SPOTLIGHT_RADIUS - 10,
-                translateY: -SPOTLIGHT_RADIUS - 10,
+                x: mouseX,
+                y: mouseY,
+                left: -SPOTLIGHT_RADIUS - 10,
+                top: -SPOTLIGHT_RADIUS - 10,
               }}
-              className="absolute h-10 w-10 border-t border-l border-cyan-400"
+              className="absolute h-10 w-10 border-t border-l border-cyan-400 pointer-events-none"
             />
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.4 }}
               exit={{ opacity: 0 }}
               style={{
-                x: mouseX as any,
-                y: mouseY as any,
-                translateX: SPOTLIGHT_RADIUS - 30,
-                translateY: SPOTLIGHT_RADIUS - 30,
+                x: mouseX,
+                y: mouseY,
+                left: SPOTLIGHT_RADIUS - 30,
+                top: SPOTLIGHT_RADIUS - 30,
               }}
-              className="absolute h-10 w-10 border-r border-b border-cyan-400"
+              className="absolute h-10 w-10 border-r border-b border-cyan-400 pointer-events-none"
             />
           </>
         )}

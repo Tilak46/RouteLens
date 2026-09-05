@@ -118,12 +118,10 @@ const GamingHUDCursor = ({ containerRef }: GamingHUDCursorProps) => {
             style={{
               x: boxX1,
               y: boxY1,
-              translateX: "-50%",
-              translateY: "-50%",
             }}
             animate={{ rotate: 360 }}
             transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-            className="absolute h-16 w-16"
+            className="absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           >
             {[0, 120, 240].map((angle, i) => (
               <motion.div
@@ -145,14 +143,11 @@ const GamingHUDCursor = ({ containerRef }: GamingHUDCursorProps) => {
               style={{
                 x: layer.x,
                 y: layer.y,
-                translateX: "-50%",
-                translateY: "-50%",
-                rotate: isMoving ? rotate : 0,
                 width: boxSize * layer.scale,
                 height: boxSize * layer.scale,
                 opacity: isVisible ? layer.opacity : 0,
               }}
-              className="absolute flex items-center justify-center border-cyan-400/80"
+              className="absolute flex items-center justify-center border-cyan-400/80 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
             >
               <div className="absolute inset-0 border border-cyan-400/40" />
               {i === 0 && isVisible && (
@@ -167,9 +162,9 @@ const GamingHUDCursor = ({ containerRef }: GamingHUDCursorProps) => {
           ))}
 
           <motion.div
-            style={{ x: boxX1, y: boxY1, translateX: 30, translateY: -30 }}
+            style={{ x: boxX1, y: boxY1 }}
             animate={{ opacity: isVisible && isMoving ? 1 : 0 }}
-            className="absolute flex flex-col items-start gap-1 font-mono text-[8px] leading-none tracking-widest text-cyan-300/70 uppercase"
+            className="absolute flex flex-col items-start gap-1 font-mono text-[8px] leading-none tracking-widest text-cyan-300/70 uppercase translate-x-[30px] -translate-y-[30px] pointer-events-none"
           >
             <div className="flex gap-2">
               <span className="text-white/30">LOC_X</span>
@@ -197,7 +192,7 @@ const GamingHUDCursor = ({ containerRef }: GamingHUDCursorProps) => {
                 animate={{ scale: 3, opacity: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.6, ease: "easeOut" }}
-                className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400 opacity-60"
+                className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400 opacity-60 pointer-events-none"
               />
             ))}
           </AnimatePresence>
@@ -206,11 +201,9 @@ const GamingHUDCursor = ({ containerRef }: GamingHUDCursorProps) => {
             style={{
               x: mouseX,
               y: mouseY,
-              translateX: "-50%",
-              translateY: "-50%",
             }}
             animate={{ opacity: isVisible ? 1 : 0, scale: isMoving ? 0.6 : 1 }}
-            className="absolute h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_cyan]"
+            className="absolute h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_cyan] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           />
         </motion.div>
       )}

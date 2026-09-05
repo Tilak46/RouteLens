@@ -17,8 +17,8 @@ const getEdgePosition = (
   height: number,
 ) => {
   const margin = 50;
-  const safeW = Math.max(100, width);
-  const safeH = Math.max(100, height);
+  const safeW = Number.isFinite(width) && width > 100 ? width : 800;
+  const safeH = Number.isFinite(height) && height > 100 ? height : 600;
 
   switch (edge) {
     case "top":
@@ -182,26 +182,32 @@ export const useGhostHunter = (options?: {
           const chance = Math.random();
 
           if (isGameActive && (isIdle || chance < 0.12) && isVisible) {
+            const mx = mouseX.get();
+            const my = mouseY.get();
             return {
               ...g,
               state: "LUNGING",
-              targetX: mouseX.get(),
-              targetY: mouseY.get(),
+              targetX: Number.isFinite(mx) ? mx : width / 2,
+              targetY: Number.isFinite(my) ? my : height / 2,
               dialogue: undefined,
             };
           }
 
           if (g.state === "PROWLING" && !isIdle) {
             const move = (Math.random() - 0.5) * 30;
+            const safeWidth = Number.isFinite(width) && width > 80 ? width : 800;
+            const safeHeight = Number.isFinite(height) && height > 80 ? height : 600;
+            const curX = Number.isFinite(g.x) ? g.x : 100;
+            const curY = Number.isFinite(g.y) ? g.y : 100;
             if (g.edge === "top" || g.edge === "bottom") {
               return {
                 ...g,
-                x: Math.max(40, Math.min(width - 40, g.x + move)),
+                x: Math.max(40, Math.min(safeWidth - 40, curX + move)),
               };
             } else {
               return {
                 ...g,
-                y: Math.max(40, Math.min(height - 40, g.y + move)),
+                y: Math.max(40, Math.min(safeHeight - 40, curY + move)),
               };
             }
           }
