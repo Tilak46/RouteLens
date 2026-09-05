@@ -36,8 +36,7 @@ const CombatHUD = ({
             <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-breathe"></span>
                 </span>
                 <span className="text-[11px] font-bold tracking-wider text-cyan-300 uppercase font-mono">
                   Scanning Backend

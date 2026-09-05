@@ -786,7 +786,7 @@ export function ApiExplorerSidebarPanel({
                         className={cn(
                           "w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300",
                           isScanningThis
-                            ? "bg-cyan-400 animate-ping"
+                            ? "bg-cyan-400 animate-breathe"
                             : isActive
                             ? "bg-primary"
                             : "bg-muted-foreground/40"

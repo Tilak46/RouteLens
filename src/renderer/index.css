@@ -865,6 +865,23 @@
   animation: blink-error 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
+@keyframes dot-breathe {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 6px rgba(34, 211, 238, 0.9), 0 0 12px rgba(34, 211, 238, 0.4);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+    box-shadow: 0 0 2px rgba(34, 211, 238, 0.2);
+  }
+}
+
+.animate-breathe {
+  animation: dot-breathe 2.4s ease-in-out infinite;
+}
+
 /* Custom horizontal scrollbar for tabs container */
 .tabs-scroll::-webkit-scrollbar {
   height: 4px;
