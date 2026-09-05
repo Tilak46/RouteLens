@@ -8,6 +8,7 @@ type MascotPhase = "wave" | "wonder" | "scan" | "cheer";
 interface OnboardingMascotProps {
   className?: string;
   onExploreClick?: () => void;
+  isDragging?: boolean;
 }
 
 const EASTER_EGG_QUOTES = [
@@ -40,6 +41,7 @@ const EASTER_EGG_QUOTES = [
 
 export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
   className,
+  isDragging = false,
 }) => {
   const [phase, setPhase] = useState<MascotPhase>("wave");
   const [isHovered, setIsHovered] = useState(false);
@@ -74,17 +76,41 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
       <div
         className={cn(
           "absolute top-8 w-64 h-64 rounded-full blur-3xl pointer-events-none -z-10 transition-all duration-700",
-          phase === "wave" && "bg-blue-500/20",
-          phase === "wonder" && "bg-purple-500/20",
-          phase === "scan" && "bg-cyan-500/25",
-          phase === "cheer" && "bg-amber-500/30"
+          isDragging && "bg-cyan-500/35 scale-125",
+          !isDragging && phase === "wave" && "bg-blue-500/20",
+          !isDragging && phase === "wonder" && "bg-purple-500/20",
+          !isDragging && phase === "scan" && "bg-cyan-500/25",
+          !isDragging && phase === "cheer" && "bg-amber-500/30"
         )}
       />
 
       {/* Floating Story Speech / Thought Cloud Bubble */}
       <div className="h-18 flex items-end justify-center mb-1 z-20">
         <AnimatePresence mode="wait">
-          {phase === "wave" && (
+          {isDragging && (
+            <motion.div
+              key="bubble-drag"
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1.05 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="relative px-4 py-2.5 rounded-2xl bg-card/95 border-2 border-cyan-400 backdrop-blur-md shadow-[0_12px_36px_rgba(6,182,212,0.35)] text-center flex items-center gap-3"
+            >
+              <span className="text-2xl animate-bounce">🤩</span>
+              <div className="text-left">
+                <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                  Ooh, what backend did you bring me?
+                </div>
+                <div className="text-[11px] text-foreground font-medium">
+                  Drop it right here!
+                </div>
+              </div>
+              {/* Pointy speech arrow */}
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-cyan-400 rotate-45" />
+            </motion.div>
+          )}
+
+          {!isDragging && phase === "wave" && (
             <motion.div
               key="bubble-wave"
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
@@ -108,7 +134,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             </motion.div>
           )}
 
-          {phase === "wonder" && (
+          {!isDragging && phase === "wonder" && (
             <motion.div
               key="bubble-wonder"
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
@@ -133,7 +159,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             </motion.div>
           )}
 
-          {phase === "scan" && (
+          {!isDragging && phase === "scan" && (
             <motion.div
               key="bubble-scan"
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
@@ -145,11 +171,11 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
               <span className="text-2xl animate-pulse">🔍</span>
               <div className="text-left">
                 <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                  Point me to your backend folder!
+                  Drop your backend folder here!
                   <Sparkles size={12} className="text-cyan-400 animate-spin" style={{ animationDuration: "3s" }} />
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  I&apos;ll scan and discover all your endpoints in seconds!
+                  Drag &amp; drop anywhere or choose folder below to scan!
                 </div>
               </div>
               {/* Pointy speech arrow */}
@@ -157,31 +183,30 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             </motion.div>
           )}
 
-          {phase === "cheer" && (() => {
-            const quote = EASTER_EGG_QUOTES[clickCount % EASTER_EGG_QUOTES.length];
-            return (
-              <motion.div
-                key={`bubble-cheer-${clickCount}`}
-                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
-                className="relative px-4 py-2.5 rounded-2xl bg-card/95 border border-amber-500/50 backdrop-blur-md shadow-[0_8px_30px_rgba(245,158,11,0.3)] text-center flex items-center gap-3"
-              >
-                <span className="text-2xl animate-bounce">{quote.icon}</span>
-                <div className="text-left">
-                  <div className="text-xs font-bold text-amber-300">
-                    {quote.title}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {quote.sub}
-                  </div>
+          {!isDragging && phase === "cheer" && (
+            <motion.div
+              key={`bubble-cheer-${clickCount}`}
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="relative px-4 py-2.5 rounded-2xl bg-card/95 border border-amber-500/50 backdrop-blur-md shadow-[0_8px_30px_rgba(245,158,11,0.3)] text-center flex items-center gap-3"
+            >
+              <span className="text-2xl animate-bounce">
+                {EASTER_EGG_QUOTES[clickCount % EASTER_EGG_QUOTES.length].icon}
+              </span>
+              <div className="text-left">
+                <div className="text-xs font-bold text-amber-300">
+                  {EASTER_EGG_QUOTES[clickCount % EASTER_EGG_QUOTES.length].title}
                 </div>
-                {/* Pointy speech arrow */}
-                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-amber-500/50 rotate-45" />
-              </motion.div>
-            );
-          })()}
+                <div className="text-[11px] text-muted-foreground">
+                  {EASTER_EGG_QUOTES[clickCount % EASTER_EGG_QUOTES.length].sub}
+                </div>
+              </div>
+              {/* Pointy speech arrow */}
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-amber-500/50 rotate-45" />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -455,7 +480,15 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
               <ellipse cx="129" cy="79" rx="4" ry="2.2" fill="#fb7185" fillOpacity="0.45" />
 
               {/* Expressive Visor Eyes */}
-              {phase === "wave" && (
+              {(isDragging || phase === "cheer") && (
+                <g>
+                  {/* Joyful Starburst Eyes */}
+                  <path d="M99 67 L101 71 L105 72 L101 73 L99 77 L97 73 L93 72 L97 71 Z" fill={isDragging ? "#38bdf8" : "#f59e0b"} />
+                  <path d="M121 67 L123 71 L127 72 L123 73 L121 77 L119 73 L115 72 L119 71 Z" fill={isDragging ? "#38bdf8" : "#f59e0b"} />
+                </g>
+              )}
+
+              {!isDragging && phase === "wave" && (
                 <g>
                   {/* Happy inverted smiling arc eyes */}
                   <path
@@ -475,7 +508,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 </g>
               )}
 
-              {phase === "wonder" && (
+              {!isDragging && phase === "wonder" && (
                 <motion.g
                   animate={{ x: [-3, 3, -3] }}
                   transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
@@ -488,7 +521,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 </motion.g>
               )}
 
-              {phase === "scan" && (
+              {!isDragging && phase === "scan" && (
                 <g>
                   {/* Focused alert scanner eyes with cyber cyan reticle */}
                   <circle cx="99" cy="72" r="4" fill="#06b6d4" />
@@ -499,18 +532,10 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   <line x1="88" y1="72" x2="132" y2="72" stroke="#06b6d4" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="2 2" />
                 </g>
               )}
-
-              {phase === "cheer" && (
-                <g>
-                  {/* Joyful Starburst Eyes */}
-                  <path d="M99 67 L101 71 L105 72 L101 73 L99 77 L97 73 L93 72 L97 71 Z" fill="#f59e0b" />
-                  <path d="M121 67 L123 71 L127 72 L123 73 L121 77 L119 73 L115 72 L119 71 Z" fill="#f59e0b" />
-                </g>
-              )}
             </motion.g>
 
             {/* 3. Thought Cloud Graphic hovering in Phase: Wonder */}
-            {phase === "wonder" && (
+            {!isDragging && phase === "wonder" && (
               <motion.g
                 initial={{ opacity: 0, scale: 0.8, y: 5 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -540,14 +565,14 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
 
             {/* 4. Storytelling Right Arm & Gadget Animations */}
             {/* State A: Natural Organic Wave (Seamless Shoulder + Wrist Flutter) */}
-            {(phase === "wave" || phase === "cheer") && (
+            {(isDragging || phase === "wave" || phase === "cheer") && (
               <motion.g
                 animate={{
-                  rotate: phase === "cheer" ? [-2.5, 2.5, -2.5] : [-1, 1, -1],
+                  rotate: isDragging ? [-3.5, 3.5, -3.5] : phase === "cheer" ? [-2.5, 2.5, -2.5] : [-1, 1, -1],
                   y: [0, -1, 0],
                 }}
                 transition={{
-                  duration: phase === "cheer" ? 0.45 : 1.4,
+                  duration: isDragging ? 0.3 : phase === "cheer" ? 0.45 : 1.4,
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
@@ -610,7 +635,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             )}
 
             {/* State B: Thoughtfully Touching Chin */}
-            {phase === "wonder" && (
+            {!isDragging && phase === "wonder" && (
               <motion.g
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -629,7 +654,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             )}
 
             {/* State C: Magnifying Glass & Ground Sonar Radar Search */}
-            {phase === "scan" && (
+            {!isDragging && phase === "scan" && (
               <motion.g
                 initial={{ opacity: 0, x: -10, y: 10, scale: 0.8 }}
                 animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}

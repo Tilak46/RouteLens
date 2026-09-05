@@ -128,11 +128,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
 
       {/* Hero: Soulful Mascot as the Center of Attraction */}
       <div className="flex flex-col items-center mb-5">
-        <OnboardingMascot />
+        <OnboardingMascot isDragging={isDragging} />
       </div>
 
       {/* Clean, Confident Typography */}
-      <div className="text-center max-w-lg mb-8">
+      <div className="text-center max-w-lg mb-4">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight mb-2">
           Welcome to{" "}
           <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
@@ -145,12 +145,20 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
         </p>
       </div>
 
+      {/* Drag & Drop Pro-Tip Badge */}
+      <div className="inline-flex items-center gap-2 text-xs text-muted-foreground/90 bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 rounded-full px-4 py-1.5 mb-7 transition-all duration-200 shadow-sm">
+        <FolderDown size={14} className="text-primary animate-bounce" />
+        <span>
+          Tip: You can <strong>drag &amp; drop</strong> any backend folder anywhere to scan
+        </span>
+      </div>
+
       {/* 3 Balanced Action Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-8">
         {/* Card 1: Open Project (Primary) */}
         <div
           onClick={() => onOpenFolder()}
-          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-card/40 hover:bg-card/70 border border-primary/40 hover:border-primary/80 transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(59,130,246,0.22)] hover:-translate-y-0.5 overflow-hidden"
+          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-card/40 hover:bg-card/70 border border-primary/50 hover:border-primary transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(59,130,246,0.22)] hover:-translate-y-0.5 overflow-hidden"
         >
           {/* Subtle hover corner sheen */}
           <div className="absolute -top-12 -right-12 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-all duration-300 pointer-events-none" />
@@ -160,19 +168,21 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               <FolderOpen size={20} />
             </div>
             <h3 className="text-sm font-bold text-foreground mb-1.5 flex items-center justify-between">
-              <span>Open Project Folder</span>
+              <span>Open or Drop Folder</span>
               <ArrowRight
                 size={14}
                 className="text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
               />
             </h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Select your Express, Next.js, or NestJS backend folder to scan
-              routes.
+              Drag &amp; drop or select your Express, Next.js, Fastify or NestJS backend folder.
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-[11px] font-semibold text-primary">
-            <span>Choose or Drop Folder</span>
+            <span className="flex items-center gap-1.5">
+              <FolderDown size={13} className="text-primary" />
+              <span>Drop or Choose Folder</span>
+            </span>
             <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/15 border border-primary/25 text-primary">
               Ctrl+O
             </kbd>
