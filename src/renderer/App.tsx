@@ -1428,19 +1428,21 @@ function App() {
 
           {/* Interactive AST Scan Mini-Game: Only visible on the right workspace during scanning */}
           {Boolean(scanningProjectId) && (
-            <div
-              id="scan-game-container"
-              ref={scanGameContainerRef}
-              className="absolute inset-0 z-50 overflow-hidden pointer-events-auto bg-black/40 backdrop-blur-[2px]"
-            >
-              <GamingHUDCursor containerRef={scanGameContainerRef} />
-              <GhostHunter
-                containerRef={scanGameContainerRef}
-                isScanning={true}
-                scanningProjectName={projects.find((p) => p.id === scanningProjectId)?.name}
-                onDismiss={() => setScanningProjectId(null)}
-              />
-            </div>
+            <ErrorBoundary fallback={null}>
+              <div
+                id="scan-game-container"
+                ref={scanGameContainerRef}
+                className="absolute inset-0 z-50 overflow-hidden pointer-events-auto bg-black/40 backdrop-blur-[2px]"
+              >
+                <GamingHUDCursor containerRef={scanGameContainerRef} />
+                <GhostHunter
+                  containerRef={scanGameContainerRef}
+                  isScanning={true}
+                  scanningProjectName={projects.find((p) => p.id === scanningProjectId)?.name}
+                  onDismiss={() => setScanningProjectId(null)}
+                />
+              </div>
+            </ErrorBoundary>
           )}
 
           {/* Center Request Workspace Area */}
@@ -1520,7 +1522,8 @@ function App() {
               ) : activeProjectId && projects.find((p) => p.id === activeProjectId) ? (
                 // Clean project overview command center when all tabs are closed
                 (() => {
-                  const activeProject = projects.find((p) => p.id === activeProjectId)!;
+                  const activeProject = projects.find((p) => p.id === activeProjectId);
+                  if (!activeProject) return null;
                   const isScanning = scanningProjectId === activeProject.id;
                   const projectTree = treeCache[activeProject.path]?.tree || [];
                   const countRoutes = (nodes: any[]): number => {

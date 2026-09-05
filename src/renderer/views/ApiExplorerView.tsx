@@ -912,7 +912,7 @@ export function ApiExplorerSidebarPanel({
             </div>
 
             <div className="flex-grow overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2">
-              {isScanning && scanningProjectId === activeProject.id ? (
+              {isScanning && scanningProjectId === activeProject?.id ? (
                 <div className="p-4 text-xs text-cyan-400 flex items-center justify-center gap-2">
                   <RefreshCw size={12} className="animate-spin" /> Scanning AST routes...
                 </div>

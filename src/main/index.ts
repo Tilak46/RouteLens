@@ -195,6 +195,23 @@ function createWindow(): void {
     }
   });
 
+  mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    if (is.dev && level >= 2) {
+      console.log(`[Renderer Console] [level=${level}] ${message} (${sourceId}:${line})`);
+    }
+  });
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error("[Renderer Crash] MainWindow render process gone:", details);
+  });
+
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12" || (input.control && input.shift && input.key.toLowerCase() === "i")) {
+      mainWindow?.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
   mainWindow.webContents.on("did-finish-load", () => {
     mainWindow.webContents.send(
       "projects-loaded",
