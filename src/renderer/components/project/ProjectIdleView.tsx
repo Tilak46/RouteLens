@@ -270,33 +270,42 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                       className="text-zinc-300"
                     />
 
-                    {/* Torso */}
+                    {/* Elongated Spacesuit Torso (Proportional Body) */}
                     <path
-                      d="M52 101 C52 128 100 128 100 101"
+                      d="M52 101 C51 118 53 133 57 141 C62 145 90 145 95 141 C99 133 101 118 100 101 Z"
                       fill="#0f172a"
                       stroke="currentColor"
                       strokeWidth="2.4"
                       className="text-zinc-300"
                     />
 
+                    {/* Waist Seam */}
+                    <path
+                      d="M55 133 Q76 136 97 133"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      className="text-zinc-600"
+                    />
+
                     {/* Chest Control Box */}
                     <rect
                       x="68"
-                      y="102"
+                      y="105"
                       width="16"
-                      height="11"
+                      height="12"
                       rx="2.5"
                       fill="#1e293b"
                       stroke="currentColor"
                       strokeWidth="1.5"
                       className="text-zinc-500"
                     />
-                    <circle cx="73" cy="107" r="1.8" fill="#f97316" />
-                    <circle cx="79" cy="107" r="1.8" fill="#06b6d4" />
+                    <circle cx="73" cy="111" r="1.8" fill="#f97316" />
+                    <circle cx="79" cy="111" r="1.8" fill="#06b6d4" />
 
                     {/* Left Arm Pointing to Watch */}
                     <path
-                      d="M52 101 C42 110 46 122 62 125"
+                      d="M52 103 C41 114 45 130 62 135"
                       stroke="currentColor"
                       strokeWidth="2.4"
                       strokeLinecap="round"
@@ -306,7 +315,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
 
                     {/* Right Arm Holding Watch */}
                     <path
-                      d="M100 101 C109 110 98 126 84 126"
+                      d="M100 103 C110 114 99 135 84 135"
                       stroke="currentColor"
                       strokeWidth="2.4"
                       strokeLinecap="round"
@@ -317,19 +326,19 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                     {/* Smart Radar Scanner Watch */}
                     <circle
                       cx="73"
-                      cy="125"
+                      cy="135"
                       r="7"
                       fill="#0f172a"
                       stroke="#f97316"
                       strokeWidth="1.8"
                     />
                     <path
-                      d="M73 125 L77 121"
+                      d="M73 135 L77 131"
                       stroke="#f97316"
                       strokeWidth="1.5"
                       strokeLinecap="round"
                     />
-                    <circle cx="73" cy="125" r="1.5" fill="#f97316" />
+                    <circle cx="73" cy="135" r="1.5" fill="#f97316" />
                   </g>
                 </motion.svg>
               ) : (
