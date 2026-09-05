@@ -24,6 +24,7 @@ import apiClient from "@/lib/apiClient";
 import { Toaster, toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { ApiExplorerSidebarPanel, mergeTrees } from "@/views/ApiExplorerView";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
