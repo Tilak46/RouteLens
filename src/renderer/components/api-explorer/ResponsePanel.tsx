@@ -93,8 +93,12 @@ export function ResponsePanel({
     );
   }
 
-  const isError = response ? (response.status >= 400 || !response.ok) : false;
-  const timeLabel = (response && !loading) ? (response.timeMs ? `${response.timeMs} ms` : null) : null;
+  const isError = response ? (response.status >= 400 || !response.ok || response.status === 0) : false;
+  const timeLabel = (response && !loading && typeof response.timeMs === "number")
+    ? response.timeMs >= 1000
+      ? `${(response.timeMs / 1000).toFixed(2)} s`
+      : `${response.timeMs} ms`
+    : null;
   const sizeLabel = (response && !loading)
     ? response.sizeBytes
       ? response.sizeBytes > 1024
@@ -162,7 +166,9 @@ export function ResponsePanel({
               )}
             >
               {isError ? <AlertCircle size={12} /> : <CheckCircle2 size={12} />}
-              {response.status || "000"} {response.statusText || "Network Request"}
+              {response.status === 0
+                ? (response.statusText || "Could Not Connect")
+                : `${response.status} ${response.statusText || ""}`.trim()}
             </span>
           ) : null}
 
@@ -228,14 +234,12 @@ export function ResponsePanel({
             >
               Cookies {cookieCount > 0 && `(${cookieCount})`}
             </TabsTrigger>
-            {(hasJson || (loading && !response)) && (
-              <TabsTrigger
-                value="raw"
-                className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1 h-full font-medium"
-              >
-                Raw Output
-              </TabsTrigger>
-            )}
+            <TabsTrigger
+              value="raw"
+              className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1 h-full font-medium"
+            >
+              Raw Output
+            </TabsTrigger>
           </TabsList>
 
           {/* PRETTY BODY (Syntax Highlighting) */}
@@ -254,7 +258,7 @@ export function ResponsePanel({
                 theme={postmanTheme}
                 extensions={hasJson ? [json()] : []}
                 readOnly={true}
-                editable={true}
+                editable={false}
                 className="flex-grow border border-border/40 rounded-lg overflow-hidden text-[13px]"
                 height="100%"
               />

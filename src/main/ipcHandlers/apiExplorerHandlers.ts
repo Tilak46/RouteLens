@@ -314,10 +314,13 @@ export function registerApiExplorerHandlers() {
           }
         }
 
-        // If body is FormData, delete Content-Type from headers so fetch can set boundary automatically
-        if (body instanceof FormData) {
-          delete headers["Content-Type"];
-          delete headers["content-type"];
+        // If body is FormData, delete any Content-Type header so fetch calculates the multipart boundary automatically
+        if (bodyCfg?.mode === "form-data" || (typeof FormData !== "undefined" && body instanceof FormData)) {
+          for (const key of Object.keys(headers)) {
+            if (key.toLowerCase() === "content-type") {
+              delete headers[key];
+            }
+          }
         }
 
         // Auto-inject matching cookies from CookieJar
