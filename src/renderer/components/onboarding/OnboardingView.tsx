@@ -171,9 +171,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               : "bg-card/40 hover:bg-card/70 border border-primary/50 hover:border-primary shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(59,130,246,0.22)] hover:-translate-y-0.5"
           )}
         >
-          {/* Subtle hover corner sheen */}
-          <div className="absolute -top-12 -right-12 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-all duration-300 pointer-events-none" />
-
           <div>
             <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3.5 group-hover:scale-105 transition-transform">
               <FolderOpen size={20} />
