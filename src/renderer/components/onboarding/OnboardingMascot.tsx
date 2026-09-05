@@ -585,15 +585,15 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* Anchored Shoulder Socket */}
-                <circle cx="142" cy="112" r="7" fill="#334155" stroke="#475569" strokeWidth="2" />
+                {/* Unified curved arm sleeve matching left arm style */}
                 <path
-                  d="M140 116 C154 122 158 108 148 94 C144 89 139 90 138 94 C144 102 146 110 138 120 Z"
+                  d="M141 108 C152 110 156 102 148 90 C144 85 139 86 138 90 C143 97 146 103 141 120 Z"
                   fill="#334155"
                   stroke="#475569"
                   strokeWidth="2"
+                  strokeLinejoin="round"
                 />
-                <circle cx="137" cy="92" r="6.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
+                <circle cx="137" cy="90" r="6.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
               </motion.g>
             )}
 
@@ -604,16 +604,35 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
                 transition={{ duration: 0.45, ease: "backOut" }}
               >
-                {/* Anchored Shoulder Socket */}
-                <circle cx="142" cy="112" r="7" fill="#334155" stroke="#475569" strokeWidth="2" />
-                {/* Arm holding magnifying glass handle pointing downward */}
+                {/* Unified, smoothly contoured arm sleeve with natural taper (matching Step 1 & other arm) */}
                 <path
-                  d="M140 116 C154 118 165 114 172 106 C175 102 173 98 168 99 C162 103 154 106 142 120 Z"
+                  d="M141 108 C150 106 160 103 170 100 L172 109 C161 113 151 116 141 120 Z"
                   fill="#334155"
                   stroke="#475569"
                   strokeWidth="2"
+                  strokeLinejoin="round"
                 />
-                <circle cx="172" cy="104" r="6.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
+                {/* Wrist cuff */}
+                <ellipse
+                  cx="170"
+                  cy="104.5"
+                  rx="3"
+                  ry="5"
+                  fill="#1e293b"
+                  stroke="#475569"
+                  strokeWidth="1.5"
+                  transform="rotate(-15 170 104.5)"
+                />
+                {/* Space glove firmly gripping the handle */}
+                <circle cx="172" cy="104" r="7" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+                {/* Thumb gripping handle */}
+                <path
+                  d="M170 101 C172 99 175 100 176 103"
+                  stroke="#64748b"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  fill="none"
+                />
 
                 {/* Magnifying Glass Assembly with Sweeping Motion */}
                 <motion.g
