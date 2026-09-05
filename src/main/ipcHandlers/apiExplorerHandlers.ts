@@ -196,7 +196,7 @@ export function registerApiExplorerHandlers() {
           const loc = auth.in;
           if (key) {
             if (loc === "query") {
-              url.searchParams.append(key, value);
+              url.searchParams.set(key, value);
             } else {
               headers[key] = value;
             }

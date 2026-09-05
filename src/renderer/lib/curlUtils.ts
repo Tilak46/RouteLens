@@ -15,7 +15,7 @@ export interface RequestSnippetParams {
 /**
  * Build the complete URL with enabled query parameters appended
  */
-export function buildFullUrl(rawUrl: string, query?: ApiKeyValueRow[]): string {
+export function buildFullUrl(rawUrl: string, query?: ApiKeyValueRow[], auth?: ApiAuth): string {
   let cleanUrl = (rawUrl || "").trim();
   if (!cleanUrl) return "http://localhost:3000";
   if (!/^https?:\/\//i.test(cleanUrl)) {
@@ -35,6 +35,9 @@ export function buildFullUrl(rawUrl: string, query?: ApiKeyValueRow[]): string {
           urlObj.searchParams.set(k, String(q.value ?? ""));
         }
       }
+    }
+    if (auth?.type === "apiKey" && auth.key && auth.in === "query") {
+      urlObj.searchParams.set(auth.key.trim(), String(auth.value ?? ""));
     }
     return urlObj.toString();
   } catch {
@@ -113,7 +116,7 @@ export function buildResolvedHeaders(
  */
 export function generateCurlCommand(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toUpperCase();
-  const fullUrl = buildFullUrl(params.url, params.query);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   const lines: string[] = [`curl --location '${fullUrl}'`];
@@ -169,7 +172,7 @@ export function generateCurlCommand(params: RequestSnippetParams): string {
  */
 export function generateFetchCode(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toUpperCase();
-  const fullUrl = buildFullUrl(params.url, params.query);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   let bodyCode = "";
@@ -202,7 +205,7 @@ console.log(data);`;
  */
 export function generateAxiosCode(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toLowerCase();
-  const fullUrl = buildFullUrl(params.url, params.query);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   let dataCode = "";
@@ -230,7 +233,7 @@ console.log(response.data);`;
  */
 export function generatePythonCode(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toUpperCase();
-  const fullUrl = buildFullUrl(params.url, params.query);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   let payloadCode = "payload = {}";
