@@ -508,37 +508,54 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             )}
 
             {/* 4. Storytelling Right Arm & Gadget Animations */}
-            {/* State A: Waving Hello */}
+            {/* State A: Waving Hello (Anchored Shoulder + Forearm Pivot from Elbow) */}
             {(phase === "wave" || phase === "cheer") && (
-              <motion.g
-                initial={{ rotate: -15 }}
-                animate={{
-                  rotate: phase === "cheer" ? [-25, 25, -25, 25, -15] : [-15, 22, -15, 20, -15],
-                }}
-                transition={{
-                  duration: phase === "cheer" ? 0.7 : 1.6,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                style={{ transformOrigin: "142px 114px" }}
-              >
-                {/* Arm raised waving */}
+              <g>
+                {/* Fixed Shoulder Socket permanently locked to suit torso */}
+                <circle cx="142" cy="112" r="7" fill="#334155" stroke="#475569" strokeWidth="2" />
+
+                {/* Fixed Upper Arm extending from shoulder to elbow */}
                 <path
-                  d="M140 114 C150 106 162 94 170 80 C173 75 177 77 176 82 C170 96 157 112 145 120 Z"
+                  d="M141 106 C147 101 154 94 159 88 C163 91 165 95 161 100 C155 106 148 114 142 118 Z"
                   fill="#334155"
                   stroke="#475569"
                   strokeWidth="2"
                   strokeLinejoin="round"
                 />
-                {/* Waving Glove & Fingers */}
-                <circle cx="173" cy="78" r="7.5" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-                <path
-                  d="M171 72 L175 66 M174 71 L179 67 M176 73 L182 71"
-                  stroke="#64748b"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </motion.g>
+                {/* Elbow Joint Socket */}
+                <circle cx="160" cy="94" r="5.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
+
+                {/* Waving Forearm & Hand pivoting naturally from the elbow */}
+                <motion.g
+                  animate={{
+                    rotate: phase === "cheer" ? [-22, 22, -22] : [-16, 16, -16],
+                  }}
+                  transition={{
+                    duration: phase === "cheer" ? 0.45 : 1.3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  style={{ transformOrigin: "160px 94px" }}
+                >
+                  {/* Forearm */}
+                  <path
+                    d="M157 93 L168 68 L176 72 L163 96 Z"
+                    fill="#334155"
+                    stroke="#475569"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                  {/* Waving Glove */}
+                  <circle cx="172" cy="68" r="7" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+                  {/* Cute Waving Glove Fingers */}
+                  <path
+                    d="M170 62 L173 56 M174 61 L178 57 M177 63 L182 61"
+                    stroke="#64748b"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </motion.g>
+              </g>
             )}
 
             {/* State B: Thoughtfully Touching Chin */}
@@ -548,6 +565,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
               >
+                {/* Anchored Shoulder Socket */}
+                <circle cx="142" cy="112" r="7" fill="#334155" stroke="#475569" strokeWidth="2" />
                 <path
                   d="M140 116 C154 122 158 108 148 94 C144 89 139 90 138 94 C144 102 146 110 138 120 Z"
                   fill="#334155"
@@ -565,6 +584,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
                 transition={{ duration: 0.45, ease: "backOut" }}
               >
+                {/* Anchored Shoulder Socket */}
+                <circle cx="142" cy="112" r="7" fill="#334155" stroke="#475569" strokeWidth="2" />
                 {/* Arm holding magnifying glass handle pointing downward */}
                 <path
                   d="M140 116 C154 118 165 114 172 106 C175 102 173 98 168 99 C162 103 154 106 142 120 Z"
