@@ -672,46 +672,38 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
         </svg>
       </div>
 
-      {/* Interactive Phase Indicator & Story Stepper */}
-      <div className="flex items-center gap-2 mt-1">
+      {/* Sleek Minimal Story Stepper Dots */}
+      <div className="flex items-center gap-1.5 mt-2">
         <button
           onClick={() => setPhase("wave")}
           className={cn(
-            "text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm",
+            "h-1.5 rounded-full transition-all duration-300 cursor-pointer",
             phase === "wave"
-              ? "bg-primary/25 border-primary/50 text-primary font-semibold shadow-[0_0_12px_rgba(59,130,246,0.25)]"
-              : "bg-muted/20 border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              ? "w-5 bg-primary shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+              : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
           )}
-        >
-          <span>👋</span>
-          <span>Wave</span>
-        </button>
-
+          title="Greeting"
+        />
         <button
           onClick={() => setPhase("wonder")}
           className={cn(
-            "text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm",
+            "h-1.5 rounded-full transition-all duration-300 cursor-pointer",
             phase === "wonder"
-              ? "bg-purple-500/25 border-purple-500/50 text-purple-300 font-semibold shadow-[0_0_12px_rgba(168,85,247,0.25)]"
-              : "bg-muted/20 border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              ? "w-5 bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)]"
+              : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
           )}
-        >
-          <span>💭</span>
-          <span>Where&apos;s API?</span>
-        </button>
-
+          title="Searching for APIs"
+        />
         <button
           onClick={() => setPhase("scan")}
           className={cn(
-            "text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm",
+            "h-1.5 rounded-full transition-all duration-300 cursor-pointer",
             phase === "scan"
-              ? "bg-cyan-500/25 border-cyan-500/50 text-cyan-300 font-semibold shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-              : "bg-muted/20 border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              ? "w-5 bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]"
+              : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
           )}
-        >
-          <span>🔍</span>
-          <span>Scan Backend</span>
-        </button>
+          title="Radar Scanner"
+        />
       </div>
     </div>
   );
