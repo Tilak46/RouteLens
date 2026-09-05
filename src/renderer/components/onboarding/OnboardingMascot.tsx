@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Terminal, Search, HelpCircle, Rocket } from "lucide-react";
+import { Sparkles, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type MascotPhase = "wave" | "wonder" | "scan" | "cheer";
@@ -44,7 +44,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
   isDragging = false,
 }) => {
   const [phase, setPhase] = useState<MascotPhase>("wave");
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsHovered] = useState(false);
   const [clickCount, setClickCount] = useState(0);
 
   // Auto-cycle through the 3 storytelling phases every 4.5 seconds
@@ -219,22 +219,15 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
         title="Click me to celebrate!"
       >
         <svg
-          width="230"
+          width="240"
           height="195"
-          viewBox="0 0 240 200"
+          viewBox="0 0 240 195"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="overflow-visible"
         >
           {/* Defs for gradients & radar filters */}
           <defs>
-            {/* Visor Glass Gradient */}
-            <linearGradient id="visorGradMain" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0b1329" />
-              <stop offset="65%" stopColor="#111c3a" />
-              <stop offset="100%" stopColor="#0284c7" stopOpacity="0.5" />
-            </linearGradient>
-
             {/* Visor Glint Reflection */}
             <linearGradient id="glintGradMain" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
@@ -266,13 +259,13 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
           {/* 1. Ground Shadow with Dynamic Breathing Scale */}
           <motion.ellipse
             cx="110"
-            cy="186"
-            rx="54"
-            ry="7.5"
+            cy="176"
+            rx="52"
+            ry="7"
             fill="currentColor"
             className="text-black/60"
             animate={{
-              rx: phase === "cheer" ? [54, 40, 54] : [54, 48, 54],
+              rx: phase === "cheer" ? [52, 38, 52] : [52, 46, 52],
               opacity: phase === "cheer" ? [0.6, 0.3, 0.6] : [0.6, 0.45, 0.6],
             }}
             transition={{
@@ -283,8 +276,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
           />
           <motion.ellipse
             cx="110"
-            cy="186"
-            rx="36"
+            cy="176"
+            rx="34"
             ry="4.5"
             fill="currentColor"
             className={cn(
@@ -295,7 +288,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
               phase === "cheer" && "text-amber-400/35"
             )}
             animate={{
-              rx: [36, 30, 36],
+              rx: [34, 28, 34],
             }}
             transition={{
               duration: 3.2,
@@ -315,98 +308,163 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
               ease: "easeInOut",
             }}
           >
-            {/* Backpack (behind suit) */}
-            <rect
-              x="74"
-              y="102"
-              width="72"
-              height="60"
-              rx="15"
-              fill="#1e293b"
+            {/* Background Twinkling Stars (SS2) */}
+            <path
+              d="M34 38 L36 43 L41 45 L36 47 L34 52 L32 47 L27 45 L32 43 Z"
+              fill="currentColor"
+              className="text-zinc-500/40 animate-pulse"
+              style={{ animationDuration: "3s" }}
+            />
+            <path
+              d="M205 64 L206.5 67.5 L210 69 L206.5 70.5 L205 74 L203.5 70.5 L200 69 L203.5 67.5 Z"
+              fill="currentColor"
+              className="text-zinc-500/50 animate-pulse"
+              style={{ animationDuration: "2.4s", animationDelay: "0.8s" }}
+            />
+            <path
+              d="M28 98 L29.5 101 L33 102.5 L29.5 104 L28 107 L26.5 104 L23 102.5 L26.5 101 Z"
+              fill="currentColor"
+              className="text-zinc-500/30"
+            />
+
+            {/* Mini Rocket Orbiting in Background (SS2) */}
+            <g transform="translate(182, 22) rotate(42)">
+              {/* Rocket Body */}
+              <path
+                d="M0 -18 C6 -12 7 8 7 14 L-7 14 C-7 8 -6 -12 0 -18 Z"
+                fill="#0f172a"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+                className="text-zinc-300"
+              />
+              {/* Rocket Window */}
+              <circle
+                cx="0"
+                cy="-2"
+                r="3.2"
+                fill="#38bdf8"
+                fillOpacity="0.4"
+                stroke="#38bdf8"
+                strokeWidth="1.2"
+              />
+              {/* Left Fin */}
+              <path
+                d="M-7 8 L-13 15 L-7 14 Z"
+                fill="#0f172a"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                className="text-zinc-300"
+              />
+              {/* Right Fin */}
+              <path
+                d="M7 8 L13 15 L7 14 Z"
+                fill="#0f172a"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                className="text-zinc-300"
+              />
+              {/* Flame */}
+              <path
+                d="M-3 15 C-4 21 0 25 0 25 C0 25 4 21 3 15 Z"
+                fill="#f97316"
+                fillOpacity="0.85"
+                className="animate-pulse"
+              />
+            </g>
+            {/* Curved Smoke Trail (SS2) */}
+            <path
+              d="M185 42 Q172 58 176 75 T170 95"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeDasharray="3 3"
+              strokeLinecap="round"
+              className="text-zinc-600/60"
+            />
+
+            {/* SS2 Spacesuit Collar */}
+            <path
+              d="M92 98 Q110 106 128 98"
               stroke="currentColor"
               strokeWidth="2.5"
-              className="text-zinc-700"
+              strokeLinecap="round"
+              className="text-zinc-200"
             />
-            {/* Backpack Thruster Vents */}
-            <rect x="85" y="158" width="16" height="8" rx="3" fill="#334155" />
-            <rect x="119" y="158" width="16" height="8" rx="3" fill="#334155" />
-            {/* Status LEDs on Backpack */}
-            <circle cx="84" cy="114" r="2.5" fill="#10b981" />
-            <circle cx="92" cy="114" r="2.5" fill="#06b6d4" />
-            <circle cx="100" cy="114" r="2.5" fill="#f59e0b" />
 
-            {/* Astronaut Legs & Boots */}
-            <rect x="87" y="152" width="18" height="26" rx="8" fill="#334155" stroke="#475569" strokeWidth="2" />
-            <rect x="115" y="152" width="18" height="26" rx="8" fill="#334155" stroke="#475569" strokeWidth="2" />
-            {/* Boot Soles with Grip */}
-            <path d="M84 176 Q96 174 108 176 L106 181 Q96 183 84 181 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
-            <path d="M112 176 Q124 174 136 176 L134 181 Q124 183 112 181 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
-
-            {/* Astronaut Suit Body */}
-            <rect
-              x="78"
-              y="104"
-              width="64"
-              height="54"
-              rx="16"
+            {/* SS2 Half-Body Bust Torso */}
+            <path
+              d="M86 105 C86 135 134 135 134 105"
               fill="#0f172a"
               stroke="currentColor"
-              strokeWidth="2.5"
+              strokeWidth="2.4"
+              className="text-zinc-200"
+            />
+
+            {/* SS2 Chest Control Box */}
+            <rect
+              x="102"
+              y="106"
+              width="16"
+              height="11"
+              rx="2.5"
+              fill="#1e293b"
+              stroke="currentColor"
+              strokeWidth="1.5"
               className="text-zinc-500"
             />
-            {/* Chest Plate Detail */}
-            <rect
-              x="88"
-              y="114"
-              width="44"
-              height="26"
-              rx="7"
-              fill="#1e293b"
-              stroke="#334155"
-              strokeWidth="1.5"
-            />
-            {/* Glowing Heartbeat LED on Chest */}
-            <circle cx="98" cy="127" r="3.5" fill="#06b6d4" className="animate-pulse" />
-            {/* Data Lines on Chest Plate */}
-            <line x1="107" y1="124" x2="124" y2="124" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="107" y1="130" x2="119" y2="130" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="107" cy="111" r="1.8" fill="#f97316" />
+            <circle cx="113" cy="111" r="1.8" fill="#06b6d4" />
 
-            {/* Left Arm (Relaxed at hip) */}
-            <g>
-              <path
-                d="M78 112 C66 120 65 136 71 146 C74 150 79 148 78 143 C74 134 75 124 83 118 Z"
-                fill="#334155"
-                stroke="#475569"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <circle cx="72" cy="146" r="6.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
-            </g>
+            {/* Left Arm (Holding Smart Radar Watch - SS2 Signature) */}
+            <path
+              d="M86 105 C75 114 79 127 96 130"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              fill="none"
+              className="text-zinc-200"
+            />
+            {/* Smart Radar Scanner Watch on Left Wrist */}
+            <circle
+              cx="96"
+              cy="130"
+              r="7"
+              fill="#0f172a"
+              stroke="#f97316"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M96 130 L100 126"
+              stroke="#f97316"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <circle cx="96" cy="130" r="1.5" fill="#f97316" />
 
             {/* Head & Helmet Group (Expressive Tilting & Eye Animations) */}
             <motion.g
               animate={{
-                rotate: phase === "wonder" ? 10 : phase === "wave" ? -3 : 0,
+                rotate: phase === "wonder" ? 8 : phase === "wave" ? -2 : 0,
               }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
-              style={{ transformOrigin: "110px 72px" }}
+              style={{ transformOrigin: "110px 68px" }}
             >
               {/* Antenna Rod */}
               <line
                 x1="110"
-                y1="40"
+                y1="36"
                 x2="110"
-                y2="20"
+                y2="18"
                 stroke="currentColor"
-                strokeWidth="2.5"
+                strokeWidth="2.2"
                 strokeLinecap="round"
                 className="text-zinc-400"
               />
-              <rect x="105" y="38" width="10" height="4" rx="2" fill="#475569" />
+              <rect x="105" y="34" width="10" height="3.5" rx="1.8" fill="#475569" />
 
-              {/* Antenna Beacon Tip with Mathematically Anchored SVG Pulse */}
-              <circle cx="110" cy="16" r="4.5" fill="#f97316" className="animate-pulse" />
-              <circle cx="110" cy="16" r="5" fill="#f97316" fillOpacity="0.35">
+              {/* Antenna Beacon Tip with Mathematically Anchored SVG Pulse (SS2) */}
+              <circle cx="110" cy="14" r="4.2" fill="#f97316" className="animate-pulse" />
+              <circle cx="110" cy="14" r="5" fill="#f97316" fillOpacity="0.4">
                 <animate
                   attributeName="r"
                   values="4;8.5;4"
@@ -421,117 +479,131 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 />
               </circle>
 
-              {/* Outer Helmet Shell */}
+              {/* Outer Helmet Shell with SS2 Clean White/Silver Rim */}
               <circle
                 cx="110"
-                cy="72"
-                r="37"
+                cy="68"
+                r="33"
                 fill="#0f172a"
                 stroke="currentColor"
                 strokeWidth="2.5"
-                className="text-zinc-400"
+                className="text-zinc-200"
               />
 
-              {/* Left & Right Earmuffs with Cyber Rivets */}
+              {/* Left & Right Earmuffs */}
               <rect
-                x="70"
-                y="62"
-                width="7"
-                height="20"
-                rx="3.5"
+                x="74"
+                y="59"
+                width="6"
+                height="18"
+                rx="3"
                 fill="#1e293b"
                 stroke="currentColor"
                 strokeWidth="2"
                 className="text-zinc-400"
               />
               <rect
-                x="143"
-                y="62"
-                width="7"
-                height="20"
-                rx="3.5"
+                x="140"
+                y="59"
+                width="6"
+                height="18"
+                rx="3"
                 fill="#1e293b"
                 stroke="currentColor"
                 strokeWidth="2"
                 className="text-zinc-400"
               />
 
-              {/* Visor Glass Window */}
+              {/* Visor Window (SS2 Dark Glass with Cyan Accent) */}
               <rect
-                x="82"
-                y="53"
-                width="56"
-                height="40"
-                rx="18"
-                fill="url(#visorGradMain)"
-                stroke="#38bdf8"
-                strokeWidth="1.8"
-                strokeOpacity="0.65"
+                x="86"
+                y="50"
+                width="48"
+                height="35"
+                rx="16"
+                fill="#090d16"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-cyan-400/70"
               />
 
-              {/* Visor Top Curved Glint */}
+              {/* Visor Top Curved Glint Reflection */}
               <path
-                d="M88 61 Q102 55 124 58 Q114 63 92 65 Z"
+                d="M91 57 Q102 52 121 54 Q112 59 95 61 Z"
                 fill="url(#glintGradMain)"
               />
 
-              {/* Soulful Rosy Cheeks (Gives character warmth & cuteness) */}
-              <ellipse cx="91" cy="79" rx="4" ry="2.2" fill="#fb7185" fillOpacity="0.45" />
-              <ellipse cx="129" cy="79" rx="4" ry="2.2" fill="#fb7185" fillOpacity="0.45" />
+              {/* Sweet Rosy Cheeks (SS2 Warmth) */}
+              <ellipse cx="95" cy="72" rx="3" ry="1.6" fill="#fb7185" fillOpacity="0.55" />
+              <ellipse cx="125" cy="72" rx="3" ry="1.6" fill="#fb7185" fillOpacity="0.55" />
 
               {/* Expressive Visor Eyes */}
               {(isDragging || phase === "cheer") && (
                 <g>
                   {/* Joyful Starburst Eyes */}
-                  <path d="M99 67 L101 71 L105 72 L101 73 L99 77 L97 73 L93 72 L97 71 Z" fill={isDragging ? "#38bdf8" : "#f59e0b"} />
-                  <path d="M121 67 L123 71 L127 72 L123 73 L121 77 L119 73 L115 72 L119 71 Z" fill={isDragging ? "#38bdf8" : "#f59e0b"} />
+                  <path
+                    d="M100 62 L102 65.5 L106 66.5 L102 67.5 L100 71 L98 67.5 L94 66.5 L98 65.5 Z"
+                    fill={isDragging ? "#38bdf8" : "#f59e0b"}
+                  />
+                  <path
+                    d="M120 62 L122 65.5 L126 66.5 L122 67.5 L120 71 L118 67.5 L114 66.5 L118 65.5 Z"
+                    fill={isDragging ? "#38bdf8" : "#f59e0b"}
+                  />
                 </g>
               )}
 
               {!isDragging && phase === "wave" && (
                 <g>
-                  {/* Happy inverted smiling arc eyes */}
-                  <path
-                    d="M94 73 Q100 66 106 73"
-                    stroke="#38bdf8"
-                    strokeWidth="2.8"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                  <path
-                    d="M114 73 Q120 66 126 73"
-                    stroke="#38bdf8"
-                    strokeWidth="2.8"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
+                  {/* Cute Glossy Eyes with Smile (SS2 Canonical) */}
+                  <ellipse cx="100" cy="64" rx="2.5" ry="3.2" fill="#ffffff" />
+                  <circle cx="99.2" cy="63.2" r="1" fill="#09090b" />
+                  <ellipse cx="120" cy="64" rx="2.5" ry="3.2" fill="#ffffff" />
+                  <circle cx="119.2" cy="63.2" r="1" fill="#09090b" />
                 </g>
               )}
 
               {!isDragging && phase === "wonder" && (
                 <motion.g
-                  animate={{ x: [-3, 3, -3] }}
+                  animate={{ x: [-2.5, 2.5, -2.5] }}
                   transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
                 >
                   {/* Curious wide searching eyes looking around */}
-                  <circle cx="99" cy="72" r="4.5" fill="#c084fc" />
-                  <circle cx="101" cy="70.5" r="1.6" fill="#ffffff" />
-                  <circle cx="121" cy="72" r="4.5" fill="#c084fc" />
-                  <circle cx="123" cy="70.5" r="1.6" fill="#ffffff" />
+                  <circle cx="100" cy="64" r="3.8" fill="#c084fc" />
+                  <circle cx="101.5" cy="62.5" r="1.4" fill="#ffffff" />
+                  <circle cx="120" cy="64" r="3.8" fill="#c084fc" />
+                  <circle cx="121.5" cy="62.5" r="1.4" fill="#ffffff" />
                 </motion.g>
               )}
 
               {!isDragging && phase === "scan" && (
                 <g>
                   {/* Focused alert scanner eyes with cyber cyan reticle */}
-                  <circle cx="99" cy="72" r="4" fill="#06b6d4" />
-                  <circle cx="100.5" cy="70.5" r="1.6" fill="#ffffff" />
-                  <circle cx="121" cy="72" r="4" fill="#06b6d4" />
-                  <circle cx="122.5" cy="70.5" r="1.6" fill="#ffffff" />
+                  <circle cx="100" cy="64" r="3.4" fill="#06b6d4" />
+                  <circle cx="101.2" cy="62.8" r="1.3" fill="#ffffff" />
+                  <circle cx="120" cy="64" r="3.4" fill="#06b6d4" />
+                  <circle cx="121.2" cy="62.8" r="1.3" fill="#ffffff" />
                   {/* Digital scanline across eyes */}
-                  <line x1="88" y1="72" x2="132" y2="72" stroke="#06b6d4" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="2 2" />
+                  <line
+                    x1="91"
+                    y1="64"
+                    x2="129"
+                    y2="64"
+                    stroke="#06b6d4"
+                    strokeWidth="0.8"
+                    strokeOpacity="0.5"
+                    strokeDasharray="2 2"
+                  />
                 </g>
               )}
+
+              {/* The Signature SS2 Smile :) */}
+              <path
+                d={phase === "cheer" || isDragging ? "M105 73 Q110 79 115 73" : "M106 73 Q110 77 114 73"}
+                stroke="#ffffff"
+                strokeWidth="2"
+                strokeLinecap="round"
+                fill="none"
+              />
             </motion.g>
 
             {/* 3. Thought Cloud Graphic hovering in Phase: Wonder */}
@@ -543,11 +615,11 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 transition={{ duration: 0.35 }}
               >
                 {/* Ascending bubbles to cloud */}
-                <circle cx="138" cy="38" r="3" fill="#c084fc" fillOpacity="0.6" />
-                <circle cx="146" cy="28" r="4.5" fill="#c084fc" fillOpacity="0.75" />
-                
+                <circle cx="146" cy="34" r="2.8" fill="#c084fc" fillOpacity="0.6" />
+                <circle cx="154" cy="24" r="4.2" fill="#c084fc" fillOpacity="0.75" />
+
                 {/* Holographic Thought Cloud */}
-                <g transform="translate(136, -2)">
+                <g transform="translate(144, -6)">
                   <path
                     d="M18 18 C14 18 10 21 10 26 C6 26 2 29 2 34 C2 39 6 43 11 43 C13 46 17 48 21 48 C25 48 29 46 31 43 C35 43 39 39 39 35 C39 30 36 27 32 26 C32 21 27 18 22 18 Z"
                     fill="url(#cloudGrad)"
@@ -556,7 +628,14 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                     className="shadow-md"
                   />
                   {/* Glowing Question Mark & Brackets inside Cloud */}
-                  <text x="13" y="37" fill="#ffffff" fontSize="9" fontWeight="bold" fontFamily="monospace">
+                  <text
+                    x="13"
+                    y="37"
+                    fill="#ffffff"
+                    fontSize="9"
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                  >
                     {"{?}"}
                   </text>
                 </g>
@@ -576,33 +655,35 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-                style={{ transformOrigin: "140px 114px" }}
+                style={{ transformOrigin: "135px 110px" }}
               >
-                {/* 1. Seamless Shoulder Pad anchored to suit torso */}
-                <circle cx="140" cy="114" r="7.5" fill="#334155" stroke="#475569" strokeWidth="2" />
+                {/* Seamless Shoulder Pad */}
+                <circle cx="134" cy="110" r="7" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-200" />
 
-                {/* 2. Naturally Curved Space Suit Arm (Single organic limb, no robotic cuts) */}
+                {/* Naturally Curved Space Suit Arm */}
                 <path
-                  d="M138 112 C146 104 153 92 163 80 C167 82 170 86 166 90 C157 101 148 113 141 121 Z"
-                  fill="#334155"
-                  stroke="#475569"
+                  d="M133 108 C141 100 148 88 158 76 C162 78 165 82 161 86 C152 97 143 109 135 117 Z"
+                  fill="#0f172a"
+                  stroke="currentColor"
                   strokeWidth="2"
                   strokeLinejoin="round"
+                  className="text-zinc-200"
                 />
 
-                {/* 3. Sleek Wrist Cuff Ring */}
+                {/* Wrist Cuff Ring */}
                 <ellipse
-                  cx="165"
-                  cy="82"
-                  rx="4.5"
-                  ry="2.5"
+                  cx="160"
+                  cy="78"
+                  rx="4.2"
+                  ry="2.4"
                   fill="#1e293b"
-                  stroke="#475569"
+                  stroke="currentColor"
                   strokeWidth="1.5"
-                  transform="rotate(-35 165 82)"
+                  transform="rotate(-35 160 78)"
+                  className="text-zinc-300"
                 />
 
-                {/* 4. Natural Waving Hand (Pivoting smoothly from the wrist) */}
+                {/* Natural Waving Hand (Pivoting smoothly from the wrist) */}
                 <motion.g
                   animate={{
                     rotate: phase === "cheer" ? [-22, 22, -22] : [-16, 16, -16],
@@ -612,21 +693,21 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  style={{ transformOrigin: "165px 82px" }}
+                  style={{ transformOrigin: "160px 78px" }}
                 >
-                  {/* Chubby Space Glove */}
-                  <circle cx="171" cy="72" r="7.5" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-                  {/* Cute Waving Fingers (Spaced naturally like a real hand waving 👋) */}
+                  {/* Space Glove */}
+                  <circle cx="166" cy="68" r="7.5" fill="#0f172a" stroke="currentColor" strokeWidth="2" className="text-zinc-200" />
+                  {/* Waving Fingers */}
                   <path
-                    d="M168 65 L171 58 M172 64 L177 59 M176 67 L182 63"
-                    stroke="#64748b"
+                    d="M163 61 L166 54 M167 60 L172 55 M171 63 L177 59"
+                    stroke="#94a3b8"
                     strokeWidth="2.2"
                     strokeLinecap="round"
                   />
                   {/* Thumb */}
                   <path
-                    d="M165 72 L161 70"
-                    stroke="#64748b"
+                    d="M160 68 L156 66"
+                    stroke="#94a3b8"
                     strokeWidth="2"
                     strokeLinecap="round"
                   />
@@ -641,15 +722,16 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* Unified curved arm sleeve matching left arm style */}
+                {/* Curved arm sleeve matching suit style */}
                 <path
-                  d="M141 108 C152 110 156 102 148 90 C144 85 139 86 138 90 C143 97 146 103 141 120 Z"
-                  fill="#334155"
-                  stroke="#475569"
+                  d="M135 106 C146 108 150 100 143 88 C139 83 134 84 133 88 C138 95 141 101 136 118 Z"
+                  fill="#0f172a"
+                  stroke="currentColor"
                   strokeWidth="2"
                   strokeLinejoin="round"
+                  className="text-zinc-200"
                 />
-                <circle cx="137" cy="90" r="6.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
+                <circle cx="132" cy="88" r="6.5" fill="#1e293b" stroke="currentColor" strokeWidth="1.5" className="text-zinc-300" />
               </motion.g>
             )}
 
@@ -660,31 +742,33 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
                 transition={{ duration: 0.45, ease: "backOut" }}
               >
-                {/* Unified, smoothly contoured arm sleeve with natural taper (matching Step 1 & other arm) */}
+                {/* Arm sleeve holding scanner */}
                 <path
-                  d="M141 108 C150 106 160 103 170 100 L172 109 C161 113 151 116 141 120 Z"
-                  fill="#334155"
-                  stroke="#475569"
+                  d="M134 106 C144 104 154 101 164 98 L166 107 C155 111 145 114 134 118 Z"
+                  fill="#0f172a"
+                  stroke="currentColor"
                   strokeWidth="2"
                   strokeLinejoin="round"
+                  className="text-zinc-200"
                 />
                 {/* Wrist cuff */}
                 <ellipse
-                  cx="170"
-                  cy="104.5"
+                  cx="164"
+                  cy="102.5"
                   rx="3"
                   ry="5"
                   fill="#1e293b"
-                  stroke="#475569"
+                  stroke="currentColor"
                   strokeWidth="1.5"
-                  transform="rotate(-15 170 104.5)"
+                  transform="rotate(-15 164 102.5)"
+                  className="text-zinc-300"
                 />
                 {/* Space glove firmly gripping the handle */}
-                <circle cx="172" cy="104" r="7" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+                <circle cx="166" cy="102" r="7" fill="#0f172a" stroke="currentColor" strokeWidth="2" className="text-zinc-200" />
                 {/* Thumb gripping handle */}
                 <path
-                  d="M170 101 C172 99 175 100 176 103"
-                  stroke="#64748b"
+                  d="M164 99 C166 97 169 98 170 101"
+                  stroke="#94a3b8"
                   strokeWidth="2"
                   strokeLinecap="round"
                   fill="none"
@@ -700,23 +784,23 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  style={{ transformOrigin: "172px 104px" }}
+                  style={{ transformOrigin: "166px 102px" }}
                 >
                   {/* Metallic Handle */}
                   <line
-                    x1="172"
-                    y1="104"
-                    x2="186"
-                    y2="84"
+                    x1="166"
+                    y1="102"
+                    x2="180"
+                    y2="82"
                     stroke="#64748b"
                     strokeWidth="4.5"
                     strokeLinecap="round"
                   />
                   <line
-                    x1="172"
-                    y1="104"
-                    x2="186"
-                    y2="84"
+                    x1="166"
+                    y1="102"
+                    x2="180"
+                    y2="82"
                     stroke="#94a3b8"
                     strokeWidth="2"
                     strokeLinecap="round"
@@ -724,7 +808,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
 
                   {/* Downward Conical Radar Searchlight Beam */}
                   <polygon
-                    points="192,76 230,140 160,175"
+                    points="186,74 224,138 154,173"
                     fill="url(#radarBeamGrad)"
                     className="animate-pulse"
                     style={{ animationDuration: "1.5s" }}
@@ -732,8 +816,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
 
                   {/* Magnifying Glass Rim */}
                   <circle
-                    cx="192"
-                    cy="76"
+                    cx="186"
+                    cy="74"
                     r="19"
                     fill="url(#lensGlassGrad)"
                     stroke="#38bdf8"
@@ -742,27 +826,57 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   />
                   {/* Internal Holographic Reticle */}
                   <circle
-                    cx="192"
-                    cy="76"
+                    cx="186"
+                    cy="74"
                     r="11"
                     fill="none"
                     stroke="#06b6d4"
                     strokeWidth="1.3"
                     strokeDasharray="3 2"
                   />
-                  <line x1="183" y1="76" x2="201" y2="76" stroke="#06b6d4" strokeWidth="1.2" />
-                  <line x1="192" y1="67" x2="192" y2="85" stroke="#06b6d4" strokeWidth="1.2" />
+                  <line x1="177" y1="74" x2="195" y2="74" stroke="#06b6d4" strokeWidth="1.2" />
+                  <line x1="186" y1="65" x2="186" y2="83" stroke="#06b6d4" strokeWidth="1.2" />
 
                   {/* Ground Radar Target on Floor */}
-                  <g transform="translate(15, 0)">
-                    <ellipse cx="180" cy="170" rx="28" ry="7.5" fill="none" stroke="#06b6d4" strokeWidth="1.5" strokeDasharray="4 2" />
-                    <ellipse cx="180" cy="170" rx="16" ry="4.5" fill="#06b6d4" fillOpacity="0.15" />
+                  <g transform="translate(10, 0)">
+                    <ellipse
+                      cx="180"
+                      cy="168"
+                      rx="28"
+                      ry="7.5"
+                      fill="none"
+                      stroke="#06b6d4"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 2"
+                    />
+                    <ellipse
+                      cx="180"
+                      cy="168"
+                      rx="16"
+                      ry="4.5"
+                      fill="#06b6d4"
+                      fillOpacity="0.15"
+                    />
                     {/* Discovered API tokens popping up! */}
                     <g className="animate-pulse" style={{ animationDuration: "1.4s" }}>
-                      <text x="165" y="166" fill="#34d399" fontSize="8" fontWeight="bold" fontFamily="monospace">
+                      <text
+                        x="165"
+                        y="164"
+                        fill="#34d399"
+                        fontSize="8"
+                        fontWeight="bold"
+                        fontFamily="monospace"
+                      >
                         GET
                       </text>
-                      <text x="186" y="174" fill="#fbbf24" fontSize="8" fontWeight="bold" fontFamily="monospace">
+                      <text
+                        x="186"
+                        y="172"
+                        fill="#fbbf24"
+                        fontSize="8"
+                        fontWeight="bold"
+                        fontFamily="monospace"
+                      >
                         {"{ }"}
                       </text>
                     </g>
@@ -770,20 +884,6 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                 </motion.g>
               </motion.g>
             )}
-
-            {/* Sparkles Floating Around */}
-            <path
-              d="M46 88 L48 92 L52 94 L48 96 L46 100 L44 96 L40 94 L44 92 Z"
-              fill="#38bdf8"
-              className="animate-pulse"
-              style={{ animationDuration: "2.5s" }}
-            />
-            <path
-              d="M190 40 L191.5 43.5 L195 45 L191.5 46.5 L190 50 L188.5 46.5 L185 45 L188.5 43.5 Z"
-              fill="#c084fc"
-              className="animate-pulse"
-              style={{ animationDuration: "3.2s", animationDelay: "0.6s" }}
-            />
           </motion.g>
         </svg>
       </div>
