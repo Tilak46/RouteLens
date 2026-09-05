@@ -109,30 +109,18 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
       onDrop={handleDrop}
       className="relative w-full max-w-3xl mx-auto py-8 px-4 flex flex-col items-center select-none animate-in fade-in duration-300"
     >
-      {/* Drag & Drop Holographic Drop Zone Overlay */}
+      {/* Drag & Drop Holographic Perimeter Frame (Never obscures or blurs Victor!) */}
       {isDragging && (
-        <div className="absolute inset-0 z-50 rounded-3xl bg-background/85 backdrop-blur-md border-2 border-dashed border-primary/80 flex flex-col items-center justify-center gap-3 p-8 shadow-[0_0_50px_rgba(59,130,246,0.3)] animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
-          <div className="w-16 h-16 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary animate-bounce">
-            <FolderDown size={36} />
-          </div>
-          <div className="text-center">
-            <h3 className="text-lg font-bold text-foreground">
-              Drop your backend folder here
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              RouteLens will scan routes and controllers instantly!
-            </p>
-          </div>
-        </div>
+        <div className="absolute inset-0 z-10 rounded-3xl border-2 border-dashed border-cyan-400/80 bg-cyan-500/[0.03] shadow-[0_0_50px_rgba(6,182,212,0.25),inset_0_0_40px_rgba(6,182,212,0.08)] pointer-events-none animate-pulse" />
       )}
 
       {/* Hero: Soulful Mascot as the Center of Attraction */}
-      <div className="flex flex-col items-center mb-5">
+      <div className="relative z-20 flex flex-col items-center mb-5">
         <OnboardingMascot isDragging={isDragging} />
       </div>
 
       {/* Clean, Confident Typography */}
-      <div className="text-center max-w-lg mb-4">
+      <div className="relative z-20 text-center max-w-lg mb-4">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight mb-2">
           Welcome to{" "}
           <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
@@ -146,19 +134,42 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
       </div>
 
       {/* Drag & Drop Pro-Tip Badge */}
-      <div className="inline-flex items-center gap-2 text-xs text-muted-foreground/90 bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 rounded-full px-4 py-1.5 mb-7 transition-all duration-200 shadow-sm">
-        <FolderDown size={14} className="text-primary animate-bounce" />
+      <div
+        className={cn(
+          "relative z-20 inline-flex items-center gap-2 text-xs rounded-full px-4 py-1.5 mb-7 transition-all duration-300 shadow-sm",
+          isDragging
+            ? "text-cyan-300 bg-cyan-500/15 border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+            : "text-muted-foreground/90 bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40"
+        )}
+      >
+        <FolderDown
+          size={14}
+          className={cn(
+            isDragging ? "text-cyan-400 animate-bounce" : "text-primary animate-bounce"
+          )}
+        />
         <span>
-          Tip: You can <strong>drag &amp; drop</strong> any backend folder anywhere to scan
+          {isDragging ? (
+            <strong>Drop anywhere inside to start scanning!</strong>
+          ) : (
+            <>
+              Tip: You can <strong>drag &amp; drop</strong> any backend folder anywhere to scan
+            </>
+          )}
         </span>
       </div>
 
       {/* 3 Balanced Action Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-8">
+      <div className="relative z-20 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-8">
         {/* Card 1: Open Project (Primary) */}
         <div
           onClick={() => onOpenFolder()}
-          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-card/40 hover:bg-card/70 border border-primary/50 hover:border-primary transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(59,130,246,0.22)] hover:-translate-y-0.5 overflow-hidden"
+          className={cn(
+            "group relative flex flex-col justify-between p-5 rounded-2xl transition-all duration-200 cursor-pointer overflow-hidden",
+            isDragging
+              ? "bg-primary/20 border-2 border-dashed border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.35)] scale-[1.02]"
+              : "bg-card/40 hover:bg-card/70 border border-primary/50 hover:border-primary shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(59,130,246,0.22)] hover:-translate-y-0.5"
+          )}
         >
           {/* Subtle hover corner sheen */}
           <div className="absolute -top-12 -right-12 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-all duration-300 pointer-events-none" />
@@ -192,7 +203,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
         {/* Card 2: Explore Demo API */}
         <div
           onClick={onLoadDemo}
-          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-card/30 hover:bg-card/60 border border-border/50 hover:border-emerald-500/50 transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(16,185,129,0.15)] hover:-translate-y-0.5 overflow-hidden"
+          className={cn(
+            "group relative flex flex-col justify-between p-5 rounded-2xl bg-card/30 hover:bg-card/60 border border-border/50 hover:border-emerald-500/50 transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(16,185,129,0.15)] hover:-translate-y-0.5 overflow-hidden",
+            isDragging && "opacity-50 pointer-events-none"
+          )}
         >
           {/* Subtle hover corner sheen */}
           <div className="absolute -top-12 -right-12 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all duration-300 pointer-events-none" />
@@ -224,7 +238,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
         {/* Card 3: Quick Request */}
         <div
           onClick={onQuickRequest}
-          className="group relative flex flex-col justify-between p-5 rounded-2xl bg-card/30 hover:bg-card/60 border border-border/50 hover:border-amber-500/50 transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden"
+          className={cn(
+            "group relative flex flex-col justify-between p-5 rounded-2xl bg-card/30 hover:bg-card/60 border border-border/50 hover:border-amber-500/50 transition-all duration-200 cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_36px_rgba(245,158,11,0.15)] hover:-translate-y-0.5 overflow-hidden",
+            isDragging && "opacity-50 pointer-events-none"
+          )}
         >
           {/* Subtle hover corner sheen */}
           <div className="absolute -top-12 -right-12 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition-all duration-300 pointer-events-none" />
