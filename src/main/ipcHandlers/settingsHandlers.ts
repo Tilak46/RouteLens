@@ -110,4 +110,9 @@ export function registerSettingsHandlers(
   ipcMain.handle("store:set", async (_, key: string, value: any) => {
     (store as any).set(key, value);
   });
+
+  ipcMain.handle("store:reset", async () => {
+    (store as any).clear();
+    return true;
+  });
 }

@@ -338,6 +338,9 @@ export const api = {
   storeSet: (key: string, value: any): Promise<void> => {
     return ipcRenderer.invoke("store:set", key, value);
   },
+  storeReset: (): Promise<boolean> => {
+    return ipcRenderer.invoke("store:reset");
+  },
 };
 
 // Expose the API to the renderer process via contextBridge

@@ -14,24 +14,26 @@ import {
   ChevronRight,
   FolderCode,
   Terminal,
-  Lock
+  Lock,
+  Ghost,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type SidebarTab = "explorer" | "servers" | "automations" | "settings";
+export type SidebarTab = "explorer" | "automations" | "settings";
 
 type DashboardLayoutProps = {
   children: React.ReactNode;
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   sidebarContent: React.ReactNode;
-  consoleDrawer: React.ReactNode;
+  consoleDrawer?: React.ReactNode;
   isSidebarExpanded: boolean;
   onToggleSidebar: () => void;
   sidebarWidth?: number;
   onSidebarResizeStart?: (e: React.MouseEvent) => void;
   onDevToolsClick?: () => void;
   onTestExpiryClick?: () => void;
+  onDevTriggerScanAnimation?: () => void;
 };
 
 export function DashboardLayout({
@@ -46,6 +48,7 @@ export function DashboardLayout({
   onSidebarResizeStart,
   onDevToolsClick,
   onTestExpiryClick,
+  onDevTriggerScanAnimation,
 }: DashboardLayoutProps) {
   // Helper for leftmost toolbar icons
   const ToolbarButton = ({
@@ -62,9 +65,14 @@ export function DashboardLayout({
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={() => onTabChange(tabId)}
+            onClick={() => {
+              if (!isSidebarExpanded) {
+                onToggleSidebar();
+              }
+              onTabChange(tabId);
+            }}
             className={cn(
-              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 cursor-pointer",
               isActive
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
@@ -95,14 +103,23 @@ export function DashboardLayout({
         {/* 1. LEFT NARROW ICON TOOLBAR */}
         <div className="w-12 bg-[hsl(240,6%,4%)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
           <div className="flex flex-col items-center gap-4 w-full">
-            {/* Logo Icon */}
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(255,108,55,0.1)]">
-              <FolderCode size={16} />
-            </div>
+            {/* Logo Icon - click to toggle sidebar */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleSidebar}
+                  className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(255,108,55,0.1)] hover:bg-primary/20 hover:scale-105 transition-all cursor-pointer"
+                >
+                  <FolderCode size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+                {isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+              </TooltipContent>
+            </Tooltip>
 
             {/* Tabs */}
-            <ToolbarButton tabId="explorer" icon={Compass} label="API Discovery" />
-            <ToolbarButton tabId="servers" icon={Server} label="Local Servers" />
+            <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
           </div>
 
           <div className="flex flex-col items-center gap-3 w-full">
@@ -119,6 +136,24 @@ export function DashboardLayout({
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-popover border-border text-xs">
                   Developer Panel
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Dev: Scan & Ghost Hunter Mini-Game Trigger (Development Only) */}
+            {import.meta.env.DEV && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onDevTriggerScanAnimation}
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-cyan-400 hover:bg-cyan-500/15 hover:text-cyan-300 transition-all duration-200 group cursor-pointer"
+                    title="Dev: Test Scan & Ghost Mini-Game"
+                  >
+                    <Ghost size={16} className="group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform duration-200" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover border-border text-xs font-medium text-cyan-300">
+                  Dev: Test Scan & Ghost Mini-Game
                 </TooltipContent>
               </Tooltip>
             )}
@@ -183,20 +218,26 @@ export function DashboardLayout({
 
           {/* Toggle sidebar handle when collapsed */}
           {!isSidebarExpanded && (
-            <button
-              onClick={onToggleSidebar}
-              className="absolute left-0 top-1/2 -translate-y-1/2 bg-primary/10 border border-l-0 border-primary/20 text-primary p-1.5 rounded-r-md hover:bg-primary/20 transition-all shadow-md z-30"
-              title="Expand Sidebar"
-            >
-              <ChevronRight size={14} />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleSidebar}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(240,6%,8%)] border border-l-0 border-border/80 text-muted-foreground hover:text-primary hover:bg-primary/15 hover:border-primary/40 h-14 w-4 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
+                >
+                  <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+                Expand Sidebar (Backends & APIs)
+              </TooltipContent>
+            </Tooltip>
           )}
         </aside>
 
         {/* 3. MAIN WORKSPACE AREA */}
         <div className="flex-1 flex flex-col min-w-0 bg-[hsl(240,5%,11%)] overflow-hidden relative">
           {/* Main workspace container (no padding so request/response tab layouts can fit edge-to-edge) */}
-          <main className="flex-grow flex flex-col min-h-0 relative">
+          <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
             {children}
           </main>
 

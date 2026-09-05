@@ -91,8 +91,9 @@ import { registerApiExplorerHandlers } from "./ipcHandlers/apiExplorerHandlers";
 
 let mainWindow: BrowserWindow | null = null; // Global reference
 
-// Initialize Store
+// Initialize Store (separate dev and production stores for 100% clean state)
 const store = new Store<StoreType>({
+  name: is.dev ? "routelens-dev" : "routelens-store",
   defaults: {
     projects: [],
     groups: [],

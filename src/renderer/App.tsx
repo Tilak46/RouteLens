@@ -9,6 +9,7 @@ import {
   GitSummary,
   Method,
   ApiRoute,
+  ApiFolder,
   ApiHttpResponse,
 } from "@/../types";
 import { AddProjectModal } from "@/components/AddProjectModal";
@@ -22,11 +23,9 @@ import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/apiClient";
 import { Toaster, toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Compass, Plus, Server, Zap, Hourglass } from "lucide-react";
+import { Compass, Plus, Server, Zap, Hourglass, FolderCode } from "lucide-react";
 
-// Sidebar tab panels
-import { ApiExplorerSidebarPanel } from "@/views/ApiExplorerView";
-import { ServersPanel } from "@/components/api-explorer/ServersPanel";
+import { ApiExplorerSidebarPanel, mergeTrees } from "@/views/ApiExplorerView";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
 import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarPanel";
 
@@ -34,16 +33,10 @@ import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarP
 import { WorkspaceTabs, RequestTab } from "@/components/api-explorer/WorkspaceTabs";
 import { RequestPanel } from "@/components/api-explorer/RequestPanel";
 import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
-import { ConsoleLogsDrawer } from "@/components/api-explorer/ConsoleLogsDrawer";
 import { ManageEnvironmentsModal, ApiEnvironment } from "@/components/api-explorer/ManageEnvironmentsModal";
-
-type ProjectState = {
-  [id: string]: {
-    status: ProjectStatus;
-    logs: string;
-    url?: string;
-  };
-};
+import { OnboardingView } from "@/components/onboarding/OnboardingView";
+import GhostHunter from "@/components/game/GhostHunter";
+import GamingHUDCursor from "@/components/game/GamingHUDCursor";
 
 const defaultTab = (projectId?: string | null): RequestTab => ({
   id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -80,7 +73,6 @@ function App() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [appWorkspaces, setAppWorkspaces] = useState<AppWorkspace[]>([]);
-  const [projectState, setProjectState] = useState<ProjectState>({});
   const [gitSummaries, setGitSummaries] = useState<Record<string, GitSummary>>({});
   const [settings, setSettings] = useState<WorkspaceSettings>({
     manageWorkspaces: false,
@@ -90,8 +82,6 @@ function App() {
   // Layout UI state
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>("explorer");
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
-  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
-  const [consoleProjectId, setConsoleProjectId] = useState<string | null>(null);
 
   // Map of project ID -> RequestTab[]
   const [projectTabsMap, setProjectTabsMap] = useState<Record<string, RequestTab[]>>({});
@@ -99,6 +89,8 @@ function App() {
   const [projectActiveTabIdMap, setProjectActiveTabIdMap] = useState<Record<string, string | null>>({});
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [scanningProjectId, setScanningProjectId] = useState<string | null>(null);
+  const scanGameContainerRef = useRef<HTMLDivElement>(null);
   const [isTabsRestored, setIsTabsRestored] = useState(false);
   const [isEnvsRestored, setIsEnvsRestored] = useState(false);
   const [isLayoutRestored, setIsLayoutRestored] = useState(false);
@@ -106,7 +98,7 @@ function App() {
   const currentProjId = activeProjectId || "global";
 
   const tabs = useMemo(() => {
-    return projectTabsMap[currentProjId] || [defaultTab(currentProjId)];
+    return projectTabsMap[currentProjId] || [];
   }, [projectTabsMap, currentProjId]);
 
   const activeTabId = useMemo(() => {
@@ -124,7 +116,7 @@ function App() {
 
   const setTabs = (updater: RequestTab[] | ((prev: RequestTab[]) => RequestTab[])) => {
     setProjectTabsMap((prevMap) => {
-      const prevTabs = prevMap[currentProjId] || [defaultTab(currentProjId)];
+      const prevTabs = prevMap[currentProjId] || [];
       const nextTabs = typeof updater === "function" ? updater(prevTabs) : updater;
       return {
         ...prevMap,
@@ -148,11 +140,6 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = localStorage.getItem("devdash.sidebarWidth");
     return saved ? Math.max(270, parseInt(saved, 10)) : 270;
-  });
-
-  const [consoleHeight, setConsoleHeight] = useState<number>(() => {
-    const saved = localStorage.getItem("devdash.consoleHeight");
-    return saved ? Math.max(120, parseInt(saved, 10)) : 288;
   });
 
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -212,27 +199,6 @@ function App() {
     );
   };
 
-  const startConsoleResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = consoleHeight;
-
-    const doDrag = (moveEvent: MouseEvent) => {
-      const deltaY = moveEvent.clientY - startY;
-      const newHeight = Math.max(120, Math.min(550, startHeight - deltaY));
-      setConsoleHeight(newHeight);
-      localStorage.setItem("devdash.consoleHeight", String(newHeight));
-    };
-
-    const stopDrag = () => {
-      document.removeEventListener("mousemove", doDrag);
-      document.removeEventListener("mouseup", stopDrag);
-    };
-
-    document.addEventListener("mousemove", doDrag);
-    document.addEventListener("mouseup", stopDrag);
-  };
-
   // Modals state
   const [isAddProjectModalOpen, setIsAddProjectModalOpen] = useState(false);
   const [isCreateAppWorkspaceModalOpen, setIsCreateAppWorkspaceModalOpen] = useState(false);
@@ -257,8 +223,6 @@ function App() {
       apiClient.storeGet("activeEnvId").catch(() => null),
       apiClient.storeGet("activeSidebarTab").catch(() => null),
       apiClient.storeGet("isSidebarExpanded").catch(() => null),
-      apiClient.storeGet("isConsoleOpen").catch(() => null),
-      apiClient.storeGet("consoleProjectId").catch(() => null),
       apiClient.storeGet("apiScannerTreeCache").catch(() => null)
     ]).then(([
       storedMap,
@@ -268,8 +232,6 @@ function App() {
       storedEnvId,
       storedSidebarTab,
       storedSidebarExpanded,
-      storedConsoleOpen,
-      storedConsoleProjectId,
       storedTreeCache
     ]) => {
       // 1. Restore tree cache
@@ -304,11 +266,6 @@ function App() {
       if (typeof storedSidebarExpanded === "boolean") {
         setIsSidebarExpanded(storedSidebarExpanded);
       }
-      // Console drawer starts cleanly collapsed on cold launch
-      setIsConsoleOpen(false);
-      if (storedConsoleProjectId !== undefined) {
-        setConsoleProjectId(storedConsoleProjectId);
-      }
 
       // Mark all as restored
       setIsTabsRestored(true);
@@ -333,6 +290,17 @@ function App() {
     apiClient.storeSet("activeProjectId", activeProjectId);
   }, [activeProjectId, isTabsRestored]);
 
+  // Ensure activeProjectId is valid whenever projects change or are loaded
+  useEffect(() => {
+    if (projects.length > 0) {
+      if (!activeProjectId || !projects.some((p) => p.id === activeProjectId)) {
+        setActiveProjectId(projects[0].id);
+      }
+    } else if (activeProjectId) {
+      setActiveProjectId(null);
+    }
+  }, [projects, activeProjectId]);
+
   // Sync environment variables state to Electron Store
   useEffect(() => {
     if (!isEnvsRestored) return;
@@ -355,35 +323,12 @@ function App() {
     apiClient.storeSet("isSidebarExpanded", isSidebarExpanded);
   }, [isSidebarExpanded, isLayoutRestored]);
 
-  // Sync console drawer state to Electron Store
-  useEffect(() => {
-    if (!isLayoutRestored) return;
-    apiClient.storeSet("isConsoleOpen", isConsoleOpen);
-  }, [isConsoleOpen, isLayoutRestored]);
-
-  useEffect(() => {
-    if (!isLayoutRestored) return;
-    apiClient.storeSet("consoleProjectId", consoleProjectId);
-  }, [consoleProjectId, isLayoutRestored]);
-
   // Load initial configurations from Electron Store
   useEffect(() => {
     apiClient.getSettings();
     apiClient.onGroupsLoaded(setGroups);
     apiClient.onProjectsLoaded((loadedProjects) => {
       setProjects(loadedProjects);
-
-      setProjectState((prev) => {
-        const next: ProjectState = {};
-        loadedProjects.forEach((p) => {
-          next[p.id] = prev[p.id] || {
-            status: "stopped",
-            logs: "",
-            url: undefined,
-          };
-        });
-        return next;
-      });
 
       setGitSummaries((prev) => {
         const next: Record<string, GitSummary> = {};
@@ -411,69 +356,6 @@ function App() {
     });
     apiClient.onWorkspacesLoaded(setWorkspaces);
     apiClient.onAppWorkspacesLoaded(setAppWorkspaces);
-    apiClient.onServerStatusChanged(({ projectId, status }) => {
-      setProjectState((prevState) => {
-        const nextState = {
-          ...prevState,
-          [projectId]: {
-            ...prevState[projectId],
-            status: status,
-            url: status === "stopped" ? undefined : prevState[projectId]?.url,
-          },
-        };
-
-        // If a server stopped, auto-close console if no servers are currently running
-        if (status === "stopped") {
-          const hasRunningServers = Object.values(nextState).some(
-            (p) => p.status === "running" || p.status === "starting"
-          );
-          if (!hasRunningServers) {
-            setIsConsoleOpen(false);
-          }
-        }
-
-        return nextState;
-      });
-    });
-    apiClient.onTerminalLog(({ projectId, log }) => {
-      setProjectState((prevState) => {
-        if (!prevState[projectId]) return prevState;
-        return {
-          ...prevState,
-          [projectId]: {
-            ...prevState[projectId],
-            logs: prevState[projectId].logs + log,
-          },
-        };
-      });
-
-      // Auto-open terminal console drawer on errors
-      if (
-        log.includes("RouteLens Error") ||
-        log.includes("Error starting server") ||
-        log.includes("exited unexpectedly") ||
-        log.includes("Cannot find package.json") ||
-        log.includes("Project folder does not exist")
-      ) {
-        setConsoleProjectId(projectId);
-        setIsConsoleOpen(true);
-      }
-    });
-    apiClient.onServerUrlFound(({ projectId, url }) => {
-      setProjectState((prevState) => ({
-        ...prevState,
-        [projectId]: { ...prevState[projectId], url: url },
-      }));
-    });
-    apiClient.onClearLogs(({ projectId }) => {
-      setProjectState((prevState) => {
-        if (!prevState[projectId]) return prevState;
-        return {
-          ...prevState,
-          [projectId]: { ...prevState[projectId], logs: "" },
-        };
-      });
-    });
     apiClient.onSettingsLoaded(setSettings);
     apiClient.onSettingsUpdated(setSettings);
   }, []);
@@ -660,7 +542,12 @@ function App() {
 
   // --- Horizontal Request Tab Actions ---
   const handleNewTab = () => {
-    const tab = defaultTab();
+    const currentProj = projects.find((p) => p.id === activeProjectId);
+    const initialUrl = currentProj?.url ? `${currentProj.url.replace(/\/+$/, "")}/` : "";
+    const tab: RequestTab = {
+      ...defaultTab(activeProjectId),
+      url: initialUrl,
+    };
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   };
@@ -797,20 +684,32 @@ function App() {
   };
 
   const handleSelectRoute = (route: ApiRoute, baseUrl: string, projectId: string) => {
-    // Check if we already have an open tab for this specific scanned route path or routeId
-    const existing = tabs.find(
-      (t) => t.projectId === projectId && (t.routeId === route.id || (t.routePath === route.path && !t.routeId))
+    // 1. Ensure activeProjectId matches the selected route's project
+    if (activeProjectId !== projectId) {
+      setActiveProjectId(projectId);
+    }
+
+    // 2. Look up existing tab within this project's scoped tabs
+    const currentProjTabs = projectTabsMap[projectId] || [];
+    const existing = currentProjTabs.find(
+      (t) => t.routeId === route.id || (t.routePath === route.path && !t.routeId)
     );
+
     if (existing) {
-      // Dynamic URL update on click to respect any newly set Base URL
       const cleanBase = baseUrl.replace(/\/+$/, "");
       const newUrl = route.path ? `${cleanBase}${route.path}` : "";
       if (existing.url !== newUrl) {
-        setTabs((prev) =>
-          prev.map((t) => (t.id === existing.id ? { ...t, url: newUrl } : t))
-        );
+        setProjectTabsMap((prevMap) => ({
+          ...prevMap,
+          [projectId]: (prevMap[projectId] || []).map((t) =>
+            t.id === existing.id ? { ...t, url: newUrl } : t
+          ),
+        }));
       }
-      setActiveTabId(existing.id);
+      setProjectActiveTabIdMap((prevActiveMap) => ({
+        ...prevActiveMap,
+        [projectId]: existing.id,
+      }));
       return;
     }
 
@@ -836,11 +735,16 @@ function App() {
     const pathCleaned = route.path;
     const finalMethod = (route.method === "ALL" ? "GET" : route.method) as Method;
 
+    const cleanBase = baseUrl.replace(/\/+$/, "");
+    const initialUrl = route.path
+      ? `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`
+      : `${cleanBase}/`;
+
     const newTab: RequestTab = {
       id: `scanned_${projectId}_${route.id}`,
-      name: route.name || pathCleaned,
+      name: route.name || pathCleaned || "New Request",
       method: finalMethod,
-      url: route.path ? `${baseUrl.replace(/\/+$/, "")}${route.path}` : "",
+      url: initialUrl,
       params: queryRows,
       headers: [],
       auth: { type: "none" },
@@ -862,21 +766,344 @@ function App() {
       splitPercent: 50,
     };
 
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(newTab.id);
+    setProjectTabsMap((prevMap) => ({
+      ...prevMap,
+      [projectId]: [...(prevMap[projectId] || []), newTab],
+    }));
+    setProjectActiveTabIdMap((prevActiveMap) => ({
+      ...prevActiveMap,
+      [projectId]: newTab.id,
+    }));
   };
 
   const handleBaseUrlChange = (projectId: string, newBaseUrl: string) => {
-    setTabs((prev) =>
-      prev.map((t) => {
-        if (t.projectId === projectId && t.routePath) {
-          const cleanBase = newBaseUrl.replace(/\/+$/, "");
-          const newUrl = `${cleanBase}${t.routePath}`;
-          return { ...t, url: newUrl };
+    const cleanBase = newBaseUrl.trim();
+    const cleanNoSlash = cleanBase.replace(/\/+$/, "");
+
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, url: cleanBase } : p))
+    );
+    const proj = projects.find((p) => p.id === projectId);
+    if (proj) {
+      apiClient.updateProject({ ...proj, url: cleanBase });
+    }
+
+    setProjectTabsMap((prevMap) => {
+      const projTabs = prevMap[projectId] || [];
+      const updated = projTabs.map((t) => {
+        if (t.routePath) {
+          const pathWithSlash = t.routePath.startsWith("/") ? t.routePath : `/${t.routePath}`;
+          return { ...t, url: `${cleanNoSlash}${pathWithSlash}` };
+        }
+        if (proj?.url) {
+          const oldClean = proj.url.replace(/\/+$/, "");
+          if (oldClean && t.url.startsWith(oldClean)) {
+            return { ...t, url: `${cleanNoSlash}${t.url.slice(oldClean.length)}` };
+          }
         }
         return t;
-      })
-    );
+      });
+      return {
+        ...prevMap,
+        [projectId]: updated,
+      };
+    });
+  };
+
+  const handleAddBackendFolder = async () => {
+    try {
+      const folder = await apiClient.openDirectoryDialog();
+      if (!folder) return;
+
+      const existing = projects.find((p) => p.path === folder);
+      if (existing) {
+        setActiveProjectId(existing.id);
+        toast.info(`Backend "${existing.name}" is already linked.`);
+        return;
+      }
+
+      const parts = folder.split(/[\\/]/).filter(Boolean);
+      const folderName = parts[parts.length - 1] || "My API Project";
+
+      const port = await apiClient.detectProjectPort(folder).catch(() => null);
+      const finalPort = port || 3000;
+      const baseUrl = `http://localhost:${finalPort}`;
+
+      const newProject: Project = {
+        id: `proj_${Date.now()}`,
+        name: folderName,
+        path: folder,
+        startCommand: "",
+        url: baseUrl,
+        groupId: null,
+      };
+
+      apiClient.addProject(newProject);
+      setProjects((prev) => [...prev, newProject]);
+      setActiveProjectId(newProject.id);
+
+      void handleRescanProject(newProject);
+    } catch (err) {
+      console.error("Failed to add project folder:", err);
+      toast.error("Failed to select backend folder");
+    }
+  };
+
+  const handleRemoveProject = (id: string) => {
+    const proj = projects.find((p) => p.id === id);
+    apiClient.removeProject(id);
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+
+    // Clean up tabs
+    setProjectTabsMap((prevMap) => {
+      const nextMap = { ...prevMap };
+      delete nextMap[id];
+      return nextMap;
+    });
+    setProjectActiveTabIdMap((prevActiveMap) => {
+      const nextActiveMap = { ...prevActiveMap };
+      delete nextActiveMap[id];
+      return nextActiveMap;
+    });
+
+    if (proj) {
+      setTreeCache((prev) => {
+        const next = { ...prev };
+        delete next[proj.path];
+        apiClient.storeSet("apiScannerTreeCache", next);
+        return next;
+      });
+    }
+
+    if (activeProjectId === id) {
+      const remaining = projects.filter((p) => p.id !== id);
+      setActiveProjectId(remaining[0]?.id || null);
+    }
+
+    toast.success("Backend removed from workspace");
+  };
+
+  const handleQuickOpenFolder = handleAddBackendFolder;
+
+  const handleRescanProject = async (project: Project) => {
+    setScanningProjectId(project.id);
+    const toastId = toast.loading(`Scanning routes in ${project.name}...`);
+    try {
+      const result = await apiClient.scanProject(project.path);
+      const existing = treeCache[project.path];
+      const currentTree = existing?.tree || [];
+      const merged = currentTree.length > 0
+        ? mergeTrees(currentTree, result?.tree || [])
+        : (result?.tree || []);
+      const scannedLogs = result?.logs || [];
+
+      setTreeCache((prev) => {
+        const next = {
+          ...prev,
+          [project.path]: {
+            tree: merged,
+            logs: scannedLogs,
+            cachedAt: Date.now(),
+            potentialRoutesCount: result?.potentialRoutesCount,
+            detectedRoutesCount: result?.detectedRoutesCount,
+          },
+        };
+        apiClient.storeSet("apiScannerTreeCache", next);
+        return next;
+      });
+
+      toast.success("AST scan complete", {
+        id: toastId,
+        description: `Discovered ${result?.detectedRoutesCount || merged.length} routes in ${project.name}`,
+      });
+    } catch (err) {
+      toast.error("Scan failed", { id: toastId });
+    } finally {
+      setScanningProjectId(null);
+    }
+  };
+
+  const handleQuickRequest = () => {
+    const tab: RequestTab = {
+      ...defaultTab(activeProjectId),
+      name: "Quick Request",
+      url: "https://httpbin.org/get",
+    };
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+  };
+
+  const handleLoadDemoProject = () => {
+    const demoId = "proj_demo_store";
+    const demoPath = "mock://routelens-demo-store";
+    const demoProject: Project = {
+      id: demoId,
+      name: "RouteLens Demo API",
+      path: demoPath,
+      startCommand: "npm run dev",
+      url: "http://localhost:3000",
+      groupId: null,
+    };
+
+    // Add demo project
+    apiClient.addProject(demoProject);
+    setActiveProjectId(demoProject.id);
+    setActiveSidebarTab("explorer");
+
+    // Populate mock demo routes in treeCache
+    const demoTree: ApiFolder[] = [
+      {
+        id: "folder_auth",
+        name: "Authentication",
+        children: [
+          {
+            id: "route_login",
+            name: "User Login",
+            method: "POST",
+            path: "/api/v1/auth/login",
+            inferredHeaders: ["Content-Type"],
+            inferredBodyFields: ["username", "password"],
+            description: "Authenticate user credentials and receive session cookie & JWT token",
+          },
+          {
+            id: "route_me",
+            name: "Current Profile",
+            method: "GET",
+            path: "/api/v1/auth/me",
+            inferredHeaders: ["Authorization"],
+            description: "Get authenticated user profile details",
+          },
+          {
+            id: "route_logout",
+            name: "User Logout",
+            method: "POST",
+            path: "/api/v1/auth/logout",
+            description: "Clear auth cookie and terminate active session",
+          },
+        ],
+      },
+      {
+        id: "folder_products",
+        name: "Products & Catalog",
+        children: [
+          {
+            id: "route_list_products",
+            name: "List Products",
+            method: "GET",
+            path: "/api/v1/products",
+            inferredQueryFields: ["category", "limit", "sort"],
+            description: "Retrieve paginated products with category filtering",
+          },
+          {
+            id: "route_create_product",
+            name: "Create Product",
+            method: "POST",
+            path: "/api/v1/products",
+            inferredBodyFields: ["title", "price", "category", "inStock"],
+            description: "Add a new product listing to the inventory",
+          },
+          {
+            id: "route_delete_product",
+            name: "Delete Product",
+            method: "DELETE",
+            path: "/api/v1/products/:id",
+            description: "Remove product by ID",
+          },
+        ],
+      },
+      {
+        id: "folder_system",
+        name: "Health & System",
+        children: [
+          {
+            id: "route_health",
+            name: "Health Check",
+            method: "GET",
+            path: "/api/v1/health",
+            description: "System health and database connectivity probe",
+          },
+        ],
+      },
+    ];
+
+    setTreeCache((prev) => {
+      const next = {
+        ...prev,
+        [demoPath]: {
+          tree: demoTree,
+          logs: ["[demo] Initialized RouteLens Demo API specification with 7 mock endpoints."],
+          cachedAt: Date.now(),
+          potentialRoutesCount: 7,
+          detectedRoutesCount: 7,
+        },
+      };
+      apiClient.storeSet("apiScannerTreeCache", next);
+      return next;
+    });
+
+    // Open first route (User Login) in a tab for instant interaction
+    const firstRoute = demoTree[0].children[0] as ApiRoute;
+    handleSelectRoute(firstRoute, "http://localhost:3000", demoId);
+
+    toast.success("Demo API loaded!", {
+      description: "Explore endpoints, parameters, JSON body templates, and cookies.",
+    });
+  };
+
+  const handleDevTriggerScanAnimation = async () => {
+    let targetProject = projects.find((p) => p.id === activeProjectId);
+
+    if (!targetProject) {
+      if (projects.length > 0) {
+        targetProject = projects[0];
+        setActiveProjectId(targetProject.id);
+      } else {
+        handleLoadDemoProject();
+        targetProject = {
+          id: "proj_demo_store",
+          name: "RouteLens Demo API",
+          path: "mock://routelens-demo-store",
+          startCommand: "npm run dev",
+          groupId: null,
+        };
+        setProjects([targetProject]);
+      }
+    }
+
+    setScanningProjectId(targetProject.id);
+    toast.info("Hunt phantom bugs while AST scans your backend!");
+
+    if (!targetProject.path.startsWith("mock://")) {
+      const scanPromise = apiClient
+        .scanProject(targetProject.path)
+        .then((result) => {
+          const scannedTree = result?.tree || [];
+          const scannedLogs = result?.logs || [];
+          setTreeCache((prev) => ({
+            ...prev,
+            [targetProject!.path]: {
+              tree: scannedTree,
+              logs: scannedLogs,
+              cachedAt: Date.now(),
+              potentialRoutesCount: result?.potentialRoutesCount,
+              detectedRoutesCount: result?.detectedRoutesCount,
+            },
+          }));
+        })
+        .catch(() => {});
+
+      await Promise.all([
+        scanPromise,
+        new Promise((resolve) => setTimeout(resolve, 5000)),
+      ]);
+      setScanningProjectId(null);
+      toast.success("AST scan complete!");
+    } else {
+      setTimeout(() => {
+        setScanningProjectId(null);
+        toast.success("AST scan complete!");
+      }, 5000);
+    }
   };
 
   const activeRouteKey = useMemo(() => {
@@ -895,24 +1122,18 @@ function App() {
         return (
           <ApiExplorerSidebarPanel
             projects={projects}
-            projectState={projectState}
+            activeProjectId={activeProjectId}
+            onActiveProjectIdChange={setActiveProjectId}
             onSelectRoute={handleSelectRoute}
             onBaseUrlChange={handleBaseUrlChange}
             treeCache={treeCache}
             setTreeCache={setTreeCache}
-            activeProjectId={activeProjectId}
-            onActiveProjectIdChange={setActiveProjectId}
             activeRouteKey={activeRouteKey}
-          />
-        );
-      case "servers":
-        return (
-          <ServersPanel
-            projects={projects}
-            projectState={projectState}
-            onAddProjectClick={() => setIsAddProjectModalOpen(true)}
-            onEditProject={handleOpenEditModal}
-            onViewLogs={handleViewLogs}
+            onAddProjectClick={handleAddBackendFolder}
+            onRemoveProject={handleRemoveProject}
+            onRescanProject={handleRescanProject}
+            isScanning={Boolean(scanningProjectId)}
+            scanningProjectId={scanningProjectId}
           />
         );
       case "automations":
@@ -947,14 +1168,13 @@ function App() {
   }, [
     activeSidebarTab,
     projects,
-    projectState,
     appWorkspaces,
     workspaces,
     settings,
-    tabs,
     activeProjectId,
-    activeTabId,
     activeRouteKey,
+    scanningProjectId,
+    treeCache,
   ]);
 
   // Compute active environment variables
@@ -1097,18 +1317,7 @@ function App() {
           onSidebarResizeStart={startSidebarResize}
           onDevToolsClick={() => setIsDevToolsModalOpen(true)}
           onTestExpiryClick={() => setTestForceExpired(true)}
-          consoleDrawer={
-            <ConsoleLogsDrawer
-              isOpen={isConsoleOpen}
-              onClose={() => setIsConsoleOpen(!isConsoleOpen)}
-              projects={projects}
-              projectState={projectState}
-              activeProjectId={consoleProjectId}
-              onSelectProject={setConsoleProjectId}
-              consoleHeight={consoleHeight}
-              onConsoleResizeStart={startConsoleResize}
-            />
-          }
+          onDevTriggerScanAnimation={handleDevTriggerScanAnimation}
         >
           {/* Settings Modals */}
           <AddProjectModal
@@ -1152,129 +1361,107 @@ function App() {
             treeCache={treeCache}
           />
 
+          {/* Interactive AST Scan Mini-Game: Only visible on the right workspace during scanning */}
+          {Boolean(scanningProjectId) && (
+            <div
+              id="scan-game-container"
+              ref={scanGameContainerRef}
+              className="absolute inset-0 z-50 overflow-hidden pointer-events-auto bg-black/40 backdrop-blur-[2px]"
+            >
+              <GamingHUDCursor containerRef={scanGameContainerRef} />
+              <GhostHunter
+                containerRef={scanGameContainerRef}
+                isScanning={true}
+                scanningProjectName={projects.find((p) => p.id === scanningProjectId)?.name}
+                onDismiss={() => setScanningProjectId(null)}
+              />
+            </div>
+          )}
+
           {/* Center Request Workspace Area */}
           {!activeTab ? (
             <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
-              {activeProjectId && projects.find(p => p.id === activeProjectId) ? (
-                // Scanned Project Workspace Placeholder
+              {activeProjectId && projects.find((p) => p.id === activeProjectId) ? (
+                // Clean project overview command center
                 (() => {
-                  const activeScannedProject = projects.find(p => p.id === activeProjectId)!;
-                  const pState = projectState?.[activeScannedProject.id];
-                  const serverStatus = pState?.status || "stopped";
-                  const isRunning = serverStatus === "running";
+                  const activeProject = projects.find((p) => p.id === activeProjectId)!;
+                  const isScanning = scanningProjectId === activeProject.id;
+                  const projectTree = treeCache[activeProject.path]?.tree || [];
+                  const countRoutes = (nodes: any[]): number => {
+                    let count = 0;
+                    for (const n of nodes) {
+                      if (!n) continue;
+                      if ((n as any).method) count++;
+                      else if (Array.isArray(n.children)) count += countRoutes(n.children);
+                    }
+                    return count;
+                  };
+                  const totalEndpoints = countRoutes(projectTree);
+
                   return (
-                    <div className="max-w-md w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-200">
-                      <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-5 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
-                        <Compass size={24} className={isRunning ? "animate-spin-slow animate-pulse text-emerald-400" : ""} />
+                    <div className="max-w-lg w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-300">
+                      <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
+                        <FolderCode size={26} />
                       </div>
-                      <h2 className="text-xl font-bold text-foreground mb-1">
-                        {activeScannedProject.name} Scanned
+                      <h2 className="text-xl font-bold text-foreground tracking-tight mb-2">
+                        {activeProject.name}
                       </h2>
-                      <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
-                        API scanner completed successfully. Select a route from the <strong>Detected Endpoints</strong> sidebar tree on the left to start testing.
-                      </p>
-                      
-                      <div className="bg-muted/10 border border-border/30 rounded-lg p-3 text-left space-y-2 mb-6 font-mono text-[11px] text-muted-foreground">
-                        <div className="flex justify-between items-center">
-                          <span>Server Status:</span>
-                          <span className={`font-bold uppercase ${isRunning ? "text-emerald-400" : "text-zinc-500"}`}>
-                            {serverStatus}
+                      <div className="flex items-center justify-center gap-2 mb-4">
+                        <div className="text-xs text-muted-foreground font-mono bg-background/60 px-3 py-1.5 rounded-lg border border-border/40 max-w-sm truncate">
+                          <span className="text-foreground">{activeProject.path}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2 mb-6">
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-muted/40 border border-border/40 text-muted-foreground font-mono">
+                          {totalEndpoints} Endpoints Discovered
+                        </span>
+                        {activeProject.url && (
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono">
+                            {activeProject.url}
                           </span>
-                        </div>
-                        <div className="truncate">
-                          <span>Path: </span>
-                          <span className="text-foreground">{activeScannedProject.path}</span>
-                        </div>
+                        )}
+                        {isScanning && (
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono animate-pulse">
+                            Scanning AST...
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-center gap-3">
                         <Button
-                          onClick={() => apiClient.toggleServer(activeScannedProject)}
-                          className={`font-semibold text-xs px-4 h-8 transition-all ${
-                            isRunning ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"
-                          }`}
+                          onClick={handleNewTab}
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 h-8 cursor-pointer shadow-sm"
                         >
-                          {isRunning ? "Stop Server" : "Start Server"}
+                          + Manual Request
                         </Button>
-                        <Button 
+                        <Button
                           variant="outline"
-                          onClick={handleNewTab} 
-                          className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8"
+                          onClick={() => handleRescanProject(activeProject)}
+                          disabled={isScanning}
+                          className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
                         >
-                          Manual Request
+                          {isScanning ? "Scanning..." : "Rescan AST"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => apiClient.showItemInFolder(activeProject.path)}
+                          className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
+                        >
+                          Reveal in Folder
                         </Button>
                       </div>
                     </div>
                   );
                 })()
               ) : (
-                // Onboarding welcome screen
-                <div className="max-w-2xl w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-300">
-                  <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-5 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
-                    <Compass size={24} />
-                  </div>
-                  <h2 className="text-2xl font-bold text-foreground tracking-tight mb-2">Welcome to RouteLens</h2>
-                  <p className="text-sm text-muted-foreground max-w-lg mx-auto mb-8 leading-relaxed">
-                    RouteLens automatically parses your codebase to discover, execute, and monitor API routes. Zero manual collection setups, zero manual syncs.
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-left mb-8">
-                    {/* Step 1 */}
-                    <div className="flex flex-col p-4 bg-muted/20 border border-border/30 rounded-xl hover:border-primary/20 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 shrink-0">
-                        <Server size={16} />
-                      </div>
-                      <h3 className="text-xs font-semibold text-foreground mb-1">1. Add Local Project</h3>
-                      <p className="text-[11px] text-muted-foreground leading-normal">
-                        Go to <strong>Local Servers</strong> and import your folder. RouteLens supports Next.js, Express, etc.
-                      </p>
-                      <button
-                        onClick={() => setActiveSidebarTab("servers")}
-                        className="mt-auto pt-3 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors text-left focus:outline-none"
-                      >
-                        Go to Servers &rarr;
-                      </button>
-                    </div>
-
-                    {/* Step 2 */}
-                    <div className="flex flex-col p-4 bg-muted/20 border border-border/30 rounded-xl hover:border-primary/20 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 shrink-0">
-                        <Compass size={16} />
-                      </div>
-                      <h3 className="text-xs font-semibold text-foreground mb-1">2. Auto-Scan Routes</h3>
-                      <p className="text-[11px] text-muted-foreground leading-normal">
-                        Switch back to <strong>API Discovery</strong>. Your project routes will scan and render instantly.
-                      </p>
-                    </div>
-
-                    {/* Step 3 */}
-                    <div className="flex flex-col p-4 bg-muted/20 border border-border/30 rounded-xl hover:border-primary/20 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3 shrink-0">
-                        <Zap size={16} />
-                      </div>
-                      <h3 className="text-xs font-semibold text-foreground mb-1">3. Start & Request</h3>
-                      <p className="text-[11px] text-muted-foreground leading-normal">
-                        Click the Play icon on your server in the sidebar, select any endpoint, and hit Send!
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <Button 
-                      onClick={() => setIsAddProjectModalOpen(true)} 
-                      className="bg-primary text-primary-foreground font-semibold px-5 h-9"
-                    >
-                      <Plus size={14} className="mr-1.5" /> Add Project to Start
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={handleNewTab} 
-                      className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-5 h-9"
-                    >
-                      Create Manual Request
-                    </Button>
-                  </div>
-                </div>
+                // Modern Onboarding View for fresh users with 0 projects
+                <OnboardingView
+                  onOpenFolder={handleAddBackendFolder}
+                  onQuickRequest={handleQuickRequest}
+                  onLoadDemo={handleLoadDemoProject}
+                  onOpenManualModal={handleAddBackendFolder}
+                />
               )}
             </div>
           ) : (
@@ -1316,7 +1503,6 @@ function App() {
                     activeEnvName={activeEnvName || undefined}
                     onAddOrUpdateVariable={handleAddOrUpdateVariable}
                     projects={projects}
-                    projectState={projectState}
                     treeCache={treeCache}
                   />
                 </div>

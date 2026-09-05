@@ -147,6 +147,7 @@ interface ElectronApi {
   // Store Persistence
   storeGet: (key: string) => Promise<any>;
   storeSet: (key: string, value: any) => Promise<void>;
+  storeReset: () => Promise<boolean>;
 }
 
 // Access the exposed API, handling potential undefined errors during build/lint
@@ -390,6 +391,10 @@ const fallbackApi: ElectronApi = {
   },
   storeSet: async () => {
     console.warn("API not ready");
+  },
+  storeReset: async () => {
+    console.warn("API not ready");
+    return false;
   },
 };
 

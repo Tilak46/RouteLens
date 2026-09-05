@@ -85,9 +85,30 @@ export function SettingsSidebarPanel({
         </div>
       </div>
 
+      {/* Data & Storage Management */}
+      <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
+        <div className="text-xs font-semibold text-destructive flex items-center gap-1.5">
+          <span>Factory Reset</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground leading-normal">
+          Wipe all cached projects, request tabs, environments, and cookies to return to a 100% fresh slate.
+        </p>
+        <button
+          onClick={async () => {
+            if (window.confirm("Are you sure you want to reset all RouteLens app data? This will restore a clean first-run experience.")) {
+              await window.api?.storeReset?.();
+              window.location.reload();
+            }
+          }}
+          className="w-full py-1.5 px-2.5 rounded bg-destructive/20 hover:bg-destructive/30 text-destructive text-[11px] font-semibold border border-destructive/40 transition-colors cursor-pointer"
+        >
+          Reset to Clean State
+        </button>
+      </div>
+
       {/* About Box */}
       <div className="p-3 rounded-lg border border-border/50 bg-primary/5 text-center">
-        <div className="text-xs font-bold text-primary mb-1">RouteLens v1.0.0</div>
+        <div className="text-xs font-bold text-primary mb-1">RouteLens v1.0.1</div>
         <div className="text-[10px] text-muted-foreground leading-normal">
           AST Route Scanner and API Client for Modern Full-Stack Workspaces.
         </div>

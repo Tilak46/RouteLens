@@ -47,7 +47,6 @@ type RequestPanelProps = {
   activeEnvName?: string;
   onAddOrUpdateVariable?: (key: string, value: string) => void;
   projects?: Project[];
-  projectState?: Record<string, { status: any; logs: string; url?: string }>;
   treeCache?: Record<string, any>;
 };
 
@@ -247,7 +246,6 @@ export function RequestPanel({
   activeEnvName,
   onAddOrUpdateVariable,
   projects = [],
-  projectState = {},
   treeCache = {},
 }: RequestPanelProps) {
   const [method, setMethod] = useState<Method>(tab.method);
@@ -450,128 +448,7 @@ export function RequestPanel({
     }
   }, [urlPathParams]);
 
-  const warningBanner = useMemo(() => {
-    return null;
-    if (!tab.projectId || !projects || !projectState) return null;
-    const ownerProject = projects.find((p) => p.id === tab.projectId);
-    if (!ownerProject) return null;
-
-    const ownerState = projectState[tab.projectId];
-    const isOwnerRunning = ownerState?.status === "running";
-
-    // Try to parse target port from the active URL
-    let targetPort: number | null = null;
-    try {
-      const urlStr = (url || "").trim();
-      if (urlStr) {
-        // Resolve variables first
-        let resolvedUrl = urlStr;
-        if (activeVariables) {
-          for (const v of activeVariables) {
-            resolvedUrl = resolvedUrl.replace(new RegExp(`\\{\\{\\s*${v.key}\\s*\\}\\}`, "g"), v.value);
-          }
-        }
-        const urlWithProto = resolvedUrl.match(/^https?:\/\//i) ? resolvedUrl : `http://${resolvedUrl}`;
-        const parsed = new URL(urlWithProto);
-        if (parsed.port) {
-          targetPort = parseInt(parsed.port, 10);
-        } else if (parsed.protocol === "https:") {
-          targetPort = 443;
-        } else if (parsed.protocol === "http:") {
-          targetPort = 80;
-        }
-      }
-    } catch (e) {
-      // Ignore URL parsing errors
-    }
-
-    if (targetPort === null) return null;
-
-    // Check if another project is running on this port
-    let conflictingProject: Project | null = null;
-    for (const p of projects) {
-      if (p.id === tab.projectId) continue;
-      const pState = projectState[p.id];
-      if (pState && pState.status === "running") {
-        let pPort: number | null = null;
-        if (pState.url) {
-          try {
-            const parsed = new URL(pState.url);
-            pPort = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === "https:" ? 443 : 80);
-          } catch {}
-        }
-        if (pPort === targetPort) {
-          conflictingProject = p;
-          break;
-        }
-      }
-    }
-
-    if (conflictingProject) {
-      return {
-        message: (
-          <span>
-            <strong>Port Conflict:</strong> The target server <strong>{ownerProject.name}</strong> is offline, but port <strong>{targetPort}</strong> is occupied by another running server: <strong>{conflictingProject.name}</strong>. Your requests will hit the wrong backend!
-          </span>
-        ),
-      };
-    }
-
-    if (ownerState?.status === "starting") {
-      return {
-        message: (
-          <span>
-            <strong>Server Starting:</strong> The target server <strong>{ownerProject.name}</strong> is starting up...
-          </span>
-        ),
-        action: (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 text-amber-400 font-medium bg-amber-500/5 rounded border border-amber-500/20">
-            <Loader2 className="animate-spin" size={12} />
-            <span>Starting</span>
-          </div>
-        )
-      };
-    }
-
-    if (ownerState?.status === "stopping") {
-      return {
-        message: (
-          <span>
-            <strong>Server Stopping:</strong> The target server <strong>{ownerProject.name}</strong> is shutting down...
-          </span>
-        ),
-        action: (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 text-amber-400 font-medium bg-amber-500/5 rounded border border-amber-500/20">
-            <Loader2 className="animate-spin" size={12} />
-            <span>Stopping</span>
-          </div>
-        )
-      };
-    }
-
-    if (!isOwnerRunning) {
-      return {
-        message: (
-          <span>
-            <strong>Server Offline:</strong> The target server <strong>{ownerProject.name}</strong> is not running. Requests to this URL may fail.
-          </span>
-        ),
-        action: (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => apiClient.toggleServer(ownerProject)}
-            className="h-7 text-[11px] px-3 font-semibold bg-amber-500 text-black hover:bg-amber-400 border border-amber-600/30 shadow hover:shadow-md transition-all shrink-0 flex items-center gap-1.5 rounded"
-          >
-            <Play size={10} fill="currentColor" className="shrink-0" />
-            Start Server
-          </Button>
-        )
-      };
-    }
-
-    return null;
-  }, [tab.projectId, url, projects, projectState, activeVariables]);
+  const warningBanner = null;
 
   const bodyModeOptions = [
     { value: "none", label: "none" },
@@ -639,6 +516,16 @@ export function RequestPanel({
     const isPayloadMethod = tab.method === "POST" || tab.method === "PUT" || tab.method === "PATCH";
     setCurrentSubTab(tab.activeSubTab || (isPayloadMethod ? "body" : "params"));
   }, [tab.id]);
+
+  // Keep local url in sync when tab.url is updated externally (e.g. Base URL changed in sidebar)
+  useEffect(() => {
+    setUrl((prev) => (prev !== tab.url ? tab.url : prev));
+  }, [tab.url]);
+
+  // Keep local method in sync when tab.method is updated externally
+  useEffect(() => {
+    setMethod((prev) => (prev !== tab.method ? tab.method : prev));
+  }, [tab.method]);
 
   // Propagate local state changes back to parent tab state
   const updateParentTab = (patch: Partial<RequestTab>) => {
