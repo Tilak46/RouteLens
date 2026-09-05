@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/apiClient";
 import { Toaster, toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send } from "lucide-react";
+import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send, RefreshCw } from "lucide-react";
 
 import { ApiExplorerSidebarPanel, mergeTrees } from "@/views/ApiExplorerView";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
@@ -33,6 +33,7 @@ import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarP
 import { WorkspaceTabs, RequestTab } from "@/components/api-explorer/WorkspaceTabs";
 import { RequestPanel } from "@/components/api-explorer/RequestPanel";
 import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
+import { ResponseIdleMascot } from "@/components/api-explorer/ResponseIllustrations";
 import { ManageEnvironmentsModal, ApiEnvironment } from "@/components/api-explorer/ManageEnvironmentsModal";
 import { ManageCookiesModal } from "@/components/api-explorer/ManageCookiesModal";
 import { OnboardingView } from "@/components/onboarding/OnboardingView";
@@ -1536,8 +1537,8 @@ function App() {
                   return (
                     <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
                       <div className="max-w-lg w-full border border-border/40 bg-card/20 backdrop-blur-md rounded-2xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] text-center animate-in fade-in duration-300">
-                        <div className="inline-flex w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(75,144,226,0.15)]">
-                          <FolderCode size={26} />
+                        <div className="flex items-center justify-center mb-3">
+                          <ResponseIdleMascot size={90} />
                         </div>
                         <h2 className="text-xl font-bold text-foreground tracking-tight mb-2">
                           {activeProject.name}
@@ -1567,17 +1568,20 @@ function App() {
                         <div className="flex items-center justify-center gap-3">
                           <Button
                             onClick={handleNewTab}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 h-8 cursor-pointer shadow-sm"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 h-8 cursor-pointer shadow-sm gap-1.5"
                           >
-                            + Manual Request
+                            <Plus size={13} />
+                            <span>New Request</span>
+                            <kbd className="text-[9px] font-mono bg-primary-foreground/20 text-primary-foreground px-1 py-0.5 rounded">Ctrl+T</kbd>
                           </Button>
                           <Button
                             variant="outline"
                             onClick={() => handleRescanProject(activeProject)}
                             disabled={isScanning}
-                            className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer"
+                            className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground px-4 h-8 cursor-pointer gap-1.5"
                           >
-                            {isScanning ? "Scanning..." : "Rescan AST"}
+                            <RefreshCw size={12} className={cn(isScanning && "animate-spin")} />
+                            <span>{isScanning ? "Scanning..." : "Rescan AST"}</span>
                           </Button>
                           <Button
                             variant="outline"
@@ -1592,9 +1596,9 @@ function App() {
                   );
                 })()
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/5 select-none">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 shadow-lg shadow-primary/5">
-                    <Send size={22} className="translate-x-0.5" />
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/5 select-none animate-in fade-in duration-200">
+                  <div className="flex items-center justify-center mb-3">
+                    <ResponseIdleMascot size={80} />
                   </div>
                   <h3 className="text-sm font-bold text-foreground mb-1">No Request Open</h3>
                   <p className="text-xs text-muted-foreground max-w-sm leading-relaxed mb-5">

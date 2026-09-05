@@ -1260,14 +1260,18 @@ export function RequestPanel({
         <Button
           onClick={handleSend}
           disabled={loading}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 h-[34px] rounded font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors min-w-[90px]"
+          title="Send Request (Ctrl+Enter)"
+          className="bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground px-4 h-[34px] rounded font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs min-w-[95px] cursor-pointer select-none"
         >
           {loading ? (
             <Loader2 size={13} className="animate-spin" />
           ) : (
-            <Play size={12} fill="currentColor" />
+            <Play size={11} fill="currentColor" />
           )}
-          Send
+          <span>Send</span>
+          <kbd className="hidden sm:inline-flex items-center text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground/90 px-1 py-0.5 rounded font-normal ml-0.5 tracking-tighter">
+            ↵
+          </kbd>
         </Button>
       </div>
 
