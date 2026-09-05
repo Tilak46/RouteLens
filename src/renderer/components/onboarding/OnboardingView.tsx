@@ -205,9 +205,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
             isDragging && "opacity-50 pointer-events-none"
           )}
         >
-          {/* Subtle hover corner sheen */}
-          <div className="absolute -top-12 -right-12 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all duration-300 pointer-events-none" />
-
           <div>
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3.5 group-hover:scale-105 transition-transform">
               <Sparkles size={20} />
@@ -240,9 +237,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
             isDragging && "opacity-50 pointer-events-none"
           )}
         >
-          {/* Subtle hover corner sheen */}
-          <div className="absolute -top-12 -right-12 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition-all duration-300 pointer-events-none" />
-
           <div>
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3.5 group-hover:scale-105 transition-transform">
               <Zap size={20} />
