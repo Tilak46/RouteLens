@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, RefreshCw, FolderOpen, Sparkles, Zap, ArrowLeft } from "lucide-react";
+import { Plus, RefreshCw, FolderOpen, Sparkles, ArrowLeft } from "lucide-react";
 import { Project } from "@/../types";
 import { cn } from "@/lib/utils";
 
@@ -49,13 +49,14 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
   onRescan,
   onRevealInExplorer,
 }) => {
+  const [viewMode, setViewMode] = useState<"half" | "full">("half");
   const [clickCount, setClickCount] = useState(0);
   const [isJumping, setIsJumping] = useState(false);
 
   const handleVictorClick = () => {
     setClickCount((c) => c + 1);
     setIsJumping(true);
-    setTimeout(() => setIsJumping(false), 700);
+    setTimeout(() => setIsJumping(false), 650);
   };
 
   const activeQuote =
@@ -71,10 +72,10 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
       : VICTOR_COPILOT_QUOTES[(clickCount - 1) % VICTOR_COPILOT_QUOTES.length];
 
   return (
-    <div className="flex-grow flex flex-col items-center justify-center py-10 sm:py-14 px-6 select-none overflow-y-auto w-full animate-in fade-in duration-300">
+    <div className="flex-grow flex flex-col items-center justify-center py-8 sm:py-12 px-6 select-none overflow-y-auto w-full animate-in fade-in duration-300">
       <div className="max-w-2xl w-full flex flex-col items-center text-center">
         {/* Floating Story / Dialogue Bubble */}
-        <div className="h-20 flex items-end justify-center mb-4 z-20">
+        <div className="h-20 flex items-end justify-center mb-3 z-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={`bubble-${clickCount}`}
@@ -104,300 +105,442 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Central Visual: Animated Victor Mascot */}
-        <div className="relative flex flex-col items-center my-3 select-none">
+        {/* Central Visual: Animated SS2 Victor Mascot (Click to Jump / Easter Egg) */}
+        <div className="relative flex flex-col items-center my-2 select-none">
           {/* Ambient Cosmic Lighting Aura */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-tr from-blue-500/10 via-cyan-500/15 to-indigo-500/10 blur-3xl rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: "4s" }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-gradient-to-tr from-blue-500/15 via-cyan-500/15 to-indigo-500/10 blur-3xl rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: "4s" }} />
 
-          {/* Floating Orbiting Cyber Glyphs - Positioned safely away from Victor & speech bubble */}
-          <motion.div
-            animate={{ y: [0, -8, 0], rotate: [0, 8, 0] }}
-            transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-12 -left-16 text-cyan-400/60 font-mono text-sm pointer-events-none"
-          >
-            {"{ }"}
-          </motion.div>
-          <motion.div
-            animate={{ y: [0, 8, 0], rotate: [0, -10, 0] }}
-            transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            className="absolute top-8 -right-16 text-amber-400/60 font-mono text-sm pointer-events-none"
-          >
-            <Zap size={15} />
-          </motion.div>
-          <motion.div
-            animate={{ y: [0, -6, 0], scale: [0.9, 1.1, 0.9] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute bottom-10 -left-14 text-indigo-400/50 text-xs pointer-events-none"
-          >
-            ✦
-          </motion.div>
-          <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 0.7 }}
-            className="absolute bottom-8 -right-16 text-emerald-400/60 font-mono text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 pointer-events-none"
-          >
-            GET
-          </motion.div>
-
-          {/* Mascot SVG */}
+          {/* Interactive Mascot SVG with Framer Motion Bob */}
           <div
             onClick={handleVictorClick}
             className="relative cursor-pointer group"
-            title="Click me for co-pilot tips!"
+            title="Click me to test reactions!"
           >
-            <svg
-              width="210"
-              height="180"
-              viewBox="0 0 240 200"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="overflow-visible"
-            >
-              <defs>
-                {/* Visor Glass Gradient */}
-                <linearGradient id="visorIdleGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0b1329" />
-                  <stop offset="65%" stopColor="#111c3a" />
-                  <stop offset="100%" stopColor="#0284c7" stopOpacity="0.5" />
-                </linearGradient>
-
-                {/* Visor Glint Reflection */}
-                <linearGradient id="glintIdleGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
-                  <stop offset="60%" stopColor="#38bdf8" stopOpacity="0.2" />
-                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-                </linearGradient>
-
-                {/* Radar beam filter */}
-                <linearGradient id="radarIdleBeam" x1="0" y1="0" x2="0.3" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.75" />
-                  <stop offset="45%" stopColor="#38bdf8" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#0284c7" stopOpacity="0.05" />
-                </linearGradient>
-              </defs>
-
-              {/* Shadow Base */}
-              <motion.ellipse
-                cx="110"
-                cy="190"
-                rx="34"
-                ry="7"
-                fill="currentColor"
-                className="text-primary/25"
-                animate={{
-                  rx: isJumping ? [34, 20, 34] : [34, 28, 34],
-                  opacity: isJumping ? [0.4, 0.15, 0.4] : [0.3, 0.2, 0.3],
-                }}
-                transition={{
-                  duration: isJumping ? 0.6 : 3.4,
-                  repeat: isJumping ? 1 : Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-
-              {/* Floating Character Group */}
-              <motion.g
-                animate={{
-                  y: isJumping ? [0, -14, 0] : [0, -7, 0],
-                }}
-                transition={{
-                  duration: isJumping ? 0.6 : 3.4,
-                  repeat: isJumping ? 1 : Infinity,
-                  ease: "easeInOut",
-                }}
-              >
-                {/* Backpack (behind suit) */}
-                <rect
-                  x="74"
-                  y="102"
-                  width="72"
-                  height="60"
-                  rx="15"
-                  fill="#1e293b"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  className="text-zinc-700"
-                />
-                {/* Thruster Vents */}
-                <rect x="85" y="158" width="16" height="8" rx="3" fill="#334155" />
-                <rect x="119" y="158" width="16" height="8" rx="3" fill="#334155" />
-                {/* Status LEDs on Backpack */}
-                <circle cx="84" cy="114" r="2.5" fill="#10b981" />
-                <circle cx="92" cy="114" r="2.5" fill="#06b6d4" />
-                <circle cx="100" cy="114" r="2.5" fill="#f59e0b" />
-
-                {/* Astronaut Legs & Boots */}
-                <rect x="87" y="152" width="18" height="26" rx="8" fill="#334155" stroke="#475569" strokeWidth="2" />
-                <rect x="115" y="152" width="18" height="26" rx="8" fill="#334155" stroke="#475569" strokeWidth="2" />
-                {/* Boot Soles */}
-                <path d="M84 176 Q96 174 108 176 L106 181 Q96 183 84 181 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
-                <path d="M112 176 Q124 174 136 176 L134 181 Q124 183 112 181 Z" fill="#1e293b" stroke="#475569" strokeWidth="1" />
-
-                {/* Astronaut Suit Body */}
-                <rect
-                  x="78"
-                  y="104"
-                  width="64"
-                  height="54"
-                  rx="16"
-                  fill="#0f172a"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  className="text-zinc-500"
-                />
-                {/* Chest Plate Detail */}
-                <rect
-                  x="88"
-                  y="114"
-                  width="44"
-                  height="26"
-                  rx="7"
-                  fill="#1e293b"
-                  stroke="#334155"
-                  strokeWidth="1.5"
-                />
-                {/* Mission Status Bar */}
-                <rect x="94" y="120" width="32" height="4.5" rx="2" fill="#06b6d4" fillOpacity="0.85" className="animate-pulse" />
-                {/* Status Dot */}
-                <circle cx="98" cy="131" r="2.5" fill="#10b981" />
-                <line x1="104" y1="131" x2="122" y2="131" stroke="#475569" strokeWidth="2" strokeLinecap="round" />
-
-                {/* Left Arm (Relaxed, Resting Natural Glove) */}
-                <g>
-                  <circle cx="80" cy="114" r="7.5" fill="#334155" stroke="#475569" strokeWidth="2" />
+            <AnimatePresence mode="wait">
+              {viewMode === "half" ? (
+                /* ================= MODE A: HALF SIZE (SS2 BUST) ================= */
+                <motion.svg
+                  key="mascot-half"
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1, y: isJumping ? [0, -14, 0] : [0, -6, 0] }}
+                  exit={{ opacity: 0, scale: 0.92 }}
+                  transition={{
+                    opacity: { duration: 0.25 },
+                    scale: { duration: 0.25 },
+                    y: {
+                      duration: isJumping ? 0.6 : 3.4,
+                      repeat: isJumping ? 1 : Infinity,
+                      ease: "easeInOut",
+                    },
+                  }}
+                  width="180"
+                  height="170"
+                  viewBox="0 0 160 160"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="overflow-visible"
+                >
+                  {/* Background Twinkling Stars */}
                   <path
-                    d="M80 114 C73 125 71 138 74 148 C75 151 79 152 82 150 C85 147 84 143 83 138 C81 130 83 122 86 116 Z"
-                    fill="#334155"
-                    stroke="#475569"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
+                    d="M32 38 L34 43 L39 45 L34 47 L32 52 L30 47 L25 45 L30 43 Z"
+                    fill="currentColor"
+                    className="text-zinc-500/40 animate-pulse"
+                    style={{ animationDuration: "3s" }}
                   />
-                  <ellipse cx="76" cy="151" rx="5" ry="3.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
-                </g>
-
-                {/* Antenna Rod */}
-                <line
-                  x1="110"
-                  y1="40"
-                  x2="110"
-                  y2="20"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  className="text-zinc-400"
-                />
-                <rect x="105" y="38" width="10" height="4" rx="2" fill="#475569" />
-
-                {/* Antenna Beacon Tip with SVG Pulse */}
-                <circle cx="110" cy="16" r="4.5" fill="#f97316" className="animate-pulse" />
-                <circle cx="110" cy="16" r="5" fill="#f97316" fillOpacity="0.35">
-                  <animate attributeName="r" values="4;8.5;4" dur="1.8s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.65;0.05;0.65" dur="1.8s" repeatCount="indefinite" />
-                </circle>
-
-                {/* Outer Helmet Shell */}
-                <circle
-                  cx="110"
-                  cy="72"
-                  r="37"
-                  fill="#0f172a"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  className="text-zinc-400"
-                />
-
-                {/* Earmuffs */}
-                <rect x="70" y="62" width="7" height="20" rx="3.5" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
-                <rect x="143" y="62" width="7" height="20" rx="3.5" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
-
-                {/* Visor Bezel */}
-                <rect
-                  x="78"
-                  y="49"
-                  width="64"
-                  height="46"
-                  rx="20"
-                  fill="#030712"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-cyan-400/60"
-                />
-
-                {/* Visor Glass */}
-                <rect
-                  x="80"
-                  y="51"
-                  width="60"
-                  height="42"
-                  rx="18"
-                  fill="url(#visorIdleGrad)"
-                />
-
-                {/* Glint Reflection */}
-                <path
-                  d="M86 54 C100 52 120 52 134 57 C130 63 118 64 102 63 C94 62 89 58 86 54 Z"
-                  fill="url(#glintIdleGrad)"
-                />
-
-                {/* Rosy Cheeks */}
-                <ellipse cx="91" cy="79" rx="4" ry="2.2" fill="#fb7185" fillOpacity="0.45" />
-                <ellipse cx="129" cy="79" rx="4" ry="2.2" fill="#fb7185" fillOpacity="0.45" />
-
-                {/* Expressive Visor Eyes: Alert & Happy Co-Pilot */}
-                <g>
-                  <circle cx="99" cy="72" r="4.2" fill="#38bdf8" />
-                  <circle cx="101" cy="70.5" r="1.6" fill="#ffffff" />
-                  <circle cx="121" cy="72" r="4.2" fill="#38bdf8" />
-                  <circle cx="123" cy="70.5" r="1.6" fill="#ffffff" />
-                  {/* Gentle digital scanline accent */}
-                  <line x1="88" y1="72" x2="132" y2="72" stroke="#38bdf8" strokeWidth="0.8" strokeOpacity="0.35" strokeDasharray="2 2" />
-                </g>
-
-                {/* Right Arm: Holding Cyber Tablet Diagnostic Pad */}
-                <g>
-                  {/* Shoulder */}
-                  <circle cx="140" cy="114" r="7.5" fill="#334155" stroke="#475569" strokeWidth="2" />
-                  {/* Sleeve */}
                   <path
-                    d="M139 113 C148 111 158 114 165 124 C167 127 165 131 161 133 C155 134 149 127 141 123 Z"
-                    fill="#334155"
-                    stroke="#475569"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
+                    d="M138 68 L139.5 71.5 L143 73 L139.5 74.5 L138 78 L136.5 74.5 L133 73 L136.5 71.5 Z"
+                    fill="currentColor"
+                    className="text-zinc-500/50 animate-pulse"
+                    style={{ animationDuration: "2.4s", animationDelay: "0.8s" }}
                   />
-                  {/* Glove */}
-                  <circle cx="166" cy="129" r="6.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
+                  <path
+                    d="M26 95 L27.5 98 L31 99.5 L27.5 101 L26 104 L24.5 101 L21 99.5 L24.5 98 Z"
+                    fill="currentColor"
+                    className="text-zinc-500/30"
+                  />
 
-                  {/* Holographic Cyber Tablet */}
-                  <g transform="translate(162, 110)">
-                    <rect
-                      x="0"
-                      y="0"
-                      width="28"
-                      height="36"
-                      rx="4"
+                  {/* Mini Rocket in Background */}
+                  <g transform="translate(122, 22) rotate(42)">
+                    {/* Rocket Body */}
+                    <path
+                      d="M0 -18 C6 -12 7 8 7 14 L-7 14 C-7 8 -6 -12 0 -18 Z"
                       fill="#0f172a"
-                      stroke="#38bdf8"
+                      stroke="currentColor"
                       strokeWidth="1.8"
-                      className="shadow-lg"
+                      strokeLinejoin="round"
+                      className="text-zinc-300"
                     />
-                    {/* Tablet Screen */}
-                    <rect x="2.5" y="3" width="23" height="30" rx="2" fill="#0284c7" fillOpacity="0.25" />
-                    {/* Glowing Route Code Icon */}
-                    <text x="7" y="16" fill="#38bdf8" fontSize="10" fontWeight="bold" fontFamily="monospace">
-                      {"{ }"}
-                    </text>
-                    <line x1="6" y1="22" x2="22" y2="22" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" />
-                    <line x1="6" y1="27" x2="18" y2="27" stroke="#38bdf8" strokeWidth="1.2" strokeLinecap="round" />
+                    {/* Rocket Window */}
+                    <circle cx="0" cy="-2" r="3.2" fill="#38bdf8" fillOpacity="0.4" stroke="#38bdf8" strokeWidth="1.2" />
+                    {/* Left Fin */}
+                    <path d="M-7 8 L-13 15 L-7 14 Z" fill="#0f172a" stroke="currentColor" strokeWidth="1.6" className="text-zinc-300" />
+                    {/* Right Fin */}
+                    <path d="M7 8 L13 15 L7 14 Z" fill="#0f172a" stroke="currentColor" strokeWidth="1.6" className="text-zinc-300" />
+                    {/* Flame */}
+                    <path
+                      d="M-3 15 C-4 21 0 25 0 25 C0 25 4 21 3 15 Z"
+                      fill="#f97316"
+                      fillOpacity="0.85"
+                      className="animate-pulse"
+                    />
                   </g>
-                </g>
-              </motion.g>
-            </svg>
+                  {/* Curved Smoke Trail */}
+                  <path
+                    d="M125 42 Q112 58 116 75 T110 95"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeDasharray="3 3"
+                    strokeLinecap="round"
+                    className="text-zinc-600/60"
+                  />
+
+                  {/* Astronaut Mascot */}
+                  <g>
+                    {/* Antenna */}
+                    <line
+                      x1="76"
+                      y1="34"
+                      x2="76"
+                      y2="18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      className="text-zinc-400"
+                    />
+                    {/* Glowing Beacon on Antenna Tip */}
+                    <circle cx="76" cy="14" r="4" fill="#f97316" className="animate-pulse" />
+                    <circle cx="76" cy="14" r="5" fill="#f97316" fillOpacity="0.4">
+                      <animate attributeName="r" values="4;8;4" dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.6;0.05;0.6" dur="2s" repeatCount="indefinite" />
+                    </circle>
+
+                    {/* Helmet Outer Shell */}
+                    <circle
+                      cx="76"
+                      cy="65"
+                      r="32"
+                      fill="#0f172a"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      className="text-zinc-200"
+                    />
+                    {/* Left Earmuff */}
+                    <rect x="41" y="56" width="6" height="18" rx="3" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
+                    {/* Right Earmuff */}
+                    <rect x="105" y="56" width="6" height="18" rx="3" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
+
+                    {/* Visor */}
+                    <rect
+                      x="53"
+                      y="48"
+                      width="46"
+                      height="34"
+                      rx="16"
+                      fill="#090d16"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="text-cyan-400/60"
+                    />
+
+                    {/* Cute Face Inside Visor (SS2) */}
+                    {/* Left Eye */}
+                    <ellipse cx="68" cy="63" rx="2.5" ry="3.2" fill="#ffffff" />
+                    <circle cx="67" cy="62" r="1" fill="#09090b" />
+                    {/* Right Eye */}
+                    <ellipse cx="84" cy="63" rx="2.5" ry="3.2" fill="#ffffff" />
+                    <circle cx="83" cy="62" r="1" fill="#09090b" />
+                    {/* Rosy Cheeks */}
+                    <ellipse cx="63" cy="68" rx="2.5" ry="1.4" fill="#fb7185" fillOpacity="0.55" />
+                    <ellipse cx="89" cy="68" rx="2.5" ry="1.4" fill="#fb7185" fillOpacity="0.55" />
+                    {/* Sweet Smile */}
+                    <path
+                      d="M72 71 Q76 75 80 71"
+                      stroke="#ffffff"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+
+                    {/* Spacesuit Collar */}
+                    <path
+                      d="M58 94 Q76 102 94 94"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Torso */}
+                    <path
+                      d="M52 101 C52 128 100 128 100 101"
+                      fill="#0f172a"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Chest Control Box */}
+                    <rect
+                      x="68"
+                      y="102"
+                      width="16"
+                      height="11"
+                      rx="2.5"
+                      fill="#1e293b"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      className="text-zinc-500"
+                    />
+                    <circle cx="73" cy="107" r="1.8" fill="#f97316" />
+                    <circle cx="79" cy="107" r="1.8" fill="#06b6d4" />
+
+                    {/* Left Arm Pointing to Watch */}
+                    <path
+                      d="M52 101 C42 110 46 122 62 125"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      fill="none"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Right Arm Holding Watch */}
+                    <path
+                      d="M100 101 C109 110 98 126 84 126"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      fill="none"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Smart Radar Scanner Watch */}
+                    <circle
+                      cx="73"
+                      cy="125"
+                      r="7"
+                      fill="#0f172a"
+                      stroke="#f97316"
+                      strokeWidth="1.8"
+                    />
+                    <path
+                      d="M73 125 L77 121"
+                      stroke="#f97316"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                    <circle cx="73" cy="125" r="1.5" fill="#f97316" />
+                  </g>
+                </motion.svg>
+              ) : (
+                /* ================= MODE B: FULL SIZE (SS2 FULL-BODY) ================= */
+                <motion.svg
+                  key="mascot-full"
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1, y: isJumping ? [0, -14, 0] : [0, -7, 0] }}
+                  exit={{ opacity: 0, scale: 0.92 }}
+                  transition={{
+                    opacity: { duration: 0.25 },
+                    scale: { duration: 0.25 },
+                    y: {
+                      duration: isJumping ? 0.6 : 3.4,
+                      repeat: isJumping ? 1 : Infinity,
+                      ease: "easeInOut",
+                    },
+                  }}
+                  width="180"
+                  height="210"
+                  viewBox="0 0 160 190"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="overflow-visible"
+                >
+                  {/* Background Stars */}
+                  <path
+                    d="M26 34 L28 38 L32 40 L28 42 L26 46 L24 42 L20 40 L24 38 Z"
+                    fill="currentColor"
+                    className="text-zinc-500/40 animate-pulse"
+                  />
+                  <path
+                    d="M138 68 L139.5 71.5 L143 73 L139.5 74.5 L138 78 L136.5 74.5 L133 73 L136.5 71.5 Z"
+                    fill="currentColor"
+                    className="text-zinc-500/50 animate-pulse"
+                  />
+
+                  {/* Mini Rocket in Background */}
+                  <g transform="translate(122, 22) rotate(42)">
+                    <path
+                      d="M0 -18 C6 -12 7 8 7 14 L-7 14 C-7 8 -6 -12 0 -18 Z"
+                      fill="#0f172a"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                      className="text-zinc-300"
+                    />
+                    <circle cx="0" cy="-2" r="3.2" fill="#38bdf8" fillOpacity="0.4" stroke="#38bdf8" strokeWidth="1.2" />
+                    <path d="M-7 8 L-13 15 L-7 14 Z" fill="#0f172a" stroke="currentColor" strokeWidth="1.6" className="text-zinc-300" />
+                    <path d="M7 8 L13 15 L7 14 Z" fill="#0f172a" stroke="currentColor" strokeWidth="1.6" className="text-zinc-300" />
+                    <path d="M-3 15 C-4 21 0 25 0 25 C0 25 4 21 3 15 Z" fill="#f97316" fillOpacity="0.85" className="animate-pulse" />
+                  </g>
+                  {/* Curved Smoke Trail */}
+                  <path
+                    d="M125 42 Q112 58 116 75 T110 95"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeDasharray="3 3"
+                    strokeLinecap="round"
+                    className="text-zinc-600/60"
+                  />
+
+                  {/* Soft Zero-G Floor Shadow */}
+                  <ellipse cx="76" cy="180" rx="26" ry="5.5" fill="#38bdf8" fillOpacity="0.15" />
+
+                  {/* Astronaut Full Body */}
+                  <g>
+                    {/* Antenna */}
+                    <line x1="76" y1="34" x2="76" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-zinc-400" />
+                    <circle cx="76" cy="14" r="4" fill="#f97316" className="animate-pulse" />
+                    <circle cx="76" cy="14" r="5" fill="#f97316" fillOpacity="0.4">
+                      <animate attributeName="r" values="4;8;4" dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.6;0.05;0.6" dur="2s" repeatCount="indefinite" />
+                    </circle>
+
+                    {/* Backpack */}
+                    <rect x="52" y="78" width="48" height="42" rx="10" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-600" />
+
+                    {/* Floating Zero-G Legs & Boots */}
+                    {/* Left Leg */}
+                    <rect x="58" y="118" width="14" height="22" rx="7" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-300" />
+                    <ellipse cx="64" cy="142" rx="8" ry="4.5" fill="#0f172a" stroke="currentColor" strokeWidth="1.8" className="text-zinc-400" />
+
+                    {/* Right Leg (Tilted slightly in zero-G float) */}
+                    <rect x="80" y="118" width="14" height="22" rx="7" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-300" />
+                    <ellipse cx="88" cy="142" rx="8" ry="4.5" fill="#0f172a" stroke="currentColor" strokeWidth="1.8" className="text-zinc-400" />
+
+                    {/* Torso */}
+                    <path
+                      d="M52 98 C52 122 100 122 100 98"
+                      fill="#0f172a"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Chest Control Box */}
+                    <rect x="68" y="100" width="16" height="11" rx="2.5" fill="#1e293b" stroke="currentColor" strokeWidth="1.5" className="text-zinc-500" />
+                    <circle cx="73" cy="105" r="1.8" fill="#f97316" />
+                    <circle cx="79" cy="105" r="1.8" fill="#06b6d4" />
+
+                    {/* Left Arm Pointing to Watch */}
+                    <path
+                      d="M52 98 C42 107 46 119 62 122"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      fill="none"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Right Arm Holding Watch */}
+                    <path
+                      d="M100 98 C109 107 98 123 84 123"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      fill="none"
+                      className="text-zinc-300"
+                    />
+
+                    {/* Smart Radar Scanner Watch */}
+                    <circle cx="73" cy="122" r="7" fill="#0f172a" stroke="#f97316" strokeWidth="1.8" />
+                    <path d="M73 122 L77 118" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" />
+                    <circle cx="73" cy="122" r="1.5" fill="#f97316" />
+
+                    {/* Helmet Outer Shell */}
+                    <circle
+                      cx="76"
+                      cy="65"
+                      r="32"
+                      fill="#0f172a"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      className="text-zinc-200"
+                    />
+                    {/* Earmuffs */}
+                    <rect x="41" y="56" width="6" height="18" rx="3" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
+                    <rect x="105" y="56" width="6" height="18" rx="3" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
+
+                    {/* Visor */}
+                    <rect
+                      x="53"
+                      y="48"
+                      width="46"
+                      height="34"
+                      rx="16"
+                      fill="#090d16"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="text-cyan-400/60"
+                    />
+
+                    {/* Cute Face Inside Visor (SS2) */}
+                    <ellipse cx="68" cy="63" rx="2.5" ry="3.2" fill="#ffffff" />
+                    <circle cx="67" cy="62" r="1" fill="#09090b" />
+                    <ellipse cx="84" cy="63" rx="2.5" ry="3.2" fill="#ffffff" />
+                    <circle cx="83" cy="62" r="1" fill="#09090b" />
+                    <ellipse cx="63" cy="68" rx="2.5" ry="1.4" fill="#fb7185" fillOpacity="0.55" />
+                    <ellipse cx="89" cy="68" rx="2.5" ry="1.4" fill="#fb7185" fillOpacity="0.55" />
+                    <path
+                      d="M72 71 Q76 75 80 71"
+                      stroke="#ffffff"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+
+                    {/* Spacesuit Collar */}
+                    <path
+                      d="M58 94 Q76 102 94 94"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      className="text-zinc-300"
+                    />
+                  </g>
+                </motion.svg>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Interactive Comparison Switcher Pill: Half Body vs Full Body */}
+          <div className="inline-flex items-center p-0.5 rounded-full bg-muted/40 border border-border/50 text-[11px] mt-2 mb-1 shadow-inner">
+            <button
+              onClick={() => setViewMode("half")}
+              className={cn(
+                "px-3 py-1 rounded-full font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5",
+                viewMode === "half"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span>Half Body (SS2)</span>
+            </button>
+            <button
+              onClick={() => setViewMode("full")}
+              className={cn(
+                "px-3 py-1 rounded-full font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5",
+                viewMode === "full"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span>Full Body</span>
+            </button>
           </div>
         </div>
 
         {/* Clean Project Identity */}
-        <div className="mt-6 mb-8 flex flex-col items-center gap-2">
+        <div className="mt-5 mb-7 flex flex-col items-center gap-2">
           <div className="flex items-center gap-2.5 flex-wrap justify-center">
             <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
               {project.name}
@@ -455,4 +598,3 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
     </div>
   );
 };
-
