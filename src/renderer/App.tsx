@@ -38,6 +38,7 @@ import { ResponseIdleMascot } from "@/components/api-explorer/ResponseIllustrati
 import { ManageEnvironmentsModal, ApiEnvironment } from "@/components/api-explorer/ManageEnvironmentsModal";
 import { ManageCookiesModal } from "@/components/api-explorer/ManageCookiesModal";
 import { OnboardingView } from "@/components/onboarding/OnboardingView";
+import { ProjectIdleView } from "@/components/project/ProjectIdleView";
 import GhostHunter from "@/components/game/GhostHunter";
 import GamingHUDCursor from "@/components/game/GamingHUDCursor";
 
@@ -1521,7 +1522,7 @@ function App() {
                   </div>
                 </div>
               ) : activeProjectId && projects.find((p) => p.id === activeProjectId) ? (
-                // Clean project overview command center when all tabs are closed
+                // Visual-rich Project Command Deck with Victor
                 (() => {
                   const activeProject = projects.find((p) => p.id === activeProjectId);
                   if (!activeProject) return null;
@@ -1546,166 +1547,16 @@ function App() {
                   };
 
                   const allRoutes = extractAllRoutes(projectTree);
-                  const totalEndpoints = allRoutes.length;
-                  const quickRoutes = allRoutes.slice(0, 6);
-                  const baseUrl = activeProject.url || "http://localhost:3000";
 
                   return (
-                    <div className="flex-grow flex flex-col items-center justify-center p-6 sm:p-8 select-none overflow-y-auto w-full">
-                      <div className="max-w-3xl w-full border border-border/50 bg-card/30 backdrop-blur-md rounded-2xl p-6 sm:p-7 shadow-[0_12px_40px_rgba(0,0,0,0.35)] animate-in fade-in duration-300">
-                        {/* Header Bar */}
-                        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 pb-6 border-b border-border/40">
-                          <div className="flex items-center gap-4 text-left">
-                            <div className="shrink-0 p-1.5 rounded-xl bg-primary/10 border border-primary/20">
-                              <ResponseIdleMascot size={58} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-xl font-bold text-foreground tracking-tight">
-                                  {activeProject.name}
-                                </h2>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium inline-flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                  Active Project
-                                </span>
-                                {isScanning && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 font-mono animate-pulse">
-                                    Scanning AST...
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground font-mono mt-1 max-w-md truncate flex items-center gap-1.5" title={activeProject.path}>
-                                <FolderOpen size={12} className="shrink-0 text-muted-foreground/70" />
-                                <span className="truncate">{activeProject.path}</span>
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Button
-                              onClick={handleNewTab}
-                              size="sm"
-                              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs h-8 px-3.5 gap-1.5 shadow-sm"
-                            >
-                              <Plus size={13} />
-                              <span>New Tab</span>
-                              <kbd className="text-[9px] font-mono bg-primary-foreground/20 text-primary-foreground px-1 py-0.5 rounded">Ctrl+T</kbd>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRescanProject(activeProject)}
-                              disabled={isScanning}
-                              className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground h-8 px-3 gap-1.5"
-                            >
-                              <RefreshCw size={12} className={cn(isScanning && "animate-spin")} />
-                              <span>{isScanning ? "Scanning..." : "Rescan"}</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => apiClient.showItemInFolder(activeProject.path)}
-                              className="bg-transparent border-border hover:bg-white/5 text-muted-foreground hover:text-foreground h-8 px-2.5"
-                              title="Reveal in Explorer"
-                            >
-                              <FolderOpen size={13} />
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* 3 Metric Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-5">
-                          <div className="p-3.5 rounded-xl bg-background/50 border border-border/40 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                              <Layers size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Endpoints</div>
-                              <div className="text-sm font-bold text-foreground font-mono">{totalEndpoints} discovered</div>
-                            </div>
-                          </div>
-
-                          <div className="p-3.5 rounded-xl bg-background/50 border border-border/40 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                              <Zap size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Target Base URL</div>
-                              <div className="text-xs font-bold text-foreground font-mono truncate" title={baseUrl}>{baseUrl}</div>
-                            </div>
-                          </div>
-
-                          <div className="p-3.5 rounded-xl bg-background/50 border border-border/40 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-                              <Code2 size={18} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">AST Scanner</div>
-                              <div className="text-xs font-bold text-foreground font-mono">{isScanning ? "Analyzing..." : "Ready & Cached"}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Discovered Endpoints Quick Launchpad */}
-                        <div className="rounded-xl border border-border/40 bg-background/40 overflow-hidden">
-                          <div className="px-4 py-2.5 border-b border-border/30 flex items-center justify-between bg-muted/20">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-foreground tracking-tight">Quick Launch Endpoints</span>
-                              <span className="text-[10px] text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded">
-                                {totalEndpoints > 6 ? `Top 6 of ${totalEndpoints}` : `${totalEndpoints} total`}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-muted-foreground hidden sm:inline">Click any route to open tab</span>
-                          </div>
-
-                          <div className="divide-y divide-border/25">
-                            {quickRoutes.length > 0 ? (
-                              quickRoutes.map((route, idx) => (
-                                <div
-                                  key={route.id || `${route.method}-${route.path}-${idx}`}
-                                  onClick={() => handleSelectRoute(route, baseUrl, activeProject.id)}
-                                  className="px-4 py-2.5 flex items-center justify-between hover:bg-primary/5 cursor-pointer transition-colors group"
-                                >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <span className={cn(
-                                      "text-[10px] font-bold font-mono px-2 py-0.5 rounded tracking-wide shrink-0",
-                                      route.method === "GET" && "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25",
-                                      route.method === "POST" && "bg-amber-500/15 text-amber-400 border border-amber-500/25",
-                                      route.method === "PUT" && "bg-blue-500/15 text-blue-400 border border-blue-500/25",
-                                      route.method === "DELETE" && "bg-rose-500/15 text-rose-400 border border-rose-500/25",
-                                      route.method === "PATCH" && "bg-purple-500/15 text-purple-400 border border-purple-500/25",
-                                      !["GET", "POST", "PUT", "DELETE", "PATCH"].includes(route.method) && "bg-muted text-muted-foreground"
-                                    )}>
-                                      {route.method}
-                                    </span>
-                                    <span className="text-xs font-mono text-foreground/90 group-hover:text-primary transition-colors truncate">
-                                      {route.path}
-                                    </span>
-                                  </div>
-                                  <span className="text-[11px] text-muted-foreground/60 group-hover:text-primary flex items-center gap-1 transition-colors shrink-0">
-                                    Open <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="py-6 text-center text-xs text-muted-foreground">
-                                <p className="mb-2">No endpoints discovered yet in this project.</p>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleRescanProject(activeProject)}
-                                  disabled={isScanning}
-                                  className="text-xs h-7 gap-1"
-                                >
-                                  <RefreshCw size={11} className={cn(isScanning && "animate-spin")} />
-                                  <span>Scan AST Now</span>
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <ProjectIdleView
+                      project={activeProject}
+                      totalEndpoints={allRoutes.length}
+                      isScanning={isScanning}
+                      onNewTab={handleNewTab}
+                      onRescan={() => handleRescanProject(activeProject)}
+                      onRevealInExplorer={() => apiClient.showItemInFolder(activeProject.path)}
+                    />
                   );
                 })()
               ) : (
