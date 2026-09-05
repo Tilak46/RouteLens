@@ -100,19 +100,30 @@ export function ResponseIdleMascot({ className, size = 120 }: IllustrationProps)
           <circle
             cx="76"
             cy="14"
-            r="4.5"
+            r="4"
             fill="#f97316"
             className="animate-pulse"
           />
           <circle
             cx="76"
             cy="14"
-            r="8"
+            r="5"
             fill="#f97316"
-            fillOpacity="0.25"
-            className="animate-ping"
-            style={{ animationDuration: "2s" }}
-          />
+            fillOpacity="0.4"
+          >
+            <animate
+              attributeName="r"
+              values="4;8;4"
+              dur="2s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="opacity"
+              values="0.6;0.05;0.6"
+              dur="2s"
+              repeatCount="indefinite"
+            />
+          </circle>
 
           {/* Helmet Outer Shell */}
           <circle
@@ -316,19 +327,30 @@ export function ResponseDisconnectedMascot({ className, size = 120 }: Illustrati
           <circle
             cx="74"
             cy="14"
-            r="4.5"
+            r="4"
             fill="#ef4444"
             className="animate-pulse"
           />
           <circle
             cx="74"
             cy="14"
-            r="8"
+            r="5"
             fill="#ef4444"
-            fillOpacity="0.25"
-            className="animate-ping"
-            style={{ animationDuration: "1.5s" }}
-          />
+            fillOpacity="0.4"
+          >
+            <animate
+              attributeName="r"
+              values="4;8;4"
+              dur="1.5s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="opacity"
+              values="0.6;0.05;0.6"
+              dur="1.5s"
+              repeatCount="indefinite"
+            />
+          </circle>
 
           {/* Helmet Outer Shell */}
           <circle

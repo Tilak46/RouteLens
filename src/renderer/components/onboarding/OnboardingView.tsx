@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+import { OnboardingMascot } from "./OnboardingMascot";
+
 type OnboardingViewProps = {
   onOpenFolder: () => void;
   onQuickRequest: () => void;
@@ -28,7 +30,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   return (
     <div className="w-full max-w-4xl mx-auto py-8 px-4 flex flex-col items-center select-none animate-in fade-in duration-300">
       {/* Top Badge */}
-      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium mb-6 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium mb-3 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
         <span className="font-mono text-[11px] tracking-wide text-foreground/80 font-semibold">
           RouteLens v1.0.1
@@ -37,15 +39,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
         <span className="text-foreground/70">Intelligent API Discovery</span>
       </div>
 
-      {/* Hero Header */}
-      <div className="text-center max-w-2xl mb-10">
-        <div className="relative inline-block mb-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 p-[1px] shadow-[0_8px_30px_rgba(59,130,246,0.3)]">
-            <div className="w-full h-full bg-card rounded-2xl flex items-center justify-center text-primary">
-              <Compass size={32} className="text-blue-400 animate-in spin-in-180 duration-500" />
-            </div>
-          </div>
-        </div>
+      {/* Hero Header with Soulful Interactive Mascot */}
+      <div className="text-center max-w-2xl mb-8 flex flex-col items-center">
+        <OnboardingMascot className="mb-2" />
 
         <h1 className="text-3xl font-extrabold text-foreground tracking-tight sm:text-4xl mb-3">
           Welcome to <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">RouteLens</span>
