@@ -5,6 +5,7 @@ export interface RequestSnippetParams {
   url: string;
   headers?: ApiKeyValueRow[];
   query?: ApiKeyValueRow[];
+  pathVariables?: ApiKeyValueRow[];
   bodyMode?: string;
   bodyText?: string;
   formFields?: ApiKeyValueRow[];
@@ -13,13 +14,33 @@ export interface RequestSnippetParams {
 }
 
 /**
- * Build the complete URL with enabled query parameters appended
+ * Build the complete URL with path variables replaced and enabled query parameters appended
  */
-export function buildFullUrl(rawUrl: string, query?: ApiKeyValueRow[], auth?: ApiAuth): string {
+export function buildFullUrl(
+  rawUrl: string,
+  query?: ApiKeyValueRow[],
+  auth?: ApiAuth,
+  pathVariables?: ApiKeyValueRow[]
+): string {
   let cleanUrl = (rawUrl || "").trim();
   if (!cleanUrl) return "http://localhost:3000";
   if (!/^https?:\/\//i.test(cleanUrl)) {
     cleanUrl = `http://${cleanUrl}`;
+  }
+
+  // Substitute path variables (:id, {id})
+  if (Array.isArray(pathVariables)) {
+    for (const pv of pathVariables) {
+      if (!pv || pv.enabled === false) continue;
+      const key = String(pv.key || "").trim();
+      if (!key) continue;
+      const val = pv.value !== undefined && pv.value !== "" ? encodeURIComponent(String(pv.value)) : "";
+      if (val) {
+        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        cleanUrl = cleanUrl.replace(new RegExp(`:${escapedKey}(?=[/?#]|$)`, "g"), val);
+        cleanUrl = cleanUrl.replace(new RegExp(`\\{${escapedKey}\\}`, "g"), val);
+      }
+    }
   }
 
   try {
@@ -116,7 +137,7 @@ export function buildResolvedHeaders(
  */
 export function generateCurlCommand(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toUpperCase();
-  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth, params.pathVariables);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   const lines: string[] = [`curl --location '${fullUrl}'`];
@@ -172,7 +193,7 @@ export function generateCurlCommand(params: RequestSnippetParams): string {
  */
 export function generateFetchCode(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toUpperCase();
-  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth, params.pathVariables);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   let bodyCode = "";
@@ -205,7 +226,7 @@ console.log(data);`;
  */
 export function generateAxiosCode(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toLowerCase();
-  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth, params.pathVariables);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   let dataCode = "";
@@ -233,7 +254,7 @@ console.log(response.data);`;
  */
 export function generatePythonCode(params: RequestSnippetParams): string {
   const method = (params.method || "GET").toUpperCase();
-  const fullUrl = buildFullUrl(params.url, params.query, params.auth);
+  const fullUrl = buildFullUrl(params.url, params.query, params.auth, params.pathVariables);
   const headers = buildResolvedHeaders(params.headers, params.auth, params.bodyMode);
 
   let payloadCode = "payload = {}";

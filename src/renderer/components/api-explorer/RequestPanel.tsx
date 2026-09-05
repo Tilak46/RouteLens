@@ -440,6 +440,7 @@ export function RequestPanel({
       url,
       headers,
       query: params,
+      pathVariables,
       bodyMode,
       bodyText,
       formFields,
@@ -625,8 +626,9 @@ export function RequestPanel({
     let result = str;
     vars.forEach((v) => {
       if (v.enabled && v.key) {
-        const token = `{{${v.key}}}`;
-        result = result.split(token).join(v.value);
+        const escapedKey = v.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(`\\{\\{\\s*${escapedKey}\\s*\\}\\}`, "g");
+        result = result.replace(pattern, v.value);
       }
     });
     return result;
@@ -710,12 +712,15 @@ export function RequestPanel({
       }
     }
 
-    // Substitute Path Variables
+    // Substitute Path Variables (:id and {id})
     pathVariables.forEach((pv) => {
       if (pv.enabled && pv.key) {
         const evaluatedValue = interpolate(pv.value || "", localVars);
-        const regex = new RegExp(`:${pv.key}(?=[/?&#]|$)`, "g");
-        currentUrl = currentUrl.replace(regex, evaluatedValue || `:${pv.key}`);
+        const escapedKey = pv.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const colonRegex = new RegExp(`:${escapedKey}(?=[/?&#]|$)`, "g");
+        const braceRegex = new RegExp(`\\{${escapedKey}\\}`, "g");
+        const replacement = evaluatedValue || `:${pv.key}`;
+        currentUrl = currentUrl.replace(colonRegex, replacement).replace(braceRegex, replacement);
       }
     });
 
@@ -2040,6 +2045,7 @@ export function RequestPanel({
           url,
           headers,
           query: params,
+          pathVariables,
           bodyMode,
           bodyText,
           formFields,
