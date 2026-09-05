@@ -391,42 +391,33 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
               className="text-zinc-200"
             />
 
-            {/* Elongated, Proportional Spacesuit Body (Torso extends down to y=154 for natural Chibi balance) */}
+            {/* Smooth V-Tapered U-Shape Spacesuit Torso (Eliminates bucket shape, elegant aerodynamic curve) */}
             <path
-              d="M85 104 C84 122 86 141 90 152 C95 157 125 157 130 152 C134 141 136 122 135 104 Z"
+              d="M85 104 C85 122 93 148 110 148 C127 148 135 122 135 104 Z"
               fill="#0f172a"
               stroke="currentColor"
               strokeWidth="2.4"
               className="text-zinc-200"
             />
 
-            {/* Suit Utility Seam / Lower Trim */}
-            <path
-              d="M88 142 Q110 146 132 142"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              className="text-zinc-600"
-            />
-
-            {/* SS2 Chest Control Box (Well-spaced on elongated chest) */}
+            {/* SS2 Chest Control Box */}
             <rect
               x="101"
-              y="112"
+              y="108"
               width="18"
-              height="14"
-              rx="3"
+              height="13"
+              rx="2.5"
               fill="#1e293b"
               stroke="currentColor"
               strokeWidth="1.5"
               className="text-zinc-500"
             />
-            <circle cx="106.5" cy="119" r="2" fill="#f97316" />
-            <circle cx="113.5" cy="119" r="2" fill="#06b6d4" />
+            <circle cx="106.5" cy="114.5" r="1.8" fill="#f97316" />
+            <circle cx="113.5" cy="114.5" r="1.8" fill="#06b6d4" />
 
-            {/* Left Arm (Naturally curving down along longer body with Smart Radar Watch) */}
+            {/* Left Arm (Naturally curving down along tapered U-torso with Smart Radar Watch) */}
             <path
-              d="M85 108 C75 120 78 136 94 142"
+              d="M85 107 C75 117 78 130 94 136"
               stroke="currentColor"
               strokeWidth="2.4"
               strokeLinecap="round"
@@ -435,20 +426,20 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             />
             {/* Smart Radar Scanner Watch on Left Wrist */}
             <circle
-              cx="95"
-              cy="142"
+              cx="94"
+              cy="136"
               r="6.5"
               fill="#0f172a"
               stroke="#f97316"
               strokeWidth="1.8"
             />
             <path
-              d="M95 142 L99 138"
+              d="M94 136 L98 132"
               stroke="#f97316"
               strokeWidth="1.4"
               strokeLinecap="round"
             />
-            <circle cx="95" cy="142" r="1.4" fill="#f97316" />
+            <circle cx="94" cy="136" r="1.4" fill="#f97316" />
 
             {/* Head & Helmet Group (Expressive Tilting & Eye Animations) */}
             <motion.g
