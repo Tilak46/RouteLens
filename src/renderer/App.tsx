@@ -827,9 +827,9 @@ function App() {
     });
   };
 
-  const handleAddBackendFolder = async () => {
+  const handleAddBackendFolder = async (folderPath?: string) => {
     try {
-      const folder = await apiClient.openDirectoryDialog();
+      const folder = folderPath || (await apiClient.openDirectoryDialog());
       if (!folder) return;
 
       const existing = projects.find((p) => p.path === folder);

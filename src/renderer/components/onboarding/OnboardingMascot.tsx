@@ -10,6 +10,34 @@ interface OnboardingMascotProps {
   onExploreClick?: () => void;
 }
 
+const EASTER_EGG_QUOTES = [
+  {
+    icon: "🚀",
+    title: "Ready to launch!",
+    sub: "Point me to your backend codebase below!",
+  },
+  {
+    icon: "🥐",
+    title: "Fresh APIs daily!",
+    sub: "I eat Express, Fastify & Next.js routes for breakfast!",
+  },
+  {
+    icon: "⚡",
+    title: "Speed of light!",
+    sub: "AST deep-parsing discovers routes in milliseconds!",
+  },
+  {
+    icon: "🎸",
+    title: "Rock & Roll!",
+    sub: "Say goodbye to outdated Postman collections forever!",
+  },
+  {
+    icon: "🎯",
+    title: "Zero setup required!",
+    sub: "Just drop your folder and watch your APIs map out!",
+  },
+];
+
 export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
   className,
 }) => {
@@ -129,28 +157,31 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             </motion.div>
           )}
 
-          {phase === "cheer" && (
-            <motion.div
-              key="bubble-cheer"
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.95 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="relative px-4 py-2.5 rounded-2xl bg-card/95 border border-amber-500/50 backdrop-blur-md shadow-[0_8px_30px_rgba(245,158,11,0.3)] text-center flex items-center gap-3"
-            >
-              <span className="text-2xl animate-bounce">🚀</span>
-              <div className="text-left">
-                <div className="text-xs font-bold text-amber-300">
-                  Ready to launch!
+          {phase === "cheer" && (() => {
+            const quote = EASTER_EGG_QUOTES[clickCount % EASTER_EGG_QUOTES.length];
+            return (
+              <motion.div
+                key={`bubble-cheer-${clickCount}`}
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="relative px-4 py-2.5 rounded-2xl bg-card/95 border border-amber-500/50 backdrop-blur-md shadow-[0_8px_30px_rgba(245,158,11,0.3)] text-center flex items-center gap-3"
+              >
+                <span className="text-2xl animate-bounce">{quote.icon}</span>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-amber-300">
+                    {quote.title}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {quote.sub}
+                  </div>
                 </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Click &ldquo;Open Project Folder&rdquo; below to ignite!
-                </div>
-              </div>
-              {/* Pointy speech arrow */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-amber-500/50 rotate-45" />
-            </motion.div>
-          )}
+                {/* Pointy speech arrow */}
+                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-amber-500/50 rotate-45" />
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
       </div>
 
