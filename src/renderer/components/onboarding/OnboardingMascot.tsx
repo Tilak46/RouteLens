@@ -508,54 +508,74 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
             )}
 
             {/* 4. Storytelling Right Arm & Gadget Animations */}
-            {/* State A: Waving Hello (Anchored Shoulder + Forearm Pivot from Elbow) */}
+            {/* State A: Natural Organic Wave (Seamless Shoulder + Wrist Flutter) */}
             {(phase === "wave" || phase === "cheer") && (
-              <g>
-                {/* Fixed Shoulder Socket permanently locked to suit torso */}
-                <circle cx="142" cy="112" r="7" fill="#334155" stroke="#475569" strokeWidth="2" />
+              <motion.g
+                animate={{
+                  rotate: phase === "cheer" ? [-2.5, 2.5, -2.5] : [-1, 1, -1],
+                  y: [0, -1, 0],
+                }}
+                transition={{
+                  duration: phase === "cheer" ? 0.45 : 1.4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                style={{ transformOrigin: "140px 114px" }}
+              >
+                {/* 1. Seamless Shoulder Pad anchored to suit torso */}
+                <circle cx="140" cy="114" r="7.5" fill="#334155" stroke="#475569" strokeWidth="2" />
 
-                {/* Fixed Upper Arm extending from shoulder to elbow */}
+                {/* 2. Naturally Curved Space Suit Arm (Single organic limb, no robotic cuts) */}
                 <path
-                  d="M141 106 C147 101 154 94 159 88 C163 91 165 95 161 100 C155 106 148 114 142 118 Z"
+                  d="M138 112 C146 104 153 92 163 80 C167 82 170 86 166 90 C157 101 148 113 141 121 Z"
                   fill="#334155"
                   stroke="#475569"
                   strokeWidth="2"
                   strokeLinejoin="round"
                 />
-                {/* Elbow Joint Socket */}
-                <circle cx="160" cy="94" r="5.5" fill="#1e293b" stroke="#475569" strokeWidth="1.5" />
 
-                {/* Waving Forearm & Hand pivoting naturally from the elbow */}
+                {/* 3. Sleek Wrist Cuff Ring */}
+                <ellipse
+                  cx="165"
+                  cy="82"
+                  rx="4.5"
+                  ry="2.5"
+                  fill="#1e293b"
+                  stroke="#475569"
+                  strokeWidth="1.5"
+                  transform="rotate(-35 165 82)"
+                />
+
+                {/* 4. Natural Waving Hand (Pivoting smoothly from the wrist) */}
                 <motion.g
                   animate={{
                     rotate: phase === "cheer" ? [-22, 22, -22] : [-16, 16, -16],
                   }}
                   transition={{
-                    duration: phase === "cheer" ? 0.45 : 1.3,
+                    duration: phase === "cheer" ? 0.4 : 1.2,
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  style={{ transformOrigin: "160px 94px" }}
+                  style={{ transformOrigin: "165px 82px" }}
                 >
-                  {/* Forearm */}
+                  {/* Chubby Space Glove */}
+                  <circle cx="171" cy="72" r="7.5" fill="#1e293b" stroke="#475569" strokeWidth="2" />
+                  {/* Cute Waving Fingers (Spaced naturally like a real hand waving 👋) */}
                   <path
-                    d="M157 93 L168 68 L176 72 L163 96 Z"
-                    fill="#334155"
-                    stroke="#475569"
-                    strokeWidth="2"
-                    strokeLinejoin="round"
+                    d="M168 65 L171 58 M172 64 L177 59 M176 67 L182 63"
+                    stroke="#64748b"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
                   />
-                  {/* Waving Glove */}
-                  <circle cx="172" cy="68" r="7" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-                  {/* Cute Waving Glove Fingers */}
+                  {/* Thumb */}
                   <path
-                    d="M170 62 L173 56 M174 61 L178 57 M177 63 L182 61"
+                    d="M165 72 L161 70"
                     stroke="#64748b"
                     strokeWidth="2"
                     strokeLinecap="round"
                   />
                 </motion.g>
-              </g>
+              </motion.g>
             )}
 
             {/* State B: Thoughtfully Touching Chin */}
