@@ -7,8 +7,7 @@ import { ApiHttpResponse } from "../../../types";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import { postmanTheme } from "./codemirrorTheme";
-import idleMascot from "@/assets/response-idle.jpg";
-import errorMascot from "@/assets/response-error.jpg";
+import { ResponseIdleMascot, ResponseDisconnectedMascot } from "./ResponseIllustrations";
 
 type ResponsePanelProps = {
   response: ApiHttpResponse | null;
@@ -86,14 +85,10 @@ export function ResponsePanel({
   if (!response && !loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[260px] select-none text-center animate-in fade-in duration-300">
-        <div className="relative mb-2 flex items-center justify-center">
-          <img
-            src={idleMascot}
-            alt="Idle Mascot"
-            className="w-36 h-36 object-contain mix-blend-screen opacity-90 transition-transform duration-300 hover:scale-105 pointer-events-none select-none"
-          />
+        <div className="relative mb-3 flex items-center justify-center">
+          <ResponseIdleMascot size={145} />
         </div>
-        <h4 className="text-sm font-medium text-foreground/80 mb-2">
+        <h4 className="text-sm font-medium text-foreground/85 mb-2">
           Click Send to get a response
         </h4>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -112,11 +107,7 @@ export function ResponsePanel({
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[280px] select-none text-center overflow-y-auto animate-in fade-in duration-300">
         <div className="relative mb-2 flex items-center justify-center">
-          <img
-            src={errorMascot}
-            alt="Connection Error Mascot"
-            className="w-36 h-36 object-contain mix-blend-screen opacity-90 transition-transform duration-300 hover:scale-105 pointer-events-none select-none"
-          />
+          <ResponseDisconnectedMascot size={145} />
         </div>
         <h4 className="text-base font-semibold text-foreground tracking-tight mb-3">
           Could not send request
