@@ -105,7 +105,7 @@ function SortableTab({
         isDragging && "shadow-md"
       )}
     >
-      <span className={cn("font-bold text-[9px] w-8 shrink-0 tracking-wide", colorClass)}>
+      <span className={cn("font-bold text-[9px] w-9 shrink-0 tracking-wide", colorClass)}>
         {tab.method}
       </span>
       <span className="max-w-[100px] truncate" title={tab.name}>

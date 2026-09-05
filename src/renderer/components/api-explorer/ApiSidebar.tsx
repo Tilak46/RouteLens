@@ -681,7 +681,7 @@ function MethodBadge({ method }: { method: string }) {
   return (
     <span
       className={cn(
-        "text-[10px] font-bold w-10 shrink-0 text-right",
+        "text-[10px] font-bold w-11 shrink-0 text-left tracking-wide",
         colors[method] || "text-gray-400",
       )}
     >
