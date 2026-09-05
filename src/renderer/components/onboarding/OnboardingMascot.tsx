@@ -84,8 +84,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
         )}
       />
 
-      {/* Floating Story Speech / Thought Cloud Bubble */}
-      <div className="h-18 flex items-end justify-center mb-1 z-20">
+      {/* Floating Story Speech / Thought Cloud Bubble (Option 1: Asymmetric Comic Offset) */}
+      <div className="h-16 flex items-end justify-center mb-0.5 z-20 translate-x-5 sm:translate-x-7">
         <AnimatePresence mode="wait">
           {isDragging && (
             <motion.div
@@ -105,8 +105,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   Drop it right here!
                 </div>
               </div>
-              {/* Pointy speech arrow */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-cyan-400 rotate-45" />
+              {/* Pointy speech arrow angled down to Victor's visor */}
+              <div className="absolute -bottom-1.5 left-[38%] -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-cyan-400 rotate-45" />
             </motion.div>
           )}
 
@@ -129,8 +129,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   Welcome to your automated API companion.
                 </div>
               </div>
-              {/* Pointy speech arrow */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-primary/40 rotate-45" />
+              {/* Pointy speech arrow angled down to Victor's visor */}
+              <div className="absolute -bottom-1.5 left-[38%] -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-primary/40 rotate-45" />
             </motion.div>
           )}
 
@@ -153,9 +153,9 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   I don&apos;t see any backend routes loaded yet...
                 </div>
               </div>
-              {/* Ascending thought puffs */}
-              <div className="absolute -bottom-2 left-[48%] w-2 h-2 rounded-full bg-card border border-purple-500/40" />
-              <div className="absolute -bottom-4 left-[46%] w-1.5 h-1.5 rounded-full bg-card border border-purple-500/40" />
+              {/* Ascending thought puffs toward Victor's head */}
+              <div className="absolute -bottom-2 left-[38%] -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-card border border-purple-500/40" />
+              <div className="absolute -bottom-4 left-[35%] -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-card border border-purple-500/40" />
             </motion.div>
           )}
 
@@ -178,8 +178,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   Drag &amp; drop anywhere or choose folder below to scan!
                 </div>
               </div>
-              {/* Pointy speech arrow */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-cyan-500/50 rotate-45" />
+              {/* Pointy speech arrow angled down to Victor's visor */}
+              <div className="absolute -bottom-1.5 left-[38%] -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-cyan-500/50 rotate-45" />
             </motion.div>
           )}
 
@@ -203,8 +203,8 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
                   {EASTER_EGG_QUOTES[clickCount % EASTER_EGG_QUOTES.length].sub}
                 </div>
               </div>
-              {/* Pointy speech arrow */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-amber-500/50 rotate-45" />
+              {/* Pointy speech arrow angled down to Victor's visor */}
+              <div className="absolute -bottom-1.5 left-[38%] -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-amber-500/50 rotate-45" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -606,43 +606,7 @@ export const OnboardingMascot: React.FC<OnboardingMascotProps> = ({
               />
             </motion.g>
 
-            {/* 3. Thought Cloud Graphic in Phase: Wonder (Completely free in upper-right sky!) */}
-            {!isDragging && phase === "wonder" && (
-              <motion.g
-                initial={{ opacity: 0, scale: 0.8, y: 5 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.35 }}
-              >
-                {/* Ascending bubbles to cloud */}
-                <circle cx="148" cy="32" r="2.8" fill="#c084fc" fillOpacity="0.6" />
-                <circle cx="156" cy="22" r="4" fill="#c084fc" fillOpacity="0.75" />
-
-                {/* Holographic Thought Cloud */}
-                <g transform="translate(146, -6)">
-                  <path
-                    d="M18 18 C14 18 10 21 10 26 C6 26 2 29 2 34 C2 39 6 43 11 43 C13 46 17 48 21 48 C25 48 29 46 31 43 C35 43 39 39 39 35 C39 30 36 27 32 26 C32 21 27 18 22 18 Z"
-                    fill="url(#cloudGrad)"
-                    stroke="#e9d5ff"
-                    strokeWidth="1.5"
-                    className="shadow-md"
-                  />
-                  {/* Glowing Question Mark & Brackets inside Cloud */}
-                  <text
-                    x="13"
-                    y="37"
-                    fill="#ffffff"
-                    fontSize="9"
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                  >
-                    {"{?}"}
-                  </text>
-                </g>
-              </motion.g>
-            )}
-
-            {/* 4. Storytelling Right Arm & Gadget Animations */}
+            {/* 3. Storytelling Right Arm & Gadget Animations */}
             {/* State A: Cute, Decreased-Size Waving Arm & Hand (Proportional & Adorable) */}
             {(isDragging || phase === "wave" || phase === "cheer") && (
               <motion.g
