@@ -401,8 +401,28 @@ export function registerApiExplorerHandlers() {
         };
       } catch (err: any) {
         const ended = performance.now();
-        const cause = err?.cause?.message || (err?.cause ? String(err.cause) : "");
-        const errorDetail = cause ? `${err?.message || "Network Error"}: ${cause}` : String(err?.message || err);
+        let errorDetail = "";
+        if (err?.cause) {
+          const cause = err.cause;
+          if (Array.isArray(cause.errors) && cause.errors.length > 0) {
+            // AggregateError from Node fetch
+            const messages = cause.errors.map((e: any) => e?.message || String(e));
+            errorDetail = messages[0] || cause.message || "connect ECONNREFUSED";
+          } else if (cause.message) {
+            errorDetail = cause.message;
+          } else if (cause.code) {
+            errorDetail = `${cause.code}${cause.address ? ` ${cause.address}:${cause.port}` : ""}`;
+          } else {
+            errorDetail = String(cause);
+          }
+        } else {
+          errorDetail = err?.message || "Network Error";
+        }
+
+        if (!errorDetail.toLowerCase().startsWith("error")) {
+          errorDetail = `Error: ${errorDetail}`;
+        }
+
         return {
           ok: false,
           status: 0,

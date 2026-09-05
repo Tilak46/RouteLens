@@ -1510,6 +1510,7 @@ function App() {
                       response={activeTab.response}
                       loading={activeTab.loading}
                       tabId={activeTab.id}
+                      url={activeTab.url}
                       lastCompletedAt={activeTab.lastCompletedAt}
                       onOpenCookies={() => setIsCookiesModalOpen(true)}
                     />

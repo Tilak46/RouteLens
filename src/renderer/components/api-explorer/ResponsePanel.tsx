@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertCircle, Terminal, Loader2, Copy, Check, Cookie } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Copy, Check, Cookie } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiHttpResponse } from "../../../types";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import { postmanTheme } from "./codemirrorTheme";
+import idleMascot from "@/assets/response-idle.jpg";
+import errorMascot from "@/assets/response-error.jpg";
 
 type ResponsePanelProps = {
   response: ApiHttpResponse | null;
   loading?: boolean;
   tabId?: string;
+  url?: string;
   lastCompletedAt?: number;
   onOpenCookies?: () => void;
 };
@@ -54,6 +57,7 @@ export function ResponsePanel({
   response,
   loading = false,
   tabId,
+  url,
   lastCompletedAt,
   onOpenCookies,
 }: ResponsePanelProps) {
@@ -81,14 +85,80 @@ export function ResponsePanel({
 
   if (!response && !loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[220px] select-none text-center">
-        <div className="p-4 bg-muted/40 border border-border/80 rounded-full mb-3 text-muted-foreground/60 shadow-inner">
-          <Terminal size={32} />
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[260px] select-none text-center animate-in fade-in duration-300">
+        <div className="relative mb-2 flex items-center justify-center">
+          <img
+            src={idleMascot}
+            alt="Idle Mascot"
+            className="w-36 h-36 object-contain mix-blend-screen opacity-90 transition-transform duration-300 hover:scale-105 pointer-events-none select-none"
+          />
         </div>
-        <h4 className="text-sm font-semibold text-foreground/80 mb-1">Response Pane</h4>
-        <p className="text-xs text-muted-foreground max-w-xs leading-normal">
-          Enter an endpoint URL above and click "Send" to trigger a request and inspect the response.
-        </p>
+        <h4 className="text-sm font-medium text-foreground/80 mb-2">
+          Click Send to get a response
+        </h4>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>Hit</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/60 border border-border/60 text-[10px] font-mono text-foreground font-semibold shadow-xs">
+            Ctrl + Enter
+          </kbd>
+          <span>to run</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (response && response.status === 0 && !loading) {
+    const errorString = response.error || "Error: connect ECONNREFUSED";
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[280px] select-none text-center overflow-y-auto animate-in fade-in duration-300">
+        <div className="relative mb-2 flex items-center justify-center">
+          <img
+            src={errorMascot}
+            alt="Connection Error Mascot"
+            className="w-36 h-36 object-contain mix-blend-screen opacity-90 transition-transform duration-300 hover:scale-105 pointer-events-none select-none"
+          />
+        </div>
+        <h4 className="text-base font-semibold text-foreground tracking-tight mb-3">
+          Could not send request
+        </h4>
+
+        {/* Error Details Banner Card */}
+        <div className="w-full max-w-xl bg-[#2a0e0e]/90 border border-rose-800/60 rounded-xl p-3 px-4 mb-4 flex items-center justify-between gap-3 shadow-lg shadow-rose-950/40">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+            <AlertCircle size={16} className="text-rose-400 shrink-0" />
+            <span className="font-mono text-xs text-rose-200 select-all truncate font-medium">
+              {errorString}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(errorString);
+              toast.success("Error copied to clipboard");
+            }}
+            className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-rose-300 hover:text-white bg-rose-900/40 hover:bg-rose-900/70 border border-rose-700/50 px-2.5 py-1 rounded transition-colors cursor-pointer"
+            title="Copy Error"
+          >
+            <Copy size={11} />
+            <span>Copy</span>
+          </button>
+        </div>
+
+        {/* Troubleshooting Hints */}
+        <div className="text-xs text-muted-foreground/80 max-w-md space-y-1 text-left leading-relaxed border-t border-border/30 pt-3">
+          <div className="font-semibold text-foreground/70 mb-1.5">Troubleshooting Checklist:</div>
+          <div className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">•</span>
+            <span>Ensure your local backend server is running and listening on the specified port.</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">•</span>
+            <span>Check that the Base URL in the top bar or endpoint path is spelled correctly.</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">•</span>
+            <span>Verify local firewall, antivirus, or proxy settings are not blocking loopback connections.</span>
+          </div>
+        </div>
       </div>
     );
   }
