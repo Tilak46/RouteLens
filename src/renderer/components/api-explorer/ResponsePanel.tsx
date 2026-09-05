@@ -52,6 +52,26 @@ function highlightJson(jsonStr: string): string {
   }
 }
 
+function formatNetworkError(rawError?: string, url?: string): string {
+  if (!rawError) return "Error: connect ECONNREFUSED";
+  let target = "";
+  try {
+    if (url) {
+      const clean = url.match(/^https?:\/\//i) ? url : `http://${url}`;
+      const u = new URL(clean);
+      target = ` ${u.hostname}:${u.port || (u.protocol === "https:" ? "443" : "80")}`;
+    }
+  } catch {}
+
+  if (rawError.includes("AggregateError") || rawError.includes("fetch failed")) {
+    return `Error: connect ECONNREFUSED${target || " 127.0.0.1:3000"}`;
+  }
+  if (!rawError.toLowerCase().startsWith("error")) {
+    return `Error: ${rawError}`;
+  }
+  return rawError;
+}
+
 export function ResponsePanel({
   response,
   loading = false,
@@ -82,85 +102,13 @@ export function ResponsePanel({
     prevTabIdRef.current = tabId;
   }, [lastCompletedAt, tabId, response]);
 
-  if (!response && !loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[260px] select-none text-center animate-in fade-in duration-300">
-        <div className="relative mb-3 flex items-center justify-center">
-          <ResponseIdleMascot size={145} />
-        </div>
-        <h4 className="text-sm font-medium text-foreground/85 mb-2">
-          Click Send to get a response
-        </h4>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span>Hit</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/60 border border-border/60 text-[10px] font-mono text-foreground font-semibold shadow-xs">
-            Ctrl + Enter
-          </kbd>
-          <span>to run</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (response && response.status === 0 && !loading) {
-    const errorString = response.error || "Error: connect ECONNREFUSED";
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(240,5%,9%)]/30 border border-border/40 rounded-xl min-h-[280px] select-none text-center overflow-y-auto animate-in fade-in duration-300">
-        <div className="relative mb-2 flex items-center justify-center">
-          <ResponseDisconnectedMascot size={145} />
-        </div>
-        <h4 className="text-base font-semibold text-foreground tracking-tight mb-3">
-          Could not send request
-        </h4>
-
-        {/* Error Details Banner Card */}
-        <div className="w-full max-w-xl bg-[#2a0e0e]/90 border border-rose-800/60 rounded-xl p-3 px-4 mb-4 flex items-center justify-between gap-3 shadow-lg shadow-rose-950/40">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
-            <AlertCircle size={16} className="text-rose-400 shrink-0" />
-            <span className="font-mono text-xs text-rose-200 select-all truncate font-medium">
-              {errorString}
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(errorString);
-              toast.success("Error copied to clipboard");
-            }}
-            className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-rose-300 hover:text-white bg-rose-900/40 hover:bg-rose-900/70 border border-rose-700/50 px-2.5 py-1 rounded transition-colors cursor-pointer"
-            title="Copy Error"
-          >
-            <Copy size={11} />
-            <span>Copy</span>
-          </button>
-        </div>
-
-        {/* Troubleshooting Hints */}
-        <div className="text-xs text-muted-foreground/80 max-w-md space-y-1 text-left leading-relaxed border-t border-border/30 pt-3">
-          <div className="font-semibold text-foreground/70 mb-1.5">Troubleshooting Checklist:</div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary mt-0.5">•</span>
-            <span>Ensure your local backend server is running and listening on the specified port.</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary mt-0.5">•</span>
-            <span>Check that the Base URL in the top bar or endpoint path is spelled correctly.</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-primary mt-0.5">•</span>
-            <span>Verify local firewall, antivirus, or proxy settings are not blocking loopback connections.</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const isError = response ? (response.status >= 400 || !response.ok || response.status === 0) : false;
   const timeLabel = (response && !loading && typeof response.timeMs === "number")
     ? response.timeMs >= 1000
       ? `${(response.timeMs / 1000).toFixed(2)} s`
       : `${response.timeMs} ms`
     : null;
-  const sizeLabel = (response && !loading)
+  const sizeLabel = (response && !loading && response.status > 0)
     ? response.sizeBytes
       ? response.sizeBytes > 1024
         ? `${(response.sizeBytes / 1024).toFixed(2)} KB`
@@ -205,7 +153,7 @@ export function ResponsePanel({
       )}
       
       {/* Top Details Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0 pb-3 border-b border-border/50">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 shrink-0 pb-3 border-b border-border/50">
         <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
           Response Console
         </span>
@@ -228,7 +176,7 @@ export function ResponsePanel({
             >
               {isError ? <AlertCircle size={12} /> : <CheckCircle2 size={12} />}
               {response.status === 0
-                ? (response.statusText || "Could Not Connect")
+                ? "Could Not Connect"
                 : `${response.status} ${response.statusText || ""}`.trim()}
             </span>
           ) : null}
@@ -245,7 +193,7 @@ export function ResponsePanel({
             </span>
           )}
 
-          {response && !loading && (
+          {response && !loading && response.status > 0 && (
             <button
               onClick={handleCopy}
               className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary/40 hover:bg-secondary/70 border border-border/40 px-2 py-0.5 rounded transition-all cursor-pointer select-none"
@@ -267,17 +215,75 @@ export function ResponsePanel({
         </div>
       </div>
 
-      {!loading && response && response.error && (
-        <div className="mb-4 text-xs text-rose-400 font-mono bg-rose-950/20 border border-rose-900/30 rounded-lg p-3 whitespace-pre-wrap leading-relaxed select-text">
-          {response.error}
+      {/* Main Content Area */}
+      {(!response && !loading) ? (
+        // STATE 1: IDLE / EMPTY STATE
+        <div className="flex-1 flex flex-col items-center justify-center p-4 select-none text-center animate-in fade-in duration-300">
+          <div className="relative mb-2 flex items-center justify-center">
+            <ResponseIdleMascot size={120} />
+          </div>
+          <h4 className="text-sm font-medium text-foreground/85 mb-1.5">
+            Click Send to get a response
+          </h4>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>Hit</span>
+            <kbd className="px-1.5 py-0.5 rounded bg-muted/60 border border-border/60 text-[10px] font-mono text-foreground font-semibold shadow-xs">
+              Ctrl + Enter
+            </kbd>
+            <span>to run</span>
+          </div>
         </div>
-      )}
+      ) : (response && response.status === 0 && !loading) ? (
+        // STATE 2: CONNECTION ERROR (Status 0)
+        (() => {
+          const cleanError = formatNetworkError(response.error, url);
+          return (
+            <div className="flex-1 flex flex-col items-center justify-center p-4 select-none text-center animate-in fade-in duration-300 overflow-y-auto">
+              <div className="relative mb-1 flex items-center justify-center">
+                <ResponseDisconnectedMascot size={120} />
+              </div>
+              <h4 className="text-sm font-semibold text-foreground/90 tracking-tight mb-2.5">
+                Could not send request
+              </h4>
 
-      {/* Response body tabs */}
-      <div className={cn("flex-grow flex flex-col min-h-0 transition-opacity duration-300", shouldFade ? "opacity-30 pointer-events-none" : "opacity-100")}>
-        <Tabs defaultValue="body" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="bg-transparent border-b border-border/40 w-full justify-start rounded-none h-8 p-0 gap-4 shrink-0">
-            <TabsTrigger
+              {/* Clean Red Error Card */}
+              <div className="w-full max-w-lg bg-[#2e1010]/80 border border-rose-800/50 rounded-lg p-2.5 px-3.5 mb-2.5 flex items-center justify-between gap-3 shadow-md shadow-rose-950/20">
+                <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
+                  <AlertCircle size={14} className="text-rose-400 shrink-0" />
+                  <span className="font-mono text-xs text-rose-200 select-all truncate font-medium">
+                    {cleanError}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(cleanError);
+                    toast.success("Error copied to clipboard");
+                  }}
+                  className="shrink-0 flex items-center gap-1 text-[11px] font-medium text-rose-300 hover:text-white bg-rose-900/40 hover:bg-rose-900/70 border border-rose-700/50 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                  title="Copy Error"
+                >
+                  <Copy size={11} />
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              {/* Centered Troubleshooting Line (Postman Style) */}
+              <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground/80 max-w-lg text-center">
+                <span className="text-foreground/75 font-medium">Make sure backend is running</span>
+                <span className="text-muted-foreground/40">•</span>
+                <span>Verify port & Base URL</span>
+                <span className="text-muted-foreground/40">•</span>
+                <span>Check firewall</span>
+              </div>
+            </div>
+          );
+        })()
+      ) : (
+        // STATE 3: ACTUAL HTTP RESPONSE TABS (Pretty Body, Headers, Cookies, Raw Output)
+        <div className={cn("flex-grow flex flex-col min-h-0 transition-opacity duration-300", shouldFade ? "opacity-30 pointer-events-none" : "opacity-100")}>
+          <Tabs defaultValue="body" className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="bg-transparent border-b border-border/40 w-full justify-start rounded-none h-8 p-0 gap-4 shrink-0">
+              <TabsTrigger
               value="body"
               className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-1 py-1 h-full font-medium"
             >
@@ -508,7 +514,8 @@ export function ResponsePanel({
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }
 

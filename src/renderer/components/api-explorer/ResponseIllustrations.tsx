@@ -12,7 +12,7 @@ interface IllustrationProps {
  * with an antenna beacon and a mini rocket launching in the background.
  * 100% transparent vector, perfectly matching RouteLens's dark UI.
  */
-export function ResponseIdleMascot({ className, size = 150 }: IllustrationProps) {
+export function ResponseIdleMascot({ className, size = 120 }: IllustrationProps) {
   return (
     <div className={cn("relative flex items-center justify-center select-none", className)}>
       {/* Ambient background glow */}
@@ -272,7 +272,7 @@ export function ResponseIdleMascot({ className, size = 150 }: IllustrationProps)
  * with a tiny electric warning spark and trailing wire.
  * 100% transparent vector, perfectly matching RouteLens's dark UI.
  */
-export function ResponseDisconnectedMascot({ className, size = 150 }: IllustrationProps) {
+export function ResponseDisconnectedMascot({ className, size = 120 }: IllustrationProps) {
   return (
     <div className={cn("relative flex items-center justify-center select-none", className)}>
       {/* Ambient background warning glow */}
