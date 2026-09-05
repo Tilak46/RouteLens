@@ -883,11 +883,116 @@ function App() {
     toast.success("Backend removed from workspace");
   };
 
+  const getDemoRoutesTree = (): ApiFolder[] => [
+    {
+      id: "folder_auth",
+      name: "Authentication",
+      children: [
+        {
+          id: "route_login",
+          name: "User Login",
+          method: "POST",
+          path: "/api/v1/auth/login",
+          inferredHeaders: ["Content-Type"],
+          inferredBodyFields: ["username", "password"],
+          description: "Authenticate user credentials and receive session cookie & JWT token",
+        },
+        {
+          id: "route_me",
+          name: "Current Profile",
+          method: "GET",
+          path: "/api/v1/auth/me",
+          inferredHeaders: ["Authorization"],
+          description: "Get authenticated user profile details",
+        },
+        {
+          id: "route_logout",
+          name: "User Logout",
+          method: "POST",
+          path: "/api/v1/auth/logout",
+          description: "Clear auth cookie and terminate active session",
+        },
+      ],
+    },
+    {
+      id: "folder_products",
+      name: "Products & Catalog",
+      children: [
+        {
+          id: "route_list_products",
+          name: "List Products",
+          method: "GET",
+          path: "/api/v1/products",
+          inferredQueryFields: ["category", "limit", "sort"],
+          description: "Retrieve paginated products with category filtering",
+        },
+        {
+          id: "route_create_product",
+          name: "Create Product",
+          method: "POST",
+          path: "/api/v1/products",
+          inferredBodyFields: ["title", "price", "category", "inStock"],
+          description: "Add a new product listing to the inventory",
+        },
+        {
+          id: "route_delete_product",
+          name: "Delete Product",
+          method: "DELETE",
+          path: "/api/v1/products/:id",
+          description: "Remove product by ID",
+        },
+      ],
+    },
+    {
+      id: "folder_system",
+      name: "Health & System",
+      children: [
+        {
+          id: "route_health",
+          name: "Health Check",
+          method: "GET",
+          path: "/api/v1/health",
+          description: "System health and database connectivity probe",
+        },
+      ],
+    },
+  ];
+
   const handleQuickOpenFolder = handleAddBackendFolder;
 
   const handleRescanProject = async (project: Project) => {
     setScanningProjectId(project.id);
-    const toastId = toast.loading(`Scanning routes in ${project.name}...`);
+
+    // Mock Demo project rescan handler (preserves routes and simulates realistic scan)
+    if (project.path.startsWith("mock://") || project.id === "proj_demo_store") {
+      const scanDuration = Math.floor(Math.random() * 2000) + 4000; // 4 to 6 seconds
+      setTimeout(() => {
+        const demoTree = getDemoRoutesTree();
+        setTreeCache((prev) => {
+          const next = {
+            ...prev,
+            [project.path]: {
+              tree: demoTree,
+              logs: [
+                "[AST Scanner] Rescanned demo routes...",
+                "[AST Scanner] Discovered 7 routes across 3 controllers",
+              ],
+              cachedAt: Date.now(),
+              potentialRoutesCount: 7,
+              detectedRoutesCount: 7,
+            },
+          };
+          apiClient.storeSet("apiScannerTreeCache", next);
+          return next;
+        });
+        setScanningProjectId(null);
+        toast.success("AST scan complete", {
+          description: `Discovered 7 routes in ${project.name}`,
+        });
+      }, scanDuration);
+      return;
+    }
+
     try {
       const result = await apiClient.scanProject(project.path);
       const existing = treeCache[project.path];
@@ -913,11 +1018,10 @@ function App() {
       });
 
       toast.success("AST scan complete", {
-        id: toastId,
         description: `Discovered ${result?.detectedRoutesCount || merged.length} routes in ${project.name}`,
       });
     } catch (err) {
-      toast.error("Scan failed", { id: toastId });
+      toast.error("Scan failed");
     } finally {
       setScanningProjectId(null);
     }
@@ -947,107 +1051,52 @@ function App() {
 
     // Add demo project
     apiClient.addProject(demoProject);
+    setProjects((prev) => {
+      const exists = prev.some((p) => p.id === demoId);
+      return exists ? prev : [...prev, demoProject];
+    });
     setActiveProjectId(demoProject.id);
     setActiveSidebarTab("explorer");
 
-    // Populate mock demo routes in treeCache
-    const demoTree: ApiFolder[] = [
-      {
-        id: "folder_auth",
-        name: "Authentication",
-        children: [
-          {
-            id: "route_login",
-            name: "User Login",
-            method: "POST",
-            path: "/api/v1/auth/login",
-            inferredHeaders: ["Content-Type"],
-            inferredBodyFields: ["username", "password"],
-            description: "Authenticate user credentials and receive session cookie & JWT token",
-          },
-          {
-            id: "route_me",
-            name: "Current Profile",
-            method: "GET",
-            path: "/api/v1/auth/me",
-            inferredHeaders: ["Authorization"],
-            description: "Get authenticated user profile details",
-          },
-          {
-            id: "route_logout",
-            name: "User Logout",
-            method: "POST",
-            path: "/api/v1/auth/logout",
-            description: "Clear auth cookie and terminate active session",
-          },
-        ],
-      },
-      {
-        id: "folder_products",
-        name: "Products & Catalog",
-        children: [
-          {
-            id: "route_list_products",
-            name: "List Products",
-            method: "GET",
-            path: "/api/v1/products",
-            inferredQueryFields: ["category", "limit", "sort"],
-            description: "Retrieve paginated products with category filtering",
-          },
-          {
-            id: "route_create_product",
-            name: "Create Product",
-            method: "POST",
-            path: "/api/v1/products",
-            inferredBodyFields: ["title", "price", "category", "inStock"],
-            description: "Add a new product listing to the inventory",
-          },
-          {
-            id: "route_delete_product",
-            name: "Delete Product",
-            method: "DELETE",
-            path: "/api/v1/products/:id",
-            description: "Remove product by ID",
-          },
-        ],
-      },
-      {
-        id: "folder_system",
-        name: "Health & System",
-        children: [
-          {
-            id: "route_health",
-            name: "Health Check",
-            method: "GET",
-            path: "/api/v1/health",
-            description: "System health and database connectivity probe",
-          },
-        ],
-      },
-    ];
+    // Realistic scanning experience (5 to 8 seconds with Ghost Hunter mini-game)
+    setScanningProjectId(demoProject.id);
+    const scanDuration = Math.floor(Math.random() * 3000) + 5000; // 5 to 8 seconds
 
-    setTreeCache((prev) => {
-      const next = {
-        ...prev,
-        [demoPath]: {
-          tree: demoTree,
-          logs: ["[demo] Initialized RouteLens Demo API specification with 7 mock endpoints."],
-          cachedAt: Date.now(),
-          potentialRoutesCount: 7,
-          detectedRoutesCount: 7,
-        },
-      };
-      apiClient.storeSet("apiScannerTreeCache", next);
-      return next;
-    });
+    setTimeout(() => {
+      const demoTree = getDemoRoutesTree();
+      setTreeCache((prev) => {
+        const next = {
+          ...prev,
+          [demoPath]: {
+            tree: demoTree,
+            logs: [
+              "[AST Scanner] Scanning demo routes...",
+              "[AST Scanner] Parsed express router in /controllers/auth.ts",
+              "[AST Scanner] Parsed express router in /controllers/products.ts",
+              "[AST Scanner] Parsed health check endpoint in /server.ts",
+              "[AST Scanner] Discovered 7 routes across 3 controllers",
+            ],
+            cachedAt: Date.now(),
+            potentialRoutesCount: 7,
+            detectedRoutesCount: 7,
+          },
+        };
+        apiClient.storeSet("apiScannerTreeCache", next);
+        return next;
+      });
 
-    // Open first route (User Login) in a tab for instant interaction
-    const firstRoute = demoTree[0].children[0] as ApiRoute;
-    handleSelectRoute(firstRoute, "http://localhost:3000", demoId);
+      setScanningProjectId(null);
 
-    toast.success("Demo API loaded!", {
-      description: "Explore endpoints, parameters, JSON body templates, and cookies.",
-    });
+      // Open first route (User Login) in a tab for instant interaction
+      const firstRoute = demoTree[0]?.children?.[0] as ApiRoute;
+      if (firstRoute) {
+        handleSelectRoute(firstRoute, "http://localhost:3000", demoId);
+      }
+
+      toast.success("AST scan complete", {
+        description: "Discovered 7 routes in RouteLens Demo API",
+      });
+    }, scanDuration);
   };
 
   const handleDevTriggerScanAnimation = async () => {

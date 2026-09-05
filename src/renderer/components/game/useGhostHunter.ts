@@ -54,6 +54,7 @@ export const useGhostHunter = (options?: {
   const [ghosts, setGhosts] = useState<Ghost[]>([]);
   const [isCombat, setIsCombat] = useState(true);
   const [corruptionLevel, setCorruptionLevel] = useState(0);
+  const [ghostsKilled, setGhostsKilled] = useState(0);
   const [isHit, setIsHit] = useState(false);
   const [isGameActive, setIsGameActive] = useState(true);
   const attackCount = useRef(0);
@@ -284,6 +285,7 @@ export const useGhostHunter = (options?: {
 
     if (wasDying) return;
 
+    setGhostsKilled((k) => k + 1);
     setCorruptionLevel((c) => Math.max(c - 5, 0));
 
     setTimeout(() => {
@@ -352,6 +354,7 @@ export const useGhostHunter = (options?: {
     ghosts,
     isCombat,
     corruptionLevel,
+    ghostsKilled,
     isHit,
     isGameActive,
     killGhost,

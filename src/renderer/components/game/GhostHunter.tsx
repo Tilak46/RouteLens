@@ -25,6 +25,7 @@ const GhostHunter = ({
     ghosts,
     isCombat,
     corruptionLevel,
+    ghostsKilled,
     isHit,
     killGhost,
     giveUp,
@@ -165,34 +166,11 @@ const GhostHunter = ({
       {/* Combat & Scanning HUD */}
       <CombatHUD
         isCombat={isCombat}
-        corruptionLevel={corruptionLevel}
+        ghostsKilled={ghostsKilled}
         isScanning={isScanning}
         scanningProjectName={scanningProjectName}
         onDismiss={handleExit}
       />
-
-      {/* Exit Game Button */}
-      <AnimatePresence>
-        {isCombat && (
-          <motion.button
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            whileHover={{
-              scale: 1.05,
-              backgroundColor: "rgba(0,0,0,0.85)",
-            }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleExit}
-            className="pointer-events-auto absolute top-4 left-4 z-[9999] flex items-center gap-2 border border-white/20 bg-black/75 px-3 py-1.5 rounded-lg shadow-2xl backdrop-blur-md transition-all cursor-pointer"
-          >
-            <div className="h-1.5 w-1.5 bg-rose-400 rounded-full" />
-            <span className="text-[10px] font-bold tracking-[2px] text-white/80 uppercase font-mono">
-              Exit Game
-            </span>
-          </motion.button>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
