@@ -364,35 +364,6 @@ function App() {
     apiClient.onSettingsUpdated(setSettings);
   }, []);
 
-  // Global Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl + T (New Request)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "t") {
-        e.preventDefault();
-        handleNewTab();
-      }
-      // Ctrl + W (Close Active Tab)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
-        e.preventDefault();
-        if (activeTabId) {
-          handleCloseTab(activeTabId);
-        }
-      }
-      // Alt + Ctrl + W (Force Close Active Tab)
-      if (e.altKey && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
-        e.preventDefault();
-        if (activeTabId) {
-          handleCloseTab(activeTabId);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [activeTabId, tabs]);
 
   const handleGitSummaryChange = (projectId: string, summary: GitSummary) => {
     setGitSummaries((prev) => ({ ...prev, [projectId]: summary }));
@@ -628,7 +599,7 @@ function App() {
     setActiveTabId(null);
   };
 
-  // Global keyboard shortcuts (Ctrl+T / Cmd+T for new tab, Ctrl+W / Cmd+W for close tab)
+  // Global keyboard shortcuts (Ctrl+T for new tab, Ctrl+W for close tab, Ctrl+Tab/Alt+1-9 for navigation)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
@@ -642,11 +613,31 @@ function App() {
           e.preventDefault();
           handleCloseTab(activeTabId);
         }
+      } else if (isCmdOrCtrl && (e.key === "Tab" || e.key === "PageDown") && !e.shiftKey) {
+        if (tabs.length > 1 && activeTabId) {
+          e.preventDefault();
+          const currIdx = tabs.findIndex((t) => t.id === activeTabId);
+          const nextIdx = (currIdx + 1) % tabs.length;
+          setActiveTabId(tabs[nextIdx].id);
+        }
+      } else if (isCmdOrCtrl && ((e.key === "Tab" && e.shiftKey) || e.key === "PageUp")) {
+        if (tabs.length > 1 && activeTabId) {
+          e.preventDefault();
+          const currIdx = tabs.findIndex((t) => t.id === activeTabId);
+          const prevIdx = (currIdx - 1 + tabs.length) % tabs.length;
+          setActiveTabId(tabs[prevIdx].id);
+        }
+      } else if (e.altKey && !isCmdOrCtrl && e.key >= "1" && e.key <= "9") {
+        const targetIdx = parseInt(e.key, 10) - 1;
+        if (tabs[targetIdx]) {
+          e.preventDefault();
+          setActiveTabId(tabs[targetIdx].id);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTabId, activeProjectId, projects]);
+  }, [activeTabId, tabs, activeProjectId, projects]);
 
   const handleChangeTab = (updatedTab: RequestTab) => {
     setTabs((prev) => prev.map((t) => (t.id === updatedTab.id ? updatedTab : t)));

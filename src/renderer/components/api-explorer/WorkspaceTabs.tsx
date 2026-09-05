@@ -85,6 +85,13 @@ function SortableTab({
       {...attributes}
       {...listeners}
       onClick={() => onSelectTab(tab.id)}
+      onAuxClick={(e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCloseTab(tab.id);
+        }
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -199,7 +206,7 @@ export function WorkspaceTabs({
   };
 
   const menuWidth = 195;
-  const menuHeight = 280; // Adjusted for new Close tabs to Left / Right menu items
+  const menuHeight = 220; // Streamlined context menu
   
   let menuX = contextMenu ? contextMenu.x : 0;
   let menuY = contextMenu ? contextMenu.y : 0;
@@ -351,13 +358,12 @@ export function WorkspaceTabs({
             </button>
             <button
               onClick={() => {
-                onCloseTab(contextMenu.tabId);
+                onCloseOtherTabs(contextMenu.tabId);
                 setContextMenu(null);
               }}
               className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 rounded text-left transition-colors"
             >
-              <span>Force Close Tab</span>
-              <span className="text-[10px] text-muted-foreground font-mono">Alt+Ctrl+W</span>
+              <span>Close Other Tabs</span>
             </button>
             <button
               onClick={() => {
@@ -377,32 +383,15 @@ export function WorkspaceTabs({
             >
               <span>Close Tabs to the Left</span>
             </button>
-            <button
-              onClick={() => {
-                onCloseOtherTabs(contextMenu.tabId);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 rounded text-left transition-colors"
-            >
-              <span>Close Other Tabs</span>
-            </button>
+            <div className="h-px bg-border/40 my-1" />
             <button
               onClick={() => {
                 onCloseAllTabs();
                 setContextMenu(null);
               }}
-              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 rounded text-left transition-colors"
+              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 rounded text-left transition-colors text-rose-400 hover:text-rose-300"
             >
               <span>Close All Tabs</span>
-            </button>
-            <button
-              onClick={() => {
-                onCloseAllTabs();
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 rounded text-left transition-colors"
-            >
-              <span>Force Close All Tabs</span>
             </button>
           </div>
         </>
