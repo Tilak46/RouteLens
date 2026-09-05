@@ -7,8 +7,10 @@ import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
 import { postmanTheme, jsonCommentsPlugin } from "./codemirrorTheme";
 import { Button } from "@/components/ui/button";
-import { Loader2, Play, Plus, Trash2, Sparkles, Save, ChevronDown, Share2, Copy, Globe, Link, Cookie } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Sparkles, Save, ChevronDown, Share2, Copy, Globe, Link, Cookie, Code2, Terminal } from "lucide-react";
 import { ManageCookiesModal } from "./ManageCookiesModal";
+import { CodeSnippetModal } from "./CodeSnippetModal";
+import { generateCurlCommand, RequestSnippetParams } from "@/lib/curlUtils";
 import {
   ApiAuth,
   ApiBody,
@@ -408,6 +410,71 @@ export function RequestPanel({
   );
 
   const [pathVariables, setPathVariables] = useState<ApiKeyValueRow[]>(tab.pathVariables || []);
+  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+  const [codeModalDefaultMode, setCodeModalDefaultMode] = useState<"export" | "import">("export");
+  const [activeCookieCount, setActiveCookieCount] = useState<number>(0);
+
+  // Sync active cookie count for the current URL
+  useEffect(() => {
+    let isMounted = true;
+    if (url && url.trim()) {
+      apiClient
+        .getCookiesForUrl(url)
+        .then((cookies) => {
+          if (isMounted) {
+            setActiveCookieCount(Array.isArray(cookies) ? cookies.length : 0);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setActiveCookieCount(0);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [url, isCookiesModalOpen]);
+
+  const handleCopyCurl = () => {
+    const curl = generateCurlCommand({
+      method,
+      url,
+      headers,
+      query: params,
+      bodyMode,
+      bodyText,
+      formFields,
+      urlencodedFields,
+      auth,
+    });
+    navigator.clipboard.writeText(curl);
+    toast.success("cURL command copied to clipboard!");
+  };
+
+  const handleImportCurl = (parsed: Partial<RequestSnippetParams>) => {
+    if (parsed.method) {
+      setMethod(parsed.method as Method);
+    }
+    if (parsed.url) {
+      setUrl(parsed.url);
+    }
+    if (parsed.headers && parsed.headers.length > 0) {
+      const norm = normalizeRows(parsed.headers);
+      setHeaders(norm);
+    }
+    if (parsed.bodyMode) {
+      setBodyMode(parsed.bodyMode as any);
+      if (parsed.bodyText !== undefined) {
+        setBodyText(parsed.bodyText);
+      }
+    }
+    updateParentTab({
+      method: (parsed.method as Method) || method,
+      url: parsed.url || url,
+      headers: parsed.headers ? normalizeRows(parsed.headers) : headers,
+      bodyMode: (parsed.bodyMode as any) || bodyMode,
+      bodyText: parsed.bodyText !== undefined ? parsed.bodyText : bodyText,
+    });
+  };
 
   const urlPathParams = useMemo(() => getPathParamsFromUrl(url), [url]);
 
@@ -647,7 +714,8 @@ export function RequestPanel({
     pathVariables.forEach((pv) => {
       if (pv.enabled && pv.key) {
         const evaluatedValue = interpolate(pv.value || "", localVars);
-        currentUrl = currentUrl.split(`:${pv.key}`).join(evaluatedValue || `:${pv.key}`);
+        const regex = new RegExp(`:${pv.key}(?=[/?&#]|$)`, "g");
+        currentUrl = currentUrl.replace(regex, evaluatedValue || `:${pv.key}`);
       }
     });
 
@@ -1029,8 +1097,36 @@ export function RequestPanel({
           />
         </div>
 
-        {/* Right Side: Save & Share Buttons */}
+        {/* Right Side: Cookies, Code, Save & Share Buttons */}
         <div className="flex items-center gap-2">
+          {/* Cookies Button */}
+          <button
+            onClick={() => setIsCookiesModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 h-7 text-xs font-semibold text-foreground bg-muted/40 hover:bg-muted/60 border border-border/80 rounded-md transition-colors cursor-pointer"
+            title="Manage Cookies for this domain"
+          >
+            <Cookie size={12} className={activeCookieCount > 0 ? "text-amber-400" : "text-muted-foreground"} />
+            <span>Cookies</span>
+            {activeCookieCount > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                {activeCookieCount}
+              </span>
+            )}
+          </button>
+
+          {/* Code Snippet Button */}
+          <button
+            onClick={() => {
+              setCodeModalDefaultMode("export");
+              setIsCodeModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-2.5 h-7 text-xs font-semibold text-foreground bg-muted/40 hover:bg-muted/60 border border-border/80 rounded-md transition-colors cursor-pointer"
+            title="Generate code snippet (cURL, fetch, axios, python)"
+          >
+            <Code2 size={12} className="text-muted-foreground" />
+            <span>Code</span>
+          </button>
+
           {/* Save Button with Dropdown */}
           <div className="flex items-center rounded-md border border-border/80 bg-muted/40 hover:bg-muted/60 overflow-hidden h-7">
             <button
@@ -1048,7 +1144,7 @@ export function RequestPanel({
                   <ChevronDown size={11} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover border-border text-foreground w-[120px] z-50">
+              <DropdownMenuContent align="end" className="bg-popover border-border text-foreground w-[150px] z-50">
                 <DropdownMenuItem onClick={handleSave} className="text-xs cursor-pointer flex items-center gap-1.5">
                   <Save size={11} className="text-muted-foreground" />
                   Save
@@ -1056,6 +1152,21 @@ export function RequestPanel({
                 <DropdownMenuItem onClick={handleSaveAs} className="text-xs cursor-pointer flex items-center gap-1.5">
                   <Copy size={11} className="text-muted-foreground" />
                   Save As...
+                </DropdownMenuItem>
+                <div className="h-px bg-border/40 my-1" />
+                <DropdownMenuItem onClick={handleCopyCurl} className="text-xs cursor-pointer flex items-center gap-1.5 text-primary font-medium">
+                  <Terminal size={11} />
+                  Copy as cURL
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setCodeModalDefaultMode("import");
+                    setIsCodeModalOpen(true);
+                  }}
+                  className="text-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Code2 size={11} className="text-muted-foreground" />
+                  Import cURL...
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1905,6 +2016,24 @@ export function RequestPanel({
         isOpen={isCookiesModalOpen}
         onClose={() => setIsCookiesModalOpen(false)}
         initialDomain={url}
+      />
+
+      <CodeSnippetModal
+        isOpen={isCodeModalOpen}
+        onClose={() => setIsCodeModalOpen(false)}
+        requestParams={{
+          method,
+          url,
+          headers,
+          query: params,
+          bodyMode,
+          bodyText,
+          formFields,
+          urlencodedFields,
+          auth,
+        }}
+        onImportCurl={handleImportCurl}
+        defaultMode={codeModalDefaultMode}
       />
     </div>
   );

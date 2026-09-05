@@ -151,10 +151,16 @@ export function registerApiExplorerHandlers() {
         const addQueryRows = (rows: ApiKeyValueRow[] | undefined) => {
           if (!Array.isArray(rows)) return;
           for (const row of rows) {
-            if (!row || row.enabled === false) continue;
+            if (!row) continue;
             const k = String(row.key || "").trim();
             if (!k) continue;
-            url.searchParams.append(k, String(row.value ?? ""));
+            if (row.enabled === false) {
+              // Delete disabled query param from URL so disabling works
+              url.searchParams.delete(k);
+            } else {
+              // Use set instead of append to prevent duplicate query params
+              url.searchParams.set(k, String(row.value ?? ""));
+            }
           }
         };
 
@@ -392,6 +398,8 @@ export function registerApiExplorerHandlers() {
         };
       } catch (err: any) {
         const ended = performance.now();
+        const cause = err?.cause?.message || (err?.cause ? String(err.cause) : "");
+        const errorDetail = cause ? `${err?.message || "Network Error"}: ${cause}` : String(err?.message || err);
         return {
           ok: false,
           status: 0,
@@ -400,7 +408,7 @@ export function registerApiExplorerHandlers() {
           sizeBytes: 0,
           headers: {},
           bodyText: "",
-          error: String(err?.message || err),
+          error: errorDetail,
         };
       }
     },

@@ -13,6 +13,7 @@ type ResponsePanelProps = {
   loading?: boolean;
   tabId?: string;
   lastCompletedAt?: number;
+  onOpenCookies?: () => void;
 };
 
 // Simple tokenizer to color-code JSON strings for a premium developer feel
@@ -49,7 +50,13 @@ function highlightJson(jsonStr: string): string {
   }
 }
 
-export function ResponsePanel({ response, loading = false, tabId, lastCompletedAt }: ResponsePanelProps) {
+export function ResponsePanel({
+  response,
+  loading = false,
+  tabId,
+  lastCompletedAt,
+  onOpenCookies,
+}: ResponsePanelProps) {
   const [blink, setBlink] = useState<"success" | "error" | null>(null);
   const [blinkTrigger, setBlinkTrigger] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -327,9 +334,35 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
                     <p className="text-[11px] text-muted-foreground/60 max-w-xs mt-1 leading-relaxed">
                       When an endpoint responds with <code>Set-Cookie</code> headers, they are parsed, displayed here, and automatically stored in the Cookie Jar for future requests.
                     </p>
+                    {onOpenCookies && (
+                      <button
+                        type="button"
+                        onClick={onOpenCookies}
+                        className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 border border-primary/20 px-3 py-1.5 rounded transition-colors cursor-pointer"
+                      >
+                        <Cookie size={12} />
+                        <span>Open Cookie Jar</span>
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <table className="w-full text-xs font-mono select-text border-collapse">
+                  <>
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-border/30">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Response Cookies ({cookieCount})
+                      </span>
+                      {onOpenCookies && (
+                        <button
+                          type="button"
+                          onClick={onOpenCookies}
+                          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary/40 hover:bg-secondary/70 border border-border/40 px-2.5 py-1 rounded transition-all cursor-pointer"
+                        >
+                          <Cookie size={12} className="text-amber-400" />
+                          <span>Manage in Cookie Jar</span>
+                        </button>
+                      )}
+                    </div>
+                    <table className="w-full text-xs font-mono select-text border-collapse">
                     <thead>
                       <tr className="border-b border-border/30 text-left text-muted-foreground font-sans text-[11px]">
                         <th className="pb-2 font-semibold">Name</th>
@@ -403,6 +436,7 @@ export function ResponsePanel({ response, loading = false, tabId, lastCompletedA
                       })}
                     </tbody>
                   </table>
+                  </>
                 )}
               </div>
             )}

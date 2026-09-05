@@ -27,6 +27,8 @@ export class CookieJarService {
     clean = clean.replace(/^https?:\/\//i, "");
     // Remove trailing slashes and paths
     clean = clean.split("/")[0];
+    // Remove port numbers (e.g. localhost:3000 -> localhost)
+    clean = clean.split(":")[0];
     return clean;
   }
 

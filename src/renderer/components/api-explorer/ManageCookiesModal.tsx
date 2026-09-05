@@ -86,7 +86,11 @@ export function ManageCookiesModal({
 
       // If initialDomain provided and not yet expanded, auto-expand it
       if (initialDomain) {
-        const cleanInitial = initialDomain.replace(/^https?:\/\//i, "").split("/")[0].toLowerCase();
+        const cleanInitial = initialDomain
+          .replace(/^https?:\/\//i, "")
+          .split("/")[0]
+          .split(":")[0]
+          .toLowerCase();
         setExpandedDomains((prev) => ({
           ...prev,
           [cleanInitial]: true,
@@ -116,7 +120,11 @@ export function ManageCookiesModal({
   const handleAddDomain = () => {
     const raw = newDomainInput.trim();
     if (!raw) return;
-    const clean = raw.replace(/^https?:\/\//i, "").split("/")[0].toLowerCase();
+    const clean = raw
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0]
+      .split(":")[0]
+      .toLowerCase();
     if (!clean) return;
 
     if (!cookiesByDomain[clean]) {

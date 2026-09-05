@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/apiClient";
 import { Toaster, toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Compass, Plus, Server, Zap, Hourglass, FolderCode } from "lucide-react";
+import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send } from "lucide-react";
 
 import { ApiExplorerSidebarPanel, mergeTrees } from "@/views/ApiExplorerView";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
@@ -34,6 +34,7 @@ import { WorkspaceTabs, RequestTab } from "@/components/api-explorer/WorkspaceTa
 import { RequestPanel } from "@/components/api-explorer/RequestPanel";
 import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
 import { ManageEnvironmentsModal, ApiEnvironment } from "@/components/api-explorer/ManageEnvironmentsModal";
+import { ManageCookiesModal } from "@/components/api-explorer/ManageCookiesModal";
 import { OnboardingView } from "@/components/onboarding/OnboardingView";
 import GhostHunter from "@/components/game/GhostHunter";
 import GamingHUDCursor from "@/components/game/GamingHUDCursor";
@@ -135,6 +136,9 @@ function App() {
       };
     });
   };
+
+  // Cookie Jar modal state
+  const [isCookiesModalOpen, setIsCookiesModalOpen] = useState(false);
 
   // Resizing states
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -623,6 +627,26 @@ function App() {
     setTabs([]);
     setActiveTabId(null);
   };
+
+  // Global keyboard shortcuts (Ctrl+T / Cmd+T for new tab, Ctrl+W / Cmd+W for close tab)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+      if (isCmdOrCtrl && e.key.toLowerCase() === "t" && !e.shiftKey) {
+        e.preventDefault();
+        handleNewTab();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "w" && !e.shiftKey) {
+        const target = e.target as HTMLElement;
+        const isCodeMirror = target?.closest(".cm-content");
+        if (!isCodeMirror && activeTabId) {
+          e.preventDefault();
+          handleCloseTab(activeTabId);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTabId, activeProjectId, projects]);
 
   const handleChangeTab = (updatedTab: RequestTab) => {
     setTabs((prev) => prev.map((t) => (t.id === updatedTab.id ? updatedTab : t)));
@@ -1534,51 +1558,75 @@ function App() {
                 onCloseTabsToLeft={handleCloseTabsToLeft}
               />
               
-              {/* Resizable Split Request Panels Content */}
-              <div 
-                ref={workspaceRef}
-                className="flex-grow flex flex-col min-h-0 overflow-hidden relative"
-              >
-                {/* Top Request Panel */}
+              {activeTab ? (
+                /* Resizable Split Request Panels Content */
                 <div 
-                  style={{ height: `${activeTab?.splitPercent ?? 50}%`, flexBasis: `${activeTab?.splitPercent ?? 50}%` }} 
-                  className="flex flex-col shrink-0 min-h-[200px] overflow-hidden"
+                  ref={workspaceRef}
+                  className="flex-grow flex flex-col min-h-0 overflow-hidden relative"
                 >
-                  <RequestPanel
-                    tab={activeTab}
-                    onChangeTab={handleChangeTab}
-                    onRun={(res) => handleUpdateTabResponse(activeTab.id, res)}
-                    activeVariables={activeVariables}
-                    activeEnvName={activeEnvName || undefined}
-                    onAddOrUpdateVariable={handleAddOrUpdateVariable}
-                    projects={projects}
-                    treeCache={treeCache}
-                  />
-                </div>
+                  {/* Top Request Panel */}
+                  <div 
+                    style={{ height: `${activeTab?.splitPercent ?? 50}%`, flexBasis: `${activeTab?.splitPercent ?? 50}%` }} 
+                    className="flex flex-col shrink-0 min-h-[200px] overflow-hidden"
+                  >
+                    <RequestPanel
+                      tab={activeTab}
+                      onChangeTab={handleChangeTab}
+                      onRun={(res) => handleUpdateTabResponse(activeTab.id, res)}
+                      activeVariables={activeVariables}
+                      activeEnvName={activeEnvName || undefined}
+                      onAddOrUpdateVariable={handleAddOrUpdateVariable}
+                      projects={projects}
+                      treeCache={treeCache}
+                    />
+                  </div>
 
-                {/* Horizontal Drag Handle */}
-                <div
-                  onMouseDown={startRequestResize}
-                  onDoubleClick={resetRequestSplit}
-                  className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-border/40"
-                  title="Drag to resize panels (Double-click to reset 50/50)"
-                />
-
-                {/* Bottom Response Panel */}
-                <div className="flex-1 flex flex-col min-h-[180px] p-4 pt-0 overflow-hidden">
-                  <ResponsePanel
-                    response={activeTab.response}
-                    loading={activeTab.loading}
-                    tabId={activeTab.id}
-                    lastCompletedAt={activeTab.lastCompletedAt}
+                  {/* Horizontal Drag Handle */}
+                  <div
+                    onMouseDown={startRequestResize}
+                    onDoubleClick={resetRequestSplit}
+                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-border/40"
+                    title="Drag to resize panels (Double-click to reset 50/50)"
                   />
+
+                  {/* Bottom Response Panel */}
+                  <div className="flex-1 flex flex-col min-h-[180px] p-4 pt-0 overflow-hidden">
+                    <ResponsePanel
+                      response={activeTab.response}
+                      loading={activeTab.loading}
+                      tabId={activeTab.id}
+                      lastCompletedAt={activeTab.lastCompletedAt}
+                      onOpenCookies={() => setIsCookiesModalOpen(true)}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/5 select-none">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 shadow-lg shadow-primary/5">
+                    <Send size={22} className="translate-x-0.5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground mb-1">No Request Open</h3>
+                  <p className="text-xs text-muted-foreground max-w-sm leading-relaxed mb-5">
+                    Select an endpoint from the left sidebar or create a new request tab to start testing.
+                  </p>
+                  <Button onClick={handleNewTab} size="sm" className="gap-2 text-xs font-semibold px-4 h-8">
+                    <Plus size={14} />
+                    <span>New Request</span>
+                    <kbd className="ml-1 text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground px-1.5 py-0.5 rounded">Ctrl+T</kbd>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DashboardLayout>
       </ErrorBoundary>
       )}
+
+      <ManageCookiesModal
+        isOpen={isCookiesModalOpen}
+        onClose={() => setIsCookiesModalOpen(false)}
+        initialDomain={activeTab?.url}
+      />
     </TooltipProvider>
   );
 }
