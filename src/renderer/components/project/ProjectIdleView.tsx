@@ -71,10 +71,10 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
       : VICTOR_COPILOT_QUOTES[(clickCount - 1) % VICTOR_COPILOT_QUOTES.length];
 
   return (
-    <div className="flex-grow flex flex-col items-center justify-center p-6 sm:p-8 select-none overflow-y-auto w-full animate-in fade-in duration-300">
-      <div className="max-w-xl w-full flex flex-col items-center text-center">
+    <div className="flex-grow flex flex-col items-center justify-center py-10 sm:py-14 px-6 select-none overflow-y-auto w-full animate-in fade-in duration-300">
+      <div className="max-w-2xl w-full flex flex-col items-center text-center">
         {/* Floating Story / Dialogue Bubble */}
-        <div className="h-16 flex items-end justify-center mb-2 z-20">
+        <div className="h-20 flex items-end justify-center mb-4 z-20">
           <AnimatePresence mode="wait">
             <motion.div
               key={`bubble-${clickCount}`}
@@ -105,36 +105,36 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
         </div>
 
         {/* Central Visual: Animated Victor Mascot */}
-        <div className="relative flex flex-col items-center my-1 select-none">
+        <div className="relative flex flex-col items-center my-3 select-none">
           {/* Ambient Cosmic Lighting Aura */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-gradient-to-tr from-blue-500/15 via-cyan-500/20 to-indigo-500/10 blur-3xl rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: "4s" }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-tr from-blue-500/10 via-cyan-500/15 to-indigo-500/10 blur-3xl rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: "4s" }} />
 
-          {/* Floating Orbiting Cyber Glyphs */}
+          {/* Floating Orbiting Cyber Glyphs - Positioned safely away from Victor & speech bubble */}
           <motion.div
-            animate={{ y: [0, -10, 0], rotate: [0, 8, 0] }}
+            animate={{ y: [0, -8, 0], rotate: [0, 8, 0] }}
             transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-3 -left-8 text-cyan-400/60 font-mono text-sm pointer-events-none"
+            className="absolute top-12 -left-16 text-cyan-400/60 font-mono text-sm pointer-events-none"
           >
             {"{ }"}
           </motion.div>
           <motion.div
             animate={{ y: [0, 8, 0], rotate: [0, -10, 0] }}
             transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            className="absolute top-8 -right-8 text-amber-400/60 font-mono text-sm pointer-events-none"
+            className="absolute top-8 -right-16 text-amber-400/60 font-mono text-sm pointer-events-none"
           >
             <Zap size={15} />
           </motion.div>
           <motion.div
             animate={{ y: [0, -6, 0], scale: [0.9, 1.1, 0.9] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute -bottom-2 -left-6 text-indigo-400/50 text-xs pointer-events-none"
+            className="absolute bottom-10 -left-14 text-indigo-400/50 text-xs pointer-events-none"
           >
             ✦
           </motion.div>
           <motion.div
-            animate={{ y: [0, 7, 0] }}
+            animate={{ y: [0, 6, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 0.7 }}
-            className="absolute -bottom-3 -right-6 text-emerald-400/60 font-mono text-[10px] px-1 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 pointer-events-none"
+            className="absolute bottom-8 -right-16 text-emerald-400/60 font-mono text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 pointer-events-none"
           >
             GET
           </motion.div>
@@ -397,40 +397,40 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
         </div>
 
         {/* Clean Project Identity */}
-        <div className="mt-4 mb-6 flex flex-col items-center gap-1.5">
-          <div className="flex items-center gap-2 flex-wrap justify-center">
+        <div className="mt-6 mb-8 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2.5 flex-wrap justify-center">
             <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
               {project.name}
             </h2>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Active
             </span>
-            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
+            <span className="text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
               {totalEndpoints} {totalEndpoints === 1 ? "Route" : "Routes"}
             </span>
           </div>
 
           <button
             onClick={onRevealInExplorer}
-            className="text-xs text-muted-foreground/75 hover:text-foreground font-mono flex items-center gap-1.5 transition-colors group cursor-pointer mt-0.5"
+            className="text-xs text-muted-foreground/75 hover:text-foreground font-mono flex items-center gap-2 px-3 py-1 rounded-lg bg-card/40 border border-border/30 hover:border-primary/40 transition-all duration-200 group cursor-pointer mt-1 shadow-sm"
             title="Reveal project in Explorer"
           >
-            <FolderOpen size={12} className="group-hover:text-primary transition-colors shrink-0" />
+            <FolderOpen size={12} className="group-hover:text-primary transition-colors shrink-0 text-muted-foreground/60" />
             <span className="truncate max-w-xs sm:max-w-md">{project.path}</span>
           </button>
         </div>
 
-        {/* Just 2 Clean, Tactile Action Buttons */}
-        <div className="flex items-center justify-center gap-3 w-full max-w-sm">
+        {/* Just 2 Clean, Tactile Action Buttons with Generous Breathing Room */}
+        <div className="flex items-center justify-center gap-3.5 w-full max-w-md">
           {/* Primary: New Request */}
           <button
             onClick={onNewTab}
-            className="group flex-1 relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs transition-all duration-200 shadow-[0_4px_20px_rgba(59,130,246,0.3)] hover:shadow-[0_6px_25px_rgba(59,130,246,0.45)] hover:-translate-y-0.5 cursor-pointer"
+            className="group flex-1 relative flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs transition-all duration-200 shadow-[0_6px_24px_rgba(59,130,246,0.3)] hover:shadow-[0_8px_30px_rgba(59,130,246,0.45)] hover:-translate-y-0.5 cursor-pointer"
           >
             <Plus size={15} className="group-hover:rotate-90 transition-transform duration-200" />
             <span>New Request</span>
-            <kbd className="text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground px-1.5 py-0.5 rounded ml-0.5">
+            <kbd className="text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground px-1.5 py-0.5 rounded ml-1">
               Ctrl+T
             </kbd>
           </button>
@@ -439,7 +439,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
           <button
             onClick={onRescan}
             disabled={isScanning}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-all duration-200 shadow-sm hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-all duration-200 shadow-sm hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={13} className={cn(isScanning && "animate-spin text-primary")} />
             <span>{isScanning ? "Scanning..." : "Rescan AST"}</span>
@@ -447,7 +447,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
         </div>
 
         {/* Subtle Friendly Sidebar Cue */}
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/60 mt-6">
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/60 mt-8 mb-2">
           <ArrowLeft size={12} className="text-primary/70 animate-pulse" />
           <span>Pick any route from the sidebar to inspect parameters &amp; test</span>
         </div>
