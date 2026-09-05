@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertCircle, Loader2, Copy, Check, Cookie } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  Loader2,
+  Copy,
+  Check,
+  Cookie,
+  FileCheck,
+  Layers,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiHttpResponse } from "../../../types";
@@ -8,6 +19,56 @@ import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import { postmanTheme } from "./codemirrorTheme";
 import { ResponseIdleMascot, ResponseDisconnectedMascot } from "./ResponseIllustrations";
+
+const HTTP_STATUS_TEXT: Record<number, string> = {
+  200: "OK",
+  201: "Created",
+  202: "Accepted",
+  204: "No Content",
+  206: "Partial Content",
+  301: "Moved Permanently",
+  302: "Found",
+  304: "Not Modified",
+  307: "Temporary Redirect",
+  308: "Permanent Redirect",
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  405: "Method Not Allowed",
+  408: "Request Timeout",
+  409: "Conflict",
+  410: "Gone",
+  413: "Payload Too Large",
+  415: "Unsupported Media Type",
+  422: "Unprocessable Entity",
+  429: "Too Many Requests",
+  500: "Internal Server Error",
+  502: "Bad Gateway",
+  503: "Service Unavailable",
+  504: "Gateway Timeout",
+};
+
+export function getStatusText(status: number, fallback?: string): string {
+  if (status === 0) return "Could Not Connect";
+  return fallback || HTTP_STATUS_TEXT[status] || "";
+}
+
+function getStatusBadgeStyle(status: number) {
+  if (status === 0) {
+    return "bg-rose-500/10 text-rose-400 border-rose-500/25";
+  }
+  if (status >= 200 && status < 300) {
+    return "bg-emerald-500/10 text-emerald-400 border-emerald-500/25";
+  }
+  if (status >= 300 && status < 400) {
+    return "bg-sky-500/10 text-sky-400 border-sky-500/25";
+  }
+  if (status >= 400 && status < 500) {
+    return "bg-amber-500/10 text-amber-400 border-amber-500/25";
+  }
+  return "bg-rose-500/10 text-rose-400 border-rose-500/25";
+}
 
 type ResponsePanelProps = {
   response: ApiHttpResponse | null;
@@ -168,16 +229,24 @@ export function ResponsePanel({
           ) : response ? (
             <span
               className={cn(
-                "flex items-center gap-1 font-semibold px-2 py-0.5 rounded",
-                isError
-                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                  : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                "flex items-center gap-1.5 font-semibold px-2.5 py-0.5 rounded border select-none transition-colors",
+                getStatusBadgeStyle(response.status)
               )}
             >
-              {isError ? <AlertCircle size={12} /> : <CheckCircle2 size={12} />}
+              {response.status === 0 ? (
+                <AlertCircle size={12} className="text-rose-400" />
+              ) : response.status >= 200 && response.status < 300 ? (
+                <CheckCircle2 size={12} className="text-emerald-400" />
+              ) : response.status >= 300 && response.status < 400 ? (
+                <ArrowUpRight size={12} className="text-sky-400" />
+              ) : response.status >= 400 && response.status < 500 ? (
+                <AlertTriangle size={12} className="text-amber-400" />
+              ) : (
+                <AlertCircle size={12} className="text-rose-400" />
+              )}
               {response.status === 0
                 ? "Could Not Connect"
-                : `${response.status} ${response.statusText || ""}`.trim()}
+                : `${response.status} ${getStatusText(response.status, response.statusText)}`.trim()}
             </span>
           ) : null}
 
@@ -319,7 +388,7 @@ export function ResponsePanel({
                 <div className="h-4 bg-muted/40 rounded w-2/3" />
                 <div className="h-4 bg-muted/40 rounded w-1/3" />
               </div>
-            ) : prettyBody ? (
+            ) : (prettyBody && prettyBody.trim().length > 0) ? (
               <CodeMirror
                 value={prettyBody}
                 theme={postmanTheme}
@@ -330,8 +399,16 @@ export function ResponsePanel({
                 height="100%"
               />
             ) : (
-              <div className="flex-grow font-mono text-xs text-muted-foreground/30 bg-input border border-border/40 p-4 rounded-lg italic">
-                Empty body content
+              <div className="flex-grow flex flex-col items-center justify-center p-8 text-center bg-input/40 border border-border/40 rounded-lg select-none animate-in fade-in duration-200">
+                <div className="w-11 h-11 rounded-2xl bg-muted/40 border border-border/50 flex items-center justify-center text-muted-foreground/60 mb-3 shadow-inner">
+                  <FileCheck size={20} className="text-muted-foreground/70" />
+                </div>
+                <h5 className="text-xs font-bold text-foreground/85 mb-1">
+                  No Response Body
+                </h5>
+                <p className="text-[11px] text-muted-foreground/70 max-w-sm leading-relaxed">
+                  The server returned status {response?.status} {getStatusText(response?.status || 200, response?.statusText)} with no content in the response body.
+                </p>
               </div>
             )}
           </TabsContent>
@@ -346,7 +423,7 @@ export function ResponsePanel({
               </div>
             ) : (
               <pre className="flex-grow font-mono text-xs text-muted-foreground bg-input border border-border/40 p-4 rounded-lg overflow-auto leading-relaxed select-text scrollbar-thin">
-                <code>{response?.bodyText || <span className="text-muted-foreground/30 italic">Empty body content</span>}</code>
+                <code>{response?.bodyText && response.bodyText.trim().length > 0 ? response.bodyText : <span className="text-muted-foreground/40 italic">No response body content</span>}</code>
               </pre>
             )}
           </TabsContent>
@@ -362,26 +439,65 @@ export function ResponsePanel({
             ) : (
               <div className="flex-grow bg-input border border-border/40 rounded-lg overflow-auto p-4 scrollbar-thin">
                 {headerCount === 0 ? (
-                  <div className="text-xs text-muted-foreground italic">No headers received.</div>
+                  <div className="h-full flex flex-col items-center justify-center py-8 text-center select-none">
+                    <Layers size={24} className="text-muted-foreground/30 mb-2" />
+                    <div className="text-xs text-muted-foreground font-medium">No headers received</div>
+                  </div>
                 ) : response ? (
-                  <table className="w-full text-xs font-mono select-text border-collapse">
-                    <thead>
-                      <tr className="border-b border-border/30 text-left text-muted-foreground font-sans">
-                        <th className="pb-2 font-semibold">Header Name</th>
-                        <th className="pb-2 font-semibold pl-4">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                      {Object.entries(response.headers)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([key, value]) => (
-                          <tr key={key} className="hover:bg-white/5 transition-colors">
-                            <td className="py-2 pr-4 font-semibold text-sky-400 select-all truncate max-w-xs">{key}</td>
-                            <td className="py-2 pl-4 text-foreground/85 select-all break-all">{value}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                  <>
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-border/30 select-none">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Response Headers ({headerCount})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const formatted = Object.entries(response.headers)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join("\n");
+                          navigator.clipboard.writeText(formatted);
+                          toast.success("All headers copied to clipboard");
+                        }}
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary/40 hover:bg-secondary/70 border border-border/40 px-2.5 py-1 rounded transition-all cursor-pointer"
+                        title="Copy all headers"
+                      >
+                        <Copy size={11} />
+                        <span>Copy All</span>
+                      </button>
+                    </div>
+                    <table className="w-full text-xs font-mono select-text border-collapse">
+                      <thead>
+                        <tr className="border-b border-border/30 text-left text-muted-foreground font-sans text-[11px]">
+                          <th className="pb-2 font-semibold">Header Name</th>
+                          <th className="pb-2 font-semibold pl-4">Value</th>
+                          <th className="pb-2 font-semibold text-right w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/20">
+                        {Object.entries(response.headers)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([key, value]) => (
+                            <tr key={key} className="hover:bg-white/5 transition-colors group">
+                              <td className="py-2 pr-4 font-semibold text-sky-400 select-all truncate max-w-xs">{key}</td>
+                              <td className="py-2 pl-4 text-foreground/85 select-all break-all">{value}</td>
+                              <td className="py-2 pl-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(String(value));
+                                    toast.success(`Copied ${key}`);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-muted-foreground hover:text-foreground transition-all cursor-pointer inline-flex items-center justify-center"
+                                  title={`Copy value of ${key}`}
+                                >
+                                  <Copy size={11} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </>
                 ) : null}
               </div>
             )}

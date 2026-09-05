@@ -933,13 +933,61 @@ export function ApiExplorerSidebarPanel({
                   onDuplicateNode={handleDuplicateNode}
                   onCopyNode={handleCopyNode}
                 />
-              ) : (
-                <div className="p-4 space-y-2 select-none text-center">
-                  <p className="text-xs text-muted-foreground">
-                    {searchQuery ? "No matching endpoints." : "No APIs detected."}
+              ) : searchQuery ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
+                  <div className="w-10 h-10 rounded-xl bg-card/60 border border-dashed border-border/80 flex items-center justify-center text-muted-foreground/60 mb-2.5">
+                    <Search size={16} className="text-muted-foreground/60" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground/85 mb-1">
+                    No matching endpoints
                   </p>
-                  {currentLogs.length > 0 && !searchQuery && (
-                    <div className="bg-black/30 rounded p-2 text-[9px] font-mono text-muted-foreground overflow-x-auto text-left whitespace-pre-wrap select-text max-h-32">
+                  <p className="text-[11px] text-muted-foreground/70 max-w-[200px] mb-3 truncate">
+                    No routes found for <span className="text-primary font-mono font-semibold">"{searchQuery}"</span>
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSearchQuery("")}
+                    className="h-6 text-[11px] px-2.5 bg-secondary/40 hover:bg-secondary/70 border-border/50 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    Clear filter
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
+                  <div className="w-10 h-10 rounded-xl bg-card/60 border border-dashed border-border/80 flex items-center justify-center text-muted-foreground/60 mb-2.5">
+                    <FolderCode size={18} className="text-muted-foreground/60" />
+                  </div>
+                  <p className="text-xs font-semibold text-foreground/85 mb-1">
+                    No APIs detected
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/70 max-w-[210px] mb-3 leading-relaxed">
+                    No API routes were found in this directory. Rescan or create a manual request.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {onRescanProject && activeProject && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onRescanProject(activeProject)}
+                        disabled={isScanning}
+                        className="h-6 text-[11px] px-2.5 bg-primary/10 hover:bg-primary/20 border-primary/20 text-primary cursor-pointer"
+                      >
+                        <RefreshCw size={10} className={cn("mr-1", isScanning && "animate-spin")} />
+                        Rescan AST
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAddRequest(null)}
+                      className="h-6 text-[11px] px-2.5 bg-secondary/40 hover:bg-secondary/70 border-border/50 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      + Request
+                    </Button>
+                  </div>
+                  {currentLogs.length > 0 && (
+                    <div className="mt-4 w-full bg-black/30 rounded p-2 text-[9px] font-mono text-muted-foreground overflow-x-auto text-left whitespace-pre-wrap select-text max-h-28 border border-border/30">
                       {currentLogs.map((log, i) => (
                         <div key={i}>{log}</div>
                       ))}
