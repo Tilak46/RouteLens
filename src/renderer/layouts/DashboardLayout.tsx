@@ -34,6 +34,7 @@ type DashboardLayoutProps = {
   onDevToolsClick?: () => void;
   onTestExpiryClick?: () => void;
   onDevTriggerScanAnimation?: () => void;
+  appVersion?: string;
 };
 
 export function DashboardLayout({
@@ -49,6 +50,7 @@ export function DashboardLayout({
   onDevToolsClick,
   onTestExpiryClick,
   onDevTriggerScanAnimation,
+  appVersion,
 }: DashboardLayoutProps) {
   // Helper for leftmost toolbar icons
   const ToolbarButton = ({
@@ -189,12 +191,17 @@ export function DashboardLayout({
             <div className="flex flex-col h-full p-3.5 overflow-hidden">
               {/* App Brand Header */}
               <div className="flex items-center justify-between mb-4 shrink-0">
-                <span className="text-sm font-bold tracking-wider text-foreground">
-                  Route<span className="text-primary">Lens</span>
-                </span>
+                <div className="flex items-center gap-1.5 overflow-hidden">
+                  <span className="text-sm font-bold tracking-wider text-foreground">
+                    Route<span className="text-primary">Lens</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
+                    v{appVersion || "0.1.0"}
+                  </span>
+                </div>
                 <button
                   onClick={onToggleSidebar}
-                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
                   title="Collapse Sidebar"
                 >
                   <ChevronLeft size={14} />

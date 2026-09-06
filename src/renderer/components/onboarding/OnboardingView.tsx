@@ -8,6 +8,7 @@ type OnboardingViewProps = {
   onQuickRequest: () => void;
   onLoadDemo: () => void;
   onOpenManualModal?: () => void;
+  appVersion?: string;
 };
 
 export const OnboardingView: React.FC<OnboardingViewProps> = ({
@@ -15,6 +16,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   onQuickRequest,
   onLoadDemo,
   onOpenManualModal,
+  appVersion,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -121,10 +123,15 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
 
       {/* Clean, Confident Typography */}
       <div className="relative z-20 text-center max-w-lg mb-4">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight mb-2">
-          Welcome to{" "}
-          <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-            RouteLens
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight mb-2 flex items-center justify-center gap-2">
+          <span>
+            Welcome to{" "}
+            <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+              RouteLens
+            </span>
+          </span>
+          <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 align-middle">
+            v{appVersion || "0.1.0"}
           </span>
         </h1>
         <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
@@ -276,6 +283,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
             </button>
           </>
         )}
+        <span>•</span>
+        <span className="font-mono text-muted-foreground/80">v{appVersion || "0.1.0"}</span>
       </div>
     </div>
   );

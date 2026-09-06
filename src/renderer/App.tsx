@@ -87,6 +87,7 @@ function App() {
 
   // Mandatory Auto-Update Enforcement State
   const [enforcementStatus, setEnforcementStatus] = useState<UpdateEnforcementData | null>(null);
+  const [appVersion, setAppVersion] = useState<string>("0.1.0");
 
   // Layout UI state
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>("explorer");
@@ -400,6 +401,13 @@ function App() {
     window.api?.updates?.onEnforcementUpdated?.((status) => {
       setEnforcementStatus(status);
     });
+
+    // Fetch app version
+    window.api?.updates?.getVersion?.()
+      .then((ver) => {
+        if (ver) setAppVersion(ver);
+      })
+      .catch(() => {});
   }, []);
 
 
@@ -863,10 +871,13 @@ function App() {
     });
   };
 
-  const handleAddBackendFolder = async (folderPath?: string) => {
+  const handleAddBackendFolder = async (folderPath?: unknown) => {
     try {
-      const folder = folderPath || (await apiClient.openDirectoryDialog());
-      if (!folder) return;
+      const folder =
+        typeof folderPath === "string" && folderPath.trim().length > 0
+          ? folderPath.trim()
+          : await apiClient.openDirectoryDialog();
+      if (!folder || typeof folder !== "string") return;
 
       const existing = projects.find((p) => p.path === folder);
       if (existing) {
@@ -1429,6 +1440,7 @@ function App() {
           onDevToolsClick={() => setIsDevToolsModalOpen(true)}
           onTestExpiryClick={() => setTestForceExpired(true)}
           onDevTriggerScanAnimation={handleDevTriggerScanAnimation}
+          appVersion={appVersion}
         >
           {/* Settings Modals */}
           <AddProjectModal
@@ -1499,6 +1511,7 @@ function App() {
                 onQuickRequest={handleQuickRequest}
                 onLoadDemo={handleLoadDemoProject}
                 onOpenManualModal={handleAddBackendFolder}
+                appVersion={appVersion}
               />
             </div>
           ) : (
