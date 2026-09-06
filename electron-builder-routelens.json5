@@ -8,6 +8,14 @@
     output: "release/${version}",
   },
   files: ["out/**/*"],
+  publish: [
+    {
+      provider: "github",
+      owner: "Tilak46",
+      repo: "routelens-releases",
+      releaseType: "release",
+    },
+  ],
   mac: {
     target: ["dmg"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",

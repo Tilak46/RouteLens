@@ -148,6 +148,36 @@ interface ElectronApi {
   storeGet: (key: string) => Promise<any>;
   storeSet: (key: string, value: any) => Promise<void>;
   storeReset: () => Promise<boolean>;
+
+  // Auto-Update System
+  updates?: {
+    check: () => Promise<{
+      success: boolean;
+      isDev?: boolean;
+      version?: string;
+      message?: string;
+      error?: string;
+    }>;
+    install: () => Promise<void>;
+    getVersion: () => Promise<string>;
+    onChecking: (callback: () => void) => void;
+    onUpdateAvailable: (
+      callback: (info: { version: string; releaseDate?: string }) => void,
+    ) => void;
+    onUpdateNotAvailable: (callback: (info: { version: string }) => void) => void;
+    onProgress: (
+      callback: (progress: {
+        percent: number;
+        bytesPerSecond: number;
+        transferred: number;
+        total: number;
+      }) => void,
+    ) => void;
+    onUpdateDownloaded: (
+      callback: (info: { version: string; releaseDate?: string }) => void,
+    ) => void;
+    onError: (callback: (err: { message: string }) => void) => void;
+  };
 }
 
 // Access the exposed API, handling potential undefined errors during build/lint
@@ -395,6 +425,17 @@ const fallbackApi: ElectronApi = {
   storeReset: async () => {
     console.warn("API not ready");
     return false;
+  },
+  updates: {
+    check: async () => ({ success: false, error: "API not ready" }),
+    install: async () => {},
+    getVersion: async () => "1.0.1",
+    onChecking: () => {},
+    onUpdateAvailable: () => {},
+    onUpdateNotAvailable: () => {},
+    onProgress: () => {},
+    onUpdateDownloaded: () => {},
+    onError: () => {},
   },
 };
 

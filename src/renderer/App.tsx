@@ -365,6 +365,25 @@ function App() {
     apiClient.onAppWorkspacesLoaded(setAppWorkspaces);
     apiClient.onSettingsLoaded(setSettings);
     apiClient.onSettingsUpdated(setSettings);
+
+    // Auto-update notifications
+    window.api?.updates?.onUpdateAvailable?.((info) => {
+      toast.info(`Update Available (v${info.version})`, {
+        description: "A new version of RouteLens is downloading in the background.",
+        duration: 6000,
+      });
+    });
+
+    window.api?.updates?.onUpdateDownloaded?.((info) => {
+      toast.success(`Update Ready (v${info.version})`, {
+        description: "RouteLens has downloaded the new version and is ready to install.",
+        action: {
+          label: "Restart & Update",
+          onClick: () => window.api?.updates?.install?.(),
+        },
+        duration: 15000,
+      });
+    });
   }, []);
 
 

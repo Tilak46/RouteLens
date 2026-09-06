@@ -88,6 +88,7 @@ import { registerAIHandlers } from "./ipcHandlers/aiHandlers";
 import { registerAppScanHandlers } from "./ipcHandlers/appScanHandlers";
 import { registerBrowserScanHandlers } from "./ipcHandlers/browserScanHandlers";
 import { registerApiExplorerHandlers } from "./ipcHandlers/apiExplorerHandlers";
+import { initUpdateService } from "./services/updateService";
 
 let mainWindow: BrowserWindow | null = null; // Global reference
 
@@ -430,6 +431,9 @@ if (!gotSingleInstanceLock) {
 
     console.log("Registering Shell Handlers...");
     registerShellHandlers();
+
+    console.log("Registering Update Service...");
+    initUpdateService(getMainWindow);
 
     console.log("All handlers registered successfully.");
   } catch (error) {

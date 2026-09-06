@@ -341,6 +341,56 @@ export const api = {
   storeReset: (): Promise<boolean> => {
     return ipcRenderer.invoke("store:reset");
   },
+
+  // --- Auto-Update System ---
+  updates: {
+    check: (): Promise<{
+      success: boolean;
+      isDev?: boolean;
+      version?: string;
+      message?: string;
+      error?: string;
+    }> => {
+      return ipcRenderer.invoke("updates:check");
+    },
+    install: (): Promise<void> => {
+      return ipcRenderer.invoke("updates:install");
+    },
+    getVersion: (): Promise<string> => {
+      return ipcRenderer.invoke("updates:get-version");
+    },
+    onChecking: (callback: () => void) => {
+      ipcRenderer.on("update:checking", () => callback());
+    },
+    onUpdateAvailable: (
+      callback: (info: { version: string; releaseDate?: string }) => void,
+    ) => {
+      ipcRenderer.on("update:available", (_event, info) => callback(info));
+    },
+    onUpdateNotAvailable: (
+      callback: (info: { version: string }) => void,
+    ) => {
+      ipcRenderer.on("update:not-available", (_event, info) => callback(info));
+    },
+    onProgress: (
+      callback: (progress: {
+        percent: number;
+        bytesPerSecond: number;
+        transferred: number;
+        total: number;
+      }) => void,
+    ) => {
+      ipcRenderer.on("update:progress", (_event, progress) => callback(progress));
+    },
+    onUpdateDownloaded: (
+      callback: (info: { version: string; releaseDate?: string }) => void,
+    ) => {
+      ipcRenderer.on("update:downloaded", (_event, info) => callback(info));
+    },
+    onError: (callback: (err: { message: string }) => void) => {
+      ipcRenderer.on("update:error", (_event, err) => callback(err));
+    },
+  },
 };
 
 // Expose the API to the renderer process via contextBridge
