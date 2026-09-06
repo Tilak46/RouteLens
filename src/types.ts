@@ -175,6 +175,21 @@ export type ApiRoute = {
   inferredQueryFields?: string[];
   confidence?: ConfidenceLevel;
   bodyConfidence?: ConfidenceLevel;
+
+  // Custom request data & state persistence:
+  params?: any[];
+  headers?: any[];
+  auth?: any;
+  bodyMode?: any;
+  bodyText?: string;
+  formFields?: any[];
+  urlencodedFields?: any[];
+  binaryFilePath?: string;
+  preRequestScript?: string;
+  postResponseScript?: string;
+  pathVariables?: any[];
+  isManual?: boolean;
+  isStale?: boolean;
 };
 
 export type ApiFolder = {

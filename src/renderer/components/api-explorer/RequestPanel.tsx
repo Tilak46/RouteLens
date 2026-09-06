@@ -50,6 +50,8 @@ type RequestPanelProps = {
   onAddOrUpdateVariable?: (key: string, value: string) => void;
   projects?: Project[];
   treeCache?: Record<string, any>;
+  onSaveTab?: (tab: RequestTab) => void;
+  onSaveAsTab?: (tab: RequestTab) => void;
 };
 
 
@@ -249,6 +251,8 @@ export function RequestPanel({
   onAddOrUpdateVariable,
   projects = [],
   treeCache = {},
+  onSaveTab,
+  onSaveAsTab,
 }: RequestPanelProps) {
   const [method, setMethod] = useState<Method>(tab.method);
 
@@ -386,11 +390,19 @@ export function RequestPanel({
   }, [treeCache, tab.projectId, tab.routeId, tab.id, tab.routePath, projects]);
 
   const handleSave = () => {
-    toast.success(`Saved "${tab.name}" successfully!`);
+    if (onSaveTab) {
+      onSaveTab(tab);
+    } else {
+      toast.success(`Saved "${tab.name}" successfully!`);
+    }
   };
 
   const handleSaveAs = () => {
-    toast.success(`Created copy of "${tab.name}"`);
+    if (onSaveAsTab) {
+      onSaveAsTab(tab);
+    } else {
+      toast.success(`Created copy of "${tab.name}"`);
+    }
   };
 
   const handleShare = () => {
@@ -899,11 +911,17 @@ export function RequestPanel({
   const handleSendRef = useRef(handleSend);
   handleSendRef.current = handleSend;
 
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         handleSendRef.current();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSaveRef.current();
       }
     };
     window.addEventListener("keydown", handleKeyDown);

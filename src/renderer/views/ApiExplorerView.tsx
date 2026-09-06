@@ -40,6 +40,8 @@ export type ApiExplorerSidebarPanelProps = {
   onAddProjectClick?: () => void;
   onRemoveProject?: (id: string) => void;
   onRescanProject?: (project: Project) => void;
+  onRenameNode?: (nodeId: string, newName: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
   isScanning?: boolean;
   scanningProjectId?: string | null;
 };
@@ -54,29 +56,34 @@ const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
   return `${String(route.method).toUpperCase()}:${route.path}`;
 };
 
+type UserRouteItem = ApiRoute & { parentId: string | null };
+type UserFolderItem = ApiFolder & { parentId: string | null };
+
 function indexTree(
   nodes: (ApiFolder | ApiRoute)[],
   parentId: string | null,
   state: {
-    manualRequests: Map<string, ApiRoute & { parentId: string | null }>;
-    customFolders: Map<string, ApiFolder & { parentId: string | null }>;
-    scannedRoutes: Map<string, ApiRoute & { parentId: string | null }>;
+    manualRequests: Map<string, UserRouteItem>;
+    customFolders: Map<string, UserFolderItem>;
+    scannedRoutesById: Map<string, UserRouteItem>;
+    scannedRoutesByKey: Map<string, UserRouteItem>;
     folderNames: Map<string, string>;
     sortOrder: Map<string | null, string[]>;
   }
 ) {
   const childKeys: string[] = [];
-  
+
   for (const n of nodes) {
     if (isRoute(n)) {
-      const isManual = n.id && n.id.startsWith("request_");
-      const key = isManual ? n.id : toRouteKey(n);
+      const isManual = Boolean(n.id?.startsWith("request_") || n.isManual);
+      const key = isManual ? n.id : (n.id || toRouteKey(n));
       childKeys.push(key);
-      
+
       if (isManual) {
-        state.manualRequests.set(key, { ...n, parentId });
+        state.manualRequests.set(n.id, { ...n, parentId, isManual: true });
       } else {
-        state.scannedRoutes.set(key, { ...n, parentId });
+        if (n.id) state.scannedRoutesById.set(n.id, { ...n, parentId });
+        state.scannedRoutesByKey.set(toRouteKey(n), { ...n, parentId });
       }
     } else {
       childKeys.push(n.id);
@@ -85,7 +92,7 @@ function indexTree(
       indexTree(n.children, n.id, state);
     }
   }
-  
+
   state.sortOrder.set(parentId, childKeys);
 }
 
@@ -93,13 +100,12 @@ function indexScannedTree(
   nodes: (ApiFolder | ApiRoute)[],
   defaultParentPath: string[],
   state: {
-    routes: Map<string, ApiRoute & { defaultParentPath: string[] }>;
+    routes: (ApiRoute & { defaultParentPath: string[] })[];
   }
 ) {
   for (const n of nodes) {
     if (isRoute(n)) {
-      const key = toRouteKey(n);
-      state.routes.set(key, { ...n, defaultParentPath });
+      state.routes.push({ ...n, defaultParentPath });
     } else {
       const folderPath = [...defaultParentPath, n.name];
       indexScannedTree(n.children, folderPath, state);
@@ -109,21 +115,22 @@ function indexScannedTree(
 
 export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): ApiFolder[] {
   const userState = {
-    manualRequests: new Map<string, ApiRoute & { parentId: string | null }>(),
-    customFolders: new Map<string, ApiFolder & { parentId: string | null }>(),
-    scannedRoutes: new Map<string, ApiRoute & { parentId: string | null }>(),
+    manualRequests: new Map<string, UserRouteItem>(),
+    customFolders: new Map<string, UserFolderItem>(),
+    scannedRoutesById: new Map<string, UserRouteItem>(),
+    scannedRoutesByKey: new Map<string, UserRouteItem>(),
     folderNames: new Map<string, string>(),
     sortOrder: new Map<string | null, string[]>(),
   };
   indexTree(userTree, null, userState);
 
   const scannedState = {
-    routes: new Map<string, ApiRoute & { defaultParentPath: string[] }>(),
+    routes: [] as (ApiRoute & { defaultParentPath: string[] })[],
   };
   indexScannedTree(scannedTree, [], scannedState);
 
   const folderPathToIdMap = new Map<string, string>();
-  
+
   const mapFolderPaths = (nodes: (ApiFolder | ApiRoute)[], currentPath: string[]) => {
     for (const n of nodes) {
       if (!isRoute(n)) {
@@ -135,24 +142,8 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
   };
   mapFolderPaths(userTree, []);
 
-  for (const [routeKey, userRoute] of userState.scannedRoutes) {
-    const scannedRoute = scannedState.routes.get(routeKey);
-    if (scannedRoute && scannedRoute.defaultParentPath.length > 0 && userRoute.parentId) {
-      let userParentId: string | null = userRoute.parentId;
-      if (userParentId.startsWith("folder_")) continue;
-      
-      for (let i = scannedRoute.defaultParentPath.length - 1; i >= 0; i--) {
-        if (!userParentId) break;
-        const prefixPath = scannedRoute.defaultParentPath.slice(0, i + 1).join("/");
-        folderPathToIdMap.set(prefixPath, userParentId);
-        const parentFolder = userState.customFolders.get(userParentId);
-        userParentId = parentFolder?.parentId || null;
-      }
-    }
-  }
-
   const mergedFolderChildren = new Map<string | null, (ApiFolder | ApiRoute)[]>();
-  
+
   const addToParent = (parentId: string | null, node: ApiFolder | ApiRoute) => {
     if (!mergedFolderChildren.has(parentId)) {
       mergedFolderChildren.set(parentId, []);
@@ -160,23 +151,18 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
     mergedFolderChildren.get(parentId)!.push(node);
   };
 
-  for (const [_, req] of userState.manualRequests) {
-    addToParent(req.parentId, {
-      id: req.id,
-      name: req.name,
-      method: req.method,
-      path: req.path,
-      file: req.file,
-      handler: req.handler,
-      middlewares: req.middlewares,
-      pathParams: req.pathParams,
-      inferredBodyFields: req.inferredBodyFields,
-      inferredQueryFields: req.inferredQueryFields,
-    } as ApiRoute);
-  }
+  const matchedUserRouteIds = new Set<string>();
 
-  for (const [routeKey, scannedRoute] of scannedState.routes) {
-    const userRoute = userState.scannedRoutes.get(routeKey);
+  // 1. Process all newly scanned routes
+  for (const scannedRoute of scannedState.routes) {
+    const userRoute =
+      (scannedRoute.id ? userState.scannedRoutesById.get(scannedRoute.id) : undefined) ||
+      userState.scannedRoutesByKey.get(toRouteKey(scannedRoute));
+
+    if (userRoute?.id) {
+      matchedUserRouteIds.add(userRoute.id);
+    }
+
     let targetParentId: string | null = null;
     let finalName = scannedRoute.name;
 
@@ -185,13 +171,13 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
       finalName = userRoute.name;
     } else {
       let currentParentId: string | null = null;
-      let pathAccumulator: string[] = [];
-      
+      const pathAccumulator: string[] = [];
+
       for (const seg of scannedRoute.defaultParentPath) {
         pathAccumulator.push(seg);
         const pathKey = pathAccumulator.join("/");
         const existingId = folderPathToIdMap.get(pathKey);
-        
+
         if (existingId) {
           currentParentId = existingId;
         } else {
@@ -201,7 +187,7 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
             name: seg,
             children: [],
           };
-          
+
           userState.customFolders.set(newFolderId, { ...newFolder, parentId: currentParentId });
           folderPathToIdMap.set(pathKey, newFolderId);
           currentParentId = newFolderId;
@@ -210,12 +196,65 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
       targetParentId = currentParentId;
     }
 
-    addToParent(targetParentId, {
+    // Build default body text if none exists
+    let defaultBodyText = "{\n  \n}";
+    if (Array.isArray(scannedRoute.inferredBodyFields) && scannedRoute.inferredBodyFields.length > 0) {
+      const template: Record<string, string> = {};
+      scannedRoute.inferredBodyFields.forEach((field) => {
+        template[field] = "";
+      });
+      defaultBodyText = JSON.stringify(template, null, 2);
+    }
+
+    const mergedRoute: ApiRoute = {
       ...scannedRoute,
+      id: userRoute?.id || scannedRoute.id,
       name: finalName,
+      method: userRoute?.method || scannedRoute.method,
+      path: userRoute?.path || scannedRoute.path,
+      // Preserve all user request configuration:
+      params: userRoute?.params !== undefined ? userRoute.params : (scannedRoute.inferredQueryFields?.map((field) => ({
+        id: `query_${field}_${Math.random().toString(36).slice(2, 5)}`,
+        enabled: true,
+        key: field,
+        value: "",
+      })) || []),
+      headers: userRoute?.headers || [],
+      auth: userRoute?.auth || { type: "none" },
+      bodyMode: userRoute?.bodyMode || (scannedRoute.method === "GET" || scannedRoute.method === "HEAD" ? "none" : "json"),
+      bodyText: userRoute?.bodyText !== undefined ? userRoute.bodyText : defaultBodyText,
+      formFields: userRoute?.formFields || [],
+      urlencodedFields: userRoute?.urlencodedFields || [],
+      binaryFilePath: userRoute?.binaryFilePath || "",
+      preRequestScript: userRoute?.preRequestScript || "",
+      postResponseScript: userRoute?.postResponseScript || "",
+      pathVariables: userRoute?.pathVariables || [],
+      isManual: false,
+      isStale: false,
+    };
+
+    addToParent(targetParentId, mergedRoute);
+  }
+
+  // 2. Retain previously scanned routes that are MISSING in new scan (do NOT delete user data!)
+  for (const [_, userRoute] of userState.scannedRoutesById) {
+    if (!matchedUserRouteIds.has(userRoute.id)) {
+      addToParent(userRoute.parentId, {
+        ...userRoute,
+        isStale: true,
+      });
+    }
+  }
+
+  // 3. Retain 100% of user-created manual requests
+  for (const [_, req] of userState.manualRequests) {
+    addToParent(req.parentId, {
+      ...req,
+      isManual: true,
     });
   }
 
+  // 4. Activate all folders that have contents or were user-created
   const activeFolders = new Set<string>();
   const markActive = (folderId: string) => {
     if (activeFolders.has(folderId)) return;
@@ -237,6 +276,7 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
     }
   }
 
+  // 5. Build folder nodes
   const folderNodes = new Map<string, ApiFolder>();
   for (const folderId of activeFolders) {
     const orig = userState.customFolders.get(folderId);
@@ -247,19 +287,31 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
     });
   }
 
+  // Attach folders to parents (or root if parent not active)
   for (const [folderId, folder] of folderNodes) {
     const orig = userState.customFolders.get(folderId);
-    const parentId = orig?.parentId || null;
+    const parentId = orig?.parentId && activeFolders.has(orig.parentId) ? orig.parentId : null;
     addToParent(parentId, folder);
   }
 
+  // Populate children
   for (const [folderId, folder] of folderNodes) {
     const children = mergedFolderChildren.get(folderId) || [];
     folder.children = children;
   }
 
+  // Ensure any orphaned requests whose parent folder no longer exists are attached to root
+  for (const [parentId, children] of mergedFolderChildren) {
+    if (parentId !== null && !activeFolders.has(parentId)) {
+      for (const child of children) {
+        addToParent(null, child);
+      }
+    }
+  }
+
   const rootChildren = mergedFolderChildren.get(null) || [];
 
+  // 6. Sort children according to user sort order
   const methodOrder: Record<string, number> = {
     GET: 1,
     POST: 2,
@@ -271,33 +323,33 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
 
   const sortChildren = (nodes: (ApiFolder | ApiRoute)[], parentId: string | null) => {
     const originalOrder = userState.sortOrder.get(parentId) || [];
-    
+
     nodes.sort((a, b) => {
-      const keyA = isRoute(a) ? (a.id.startsWith("request_") ? a.id : toRouteKey(a)) : a.id;
-      const keyB = isRoute(b) ? (b.id.startsWith("request_") ? b.id : toRouteKey(b)) : b.id;
-      
+      const keyA = isRoute(a) ? (a.id.startsWith("request_") ? a.id : (a.id || toRouteKey(a))) : a.id;
+      const keyB = isRoute(b) ? (b.id.startsWith("request_") ? b.id : (b.id || toRouteKey(b))) : b.id;
+
       const idxA = originalOrder.indexOf(keyA);
       const idxB = originalOrder.indexOf(keyB);
-      
+
       if (idxA !== -1 && idxB !== -1) {
         return idxA - idxB;
       }
       if (idxA !== -1) return -1;
       if (idxB !== -1) return 1;
-      
+
       const aIsRoute = isRoute(a);
       const bIsRoute = isRoute(b);
       if (aIsRoute !== bIsRoute) return aIsRoute ? 1 : -1;
-      
+
       if (!aIsRoute && !bIsRoute) {
         return a.name.localeCompare(b.name);
       }
-      
-      const am = String((a as any).method);
-      const bm = String((b as any).method);
+
+      const am = String((a as any).method || "");
+      const bm = String((b as any).method || "");
       const byMethod = (methodOrder[am] ?? 99) - (methodOrder[bm] ?? 99);
       if (byMethod !== 0) return byMethod;
-      return String((a as any).path).localeCompare(String((b as any).path));
+      return String((a as any).path || "").localeCompare(String((b as any).path || ""));
     });
 
     for (const child of nodes) {
@@ -326,6 +378,8 @@ export function ApiExplorerSidebarPanel({
   onAddProjectClick,
   onRemoveProject,
   onRescanProject,
+  onRenameNode,
+  onDeleteNode,
   isScanning,
   scanningProjectId,
 }: ApiExplorerSidebarPanelProps) {
@@ -481,6 +535,7 @@ export function ApiExplorerSidebarPanel({
     };
     const next = renameRecursive(currentTree) as ApiFolder[];
     saveTreeCache(next);
+    onRenameNode?.(nodeId, newName);
   };
 
   const handleDeleteNode = (nodeId: string) => {
@@ -496,6 +551,7 @@ export function ApiExplorerSidebarPanel({
     };
     const next = deleteRecursive(currentTree) as ApiFolder[];
     saveTreeCache(next);
+    onDeleteNode?.(nodeId);
   };
 
   const handleDuplicateNode = (nodeId: string) => {
@@ -575,7 +631,19 @@ export function ApiExplorerSidebarPanel({
       name: "New Request",
       method: "GET",
       path: "",
+      isManual: true,
       isNew: true,
+      params: [],
+      headers: [],
+      auth: { type: "none" },
+      bodyMode: "none",
+      bodyText: "{\n  \n}",
+      formFields: [],
+      urlencodedFields: [],
+      binaryFilePath: "",
+      preRequestScript: "",
+      postResponseScript: "",
+      pathVariables: [],
     };
 
     if (parentFolderId === null) {

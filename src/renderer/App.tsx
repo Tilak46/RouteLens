@@ -711,54 +711,187 @@ function App() {
   const handleChangeTab = (updatedTab: RequestTab) => {
     setTabs((prev) => prev.map((t) => (t.id === updatedTab.id ? updatedTab : t)));
 
-    // If tab name changed, sync it to the sidebar treeCache!
-    const oldTab = tabs.find((t) => t.id === updatedTab.id);
-    if (oldTab && oldTab.name !== updatedTab.name) {
-      const targetId = updatedTab.routeId || updatedTab.id;
-      if (targetId) {
-        setTreeCache((prev) => {
-          let cacheChanged = false;
-          const nextCache = { ...prev };
+    const targetId = updatedTab.routeId || updatedTab.id;
+    if (!targetId) return;
 
-          for (const projectPath of Object.keys(prev)) {
-            const cached = prev[projectPath];
-            if (!cached || !cached.tree) continue;
+    // Synchronize tab state to the sidebar treeCache
+    setTreeCache((prev) => {
+      let cacheChanged = false;
+      const nextCache = { ...prev };
 
-            const renameRecursive = (nodes: any[]): { tree: any[]; updated: boolean } => {
-              let updated = false;
-              const nextNodes = nodes.map((n) => {
-                if (n.id === targetId) {
-                  updated = true;
-                  return { ...n, name: updatedTab.name };
-                }
-                if (n.children && Array.isArray(n.children)) {
-                  const res = renameRecursive(n.children);
-                  if (res.updated) {
-                    updated = true;
-                    return { ...n, children: res.tree };
-                  }
-                }
-                return n;
-              });
-              return { tree: nextNodes, updated };
-            };
+      // Derive clean relative path from URL if present
+      const derivedPath = updatedTab.url
+        ? updatedTab.url.replace(/^https?:\/\/[^\/]+/, "")
+        : undefined;
 
-            const result = renameRecursive(cached.tree);
-            if (result.updated) {
-              nextCache[projectPath] = { ...cached, tree: result.tree };
-              cacheChanged = true;
-              break;
+      for (const projectPath of Object.keys(prev)) {
+        const cached = prev[projectPath];
+        if (!cached || !cached.tree) continue;
+
+        const updateRecursive = (nodes: any[]): { tree: any[]; updated: boolean } => {
+          let updated = false;
+          const nextNodes = nodes.map((n) => {
+            if (n.id === targetId) {
+              updated = true;
+              return {
+                ...n,
+                name: updatedTab.name,
+                method: updatedTab.method,
+                path: derivedPath !== undefined && derivedPath !== "" ? derivedPath : n.path,
+                params: updatedTab.params,
+                headers: updatedTab.headers,
+                auth: updatedTab.auth,
+                bodyMode: updatedTab.bodyMode,
+                bodyText: updatedTab.bodyText,
+                formFields: updatedTab.formFields,
+                urlencodedFields: updatedTab.urlencodedFields,
+                binaryFilePath: updatedTab.binaryFilePath,
+                preRequestScript: updatedTab.preRequestScript,
+                postResponseScript: updatedTab.postResponseScript,
+                pathVariables: updatedTab.pathVariables,
+              };
             }
-          }
+            if (n.children && Array.isArray(n.children)) {
+              const res = updateRecursive(n.children);
+              if (res.updated) {
+                updated = true;
+                return { ...n, children: res.tree };
+              }
+            }
+            return n;
+          });
+          return { tree: nextNodes, updated };
+        };
 
-          if (cacheChanged) {
-            apiClient.storeSet("apiScannerTreeCache", nextCache);
-            return nextCache;
-          }
-          return prev;
-        });
+        const result = updateRecursive(cached.tree);
+        if (result.updated) {
+          nextCache[projectPath] = { ...cached, tree: result.tree };
+          cacheChanged = true;
+          break;
+        }
       }
+
+      if (cacheChanged) {
+        apiClient.storeSet("apiScannerTreeCache", nextCache);
+        return nextCache;
+      }
+      return prev;
+    });
+  };
+
+  const handleSaveTabToTree = (targetTab: RequestTab, parentFolderId: string | null = null) => {
+    const projId = targetTab.projectId || activeProjectId;
+    const project = projects.find((p) => p.id === projId);
+    if (!project) {
+      toast.error("No active project to save request to");
+      return;
     }
+
+    const routeId = targetTab.routeId || `request_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const derivedPath = targetTab.url
+      ? targetTab.url.replace(/^https?:\/\/[^\/]+/, "")
+      : "";
+
+    const newRoute: ApiRoute = {
+      id: routeId,
+      name: targetTab.name || "New Request",
+      method: targetTab.method || "GET",
+      path: derivedPath || "",
+      isManual: true,
+      params: targetTab.params || [],
+      headers: targetTab.headers || [],
+      auth: targetTab.auth || { type: "none" },
+      bodyMode: targetTab.bodyMode || "none",
+      bodyText: targetTab.bodyText || "{\n  \n}",
+      formFields: targetTab.formFields || [],
+      urlencodedFields: targetTab.urlencodedFields || [],
+      binaryFilePath: targetTab.binaryFilePath || "",
+      preRequestScript: targetTab.preRequestScript || "",
+      postResponseScript: targetTab.postResponseScript || "",
+      pathVariables: targetTab.pathVariables || [],
+    };
+
+    const updatedTab: RequestTab = {
+      ...targetTab,
+      routeId,
+      projectId: projId,
+    };
+    setTabs((prev) => prev.map((t) => (t.id === targetTab.id ? updatedTab : t)));
+
+    setTreeCache((prev) => {
+      const cached = prev[project.path];
+      const currentTree = cached?.tree || [];
+
+      let found = false;
+      const updateRecursive = (nodes: any[]): any[] => {
+        return nodes.map((n) => {
+          if (n.id === routeId) {
+            found = true;
+            return { ...n, ...newRoute };
+          }
+          if (!isRoute(n) && Array.isArray(n.children)) {
+            return { ...n, children: updateRecursive(n.children) };
+          }
+          return n;
+        });
+      };
+
+      let newTree = updateRecursive(currentTree);
+      if (!found) {
+        if (parentFolderId === null) {
+          newTree = [...newTree, newRoute];
+        } else {
+          const insertIntoFolder = (nodes: any[]): any[] => {
+            return nodes.map((n) => {
+              if (n.id === parentFolderId && !isRoute(n)) {
+                return { ...n, children: [...(n.children || []), newRoute] };
+              }
+              if (!isRoute(n) && Array.isArray(n.children)) {
+                return { ...n, children: insertIntoFolder(n.children) };
+              }
+              return n;
+            });
+          };
+          newTree = insertIntoFolder(newTree);
+        }
+      }
+
+      const nextCache = {
+        ...prev,
+        [project.path]: {
+          ...(cached || { logs: [], cachedAt: Date.now() }),
+          tree: newTree,
+        },
+      };
+      apiClient.storeSet("apiScannerTreeCache", nextCache);
+      return nextCache;
+    });
+
+    toast.success(`Saved "${newRoute.name}" to project requests!`);
+  };
+
+  const handleSaveAsTabToTree = (targetTab: RequestTab) => {
+    const copyTab: RequestTab = {
+      ...targetTab,
+      id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: `${targetTab.name} Copy`,
+      routeId: undefined,
+    };
+    handleSaveTabToTree(copyTab);
+    setTabs((prev) => [...prev, copyTab]);
+    setActiveTabId(copyTab.id);
+  };
+
+  const handleSidebarRenameNode = (nodeId: string, newName: string) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.routeId === nodeId || t.id === nodeId ? { ...t, name: newName } : t
+      )
+    );
+  };
+
+  const handleSidebarDeleteNode = (nodeId: string) => {
+    setTabs((prev) => prev.filter((t) => t.routeId !== nodeId && t.id !== nodeId));
   };
 
   const handleUpdateTabResponse = (tabId: string, response: ApiHttpResponse) => {
@@ -829,24 +962,24 @@ function App() {
       name: route.name || pathCleaned || "New Request",
       method: finalMethod,
       url: initialUrl,
-      params: queryRows,
-      headers: [],
-      auth: { type: "none" },
-      bodyMode: finalMethod === "GET" || finalMethod === "HEAD" ? "none" : "json",
-      bodyText: bodyText,
-      formFields: [],
-      urlencodedFields: [],
-      binaryFilePath: "",
+      params: route.params && route.params.length > 0 ? route.params : queryRows,
+      headers: route.headers || [],
+      auth: route.auth || { type: "none" },
+      bodyMode: route.bodyMode || (finalMethod === "GET" || finalMethod === "HEAD" ? "none" : "json"),
+      bodyText: route.bodyText !== undefined ? route.bodyText : bodyText,
+      formFields: route.formFields || [],
+      urlencodedFields: route.urlencodedFields || [],
+      binaryFilePath: route.binaryFilePath || "",
       lastCompletedAt: 0,
       response: null,
       projectId,
       routePath: route.path,
       routeId: route.id,
       isNew: (route as any).isNew || false,
-      preRequestScript: "",
-      postResponseScript: "",
-      activeScriptSubTab: "prerequest",
-      pathVariables: [],
+      preRequestScript: route.preRequestScript || "",
+      postResponseScript: route.postResponseScript || "",
+      activeScriptSubTab: (route as any).activeScriptSubTab || "prerequest",
+      pathVariables: route.pathVariables || [],
       splitPercent: 50,
     };
 
@@ -1269,6 +1402,8 @@ function App() {
             onAddProjectClick={handleAddBackendFolder}
             onRemoveProject={handleRemoveProject}
             onRescanProject={handleRescanProject}
+            onRenameNode={handleSidebarRenameNode}
+            onDeleteNode={handleSidebarDeleteNode}
             isScanning={Boolean(scanningProjectId)}
             scanningProjectId={scanningProjectId}
           />
@@ -1589,6 +1724,8 @@ function App() {
                       onAddOrUpdateVariable={handleAddOrUpdateVariable}
                       projects={projects}
                       treeCache={treeCache}
+                      onSaveTab={handleSaveTabToTree}
+                      onSaveAsTab={handleSaveAsTabToTree}
                     />
                   </div>
 

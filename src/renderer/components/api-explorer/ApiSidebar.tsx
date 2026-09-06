@@ -337,7 +337,16 @@ export function TreeNode({
           <span className="flex-1 min-w-0 truncate text-left">{node.name}</span>
         )}
 
-        {!node.id.startsWith("request_") && !isRenaming && (
+        {node.isStale && !isRenaming && (
+          <span
+            className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 ml-1"
+            title="This endpoint was not detected in the latest codebase scan, but your saved request data is preserved."
+          >
+            unlinked
+          </span>
+        )}
+
+        {!node.id.startsWith("request_") && !node.isStale && !isRenaming && (
           <span
             className={cn(
               "w-1.5 h-1.5 rounded-full shrink-0 ml-2 mr-1.5 transition-opacity duration-200 group-hover:opacity-0 opacity-60",
