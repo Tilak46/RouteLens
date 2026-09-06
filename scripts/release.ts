@@ -53,7 +53,16 @@ try {
     env: process.env,
   });
 
-  console.log(`\n🎉 SUCCESS! RouteLens v${updatedPkg.version} has been published to GitHub!`);
+  console.log(`\n🐧 Step 3: Packaging Linux AppImage & publishing to GitHub Releases via WSL...`);
+  execSync(
+    `wsl bash -c "cd /mnt/c/building-future/devdash && GH_TOKEN=${ghToken} GITHUB_TOKEN=${ghToken} npx electron-builder --linux AppImage --publish always"`,
+    {
+      stdio: "inherit",
+      env: process.env,
+    },
+  );
+
+  console.log(`\n🎉 SUCCESS! RouteLens v${updatedPkg.version} (Windows + Linux) has been published to GitHub!`);
   console.log(`🔗 Releases URL: https://github.com/Tilak46/routelens-releases/releases\n`);
 } catch (error: any) {
   console.error(`\n❌ Release failed:`, error?.message || error);

@@ -40,7 +40,7 @@ export function SettingsSidebarPanel({
   onSelectWorkspacePath,
 }: SettingsSidebarPanelProps) {
   const [systemStats, setSystemStats] = useState<any>(null);
-  const [appVersion, setAppVersion] = useState<string>("1.0.1");
+  const [appVersion, setAppVersion] = useState<string>("0.1.0");
   const [updateStatus, setUpdateStatus] = useState<
     "idle" | "checking" | "up-to-date" | "downloading" | "downloaded" | "error"
   >("idle");
@@ -52,6 +52,7 @@ export function SettingsSidebarPanel({
     total: number;
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [enforcement, setEnforcement] = useState<any>(null);
 
   useEffect(() => {
     // Optionally fetch some basic system specs
@@ -100,6 +101,16 @@ export function SettingsSidebarPanel({
     window.api.updates?.onError?.((err) => {
       setUpdateStatus("error");
       setErrorMessage(err?.message || "Check failed");
+    });
+
+    window.api.updates?.getEnforcementStatus?.()
+      .then((status) => {
+        if (status) setEnforcement(status);
+      })
+      .catch(() => {});
+
+    window.api.updates?.onEnforcementUpdated?.((status) => {
+      setEnforcement(status);
     });
   }, []);
 
@@ -325,6 +336,31 @@ export function SettingsSidebarPanel({
             </button>
           </div>
         )}
+
+        {/* Mandatory Policy & Test Simulator */}
+        {enforcement?.hasPendingUpdate && (
+          <div className="pt-2 border-t border-border/50 text-[10px] space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Mandatory Deadline:</span>
+              <span className="font-mono text-amber-400 font-medium">
+                {enforcement.isEnforced ? "Expired" : `${enforcement.remainingHours}h ${enforcement.remainingMinutes}m`}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Test Simulator Toggle Button */}
+        <div className="pt-1">
+          <button
+            onClick={async () => {
+              const nextMode = enforcement?.isSimulated ? "reset" : "expire";
+              await window.api.updates?.simulateEnforcement?.(nextMode);
+            }}
+            className="w-full py-1 px-2 rounded bg-secondary/30 hover:bg-secondary/60 text-muted-foreground hover:text-foreground text-[10px] font-mono border border-border/40 transition-colors cursor-pointer"
+          >
+            {enforcement?.isSimulated ? "Reset Update Simulation" : "Test Mandatory Modal (Simulate Expiration)"}
+          </button>
+        </div>
       </div>
 
       {/* About Box */}

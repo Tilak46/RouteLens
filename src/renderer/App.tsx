@@ -41,6 +41,8 @@ import { OnboardingView } from "@/components/onboarding/OnboardingView";
 import { ProjectIdleView } from "@/components/project/ProjectIdleView";
 import GhostHunter from "@/components/game/GhostHunter";
 import GamingHUDCursor from "@/components/game/GamingHUDCursor";
+import { UpdateGraceBanner, UpdateEnforcementData } from "@/components/updates/UpdateGraceBanner";
+import { MandatoryUpdateModal } from "@/components/updates/MandatoryUpdateModal";
 
 const defaultTab = (projectId?: string | null): RequestTab => ({
   id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -82,6 +84,9 @@ function App() {
     manageWorkspaces: false,
     workspaceSavePath: null,
   });
+
+  // Mandatory Auto-Update Enforcement State
+  const [enforcementStatus, setEnforcementStatus] = useState<UpdateEnforcementData | null>(null);
 
   // Layout UI state
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>("explorer");
@@ -383,6 +388,17 @@ function App() {
         },
         duration: 15000,
       });
+    });
+
+    // Mandatory update enforcement status
+    window.api?.updates?.getEnforcementStatus?.()
+      .then((status) => {
+        if (status) setEnforcementStatus(status);
+      })
+      .catch(() => {});
+
+    window.api?.updates?.onEnforcementUpdated?.((status) => {
+      setEnforcementStatus(status);
     });
   }, []);
 
@@ -1355,9 +1371,18 @@ function App() {
     toast.success(`Variable saved: ${key}`);
   };
 
+  const handleInstallUpdate = async () => {
+    try {
+      await window.api?.updates?.install?.();
+    } catch (err: any) {
+      toast.error("Failed to apply update: " + (err?.message || err));
+    }
+  };
+
   return (
     <TooltipProvider>
       <Toaster position="top-right" richColors closeButton theme="dark" />
+      <UpdateGraceBanner enforcement={enforcementStatus} onInstall={handleInstallUpdate} />
       {isBetaExpired ? (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[9999] backdrop-blur-md text-foreground select-none p-6">
           <div className="max-w-md w-full bg-bg-card border border-border-main rounded-xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-300">
@@ -1604,6 +1629,11 @@ function App() {
         isOpen={isCookiesModalOpen}
         onClose={() => setIsCookiesModalOpen(false)}
         initialDomain={activeTab?.url}
+      />
+
+      <MandatoryUpdateModal
+        enforcement={enforcementStatus}
+        onInstall={handleInstallUpdate}
       />
     </TooltipProvider>
   );

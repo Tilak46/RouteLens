@@ -1,6 +1,6 @@
 {
   "name": "routelens",
-  "version": "1.0.1",
+  "version": "0.1.0",
   "description": "Auto-Discovery API Client & Explorer",
   "author": "Tilak <tilakbuilds@gmail.com>",
   "main": "./out/main/index.js",
@@ -10,6 +10,8 @@
     "build": "electron-vite build",
     "package": "electron-packager . devdash --platform=win32 --arch=x64 --out=release-packager --overwrite",
     "build:win": "npm run build && electron-builder --win --x64",
+    "build:linux": "wsl bash -c \"cd /mnt/c/building-future/devdash && npx electron-builder --linux AppImage\"",
+    "build:all": "npm run build && electron-builder --win --x64 && npm run build:linux",
     "release": "tsx scripts/release.ts",
     "release:patch": "tsx scripts/release.ts patch",
     "release:minor": "tsx scripts/release.ts minor",

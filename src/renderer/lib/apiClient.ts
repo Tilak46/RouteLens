@@ -160,6 +160,21 @@ interface ElectronApi {
     }>;
     install: () => Promise<void>;
     getVersion: () => Promise<string>;
+    getEnforcementStatus?: () => Promise<{
+      hasPendingUpdate: boolean;
+      version: string | null;
+      releaseDate?: string;
+      firstDetectedAt: number | null;
+      deadlineAt: number | null;
+      isDownloaded: boolean;
+      isGracePeriodActive: boolean;
+      isEnforced: boolean;
+      remainingMs: number;
+      remainingHours: number;
+      remainingMinutes: number;
+      isSimulated?: boolean;
+    }>;
+    simulateEnforcement?: (mode: "expire" | "reset") => Promise<any>;
     onChecking: (callback: () => void) => void;
     onUpdateAvailable: (
       callback: (info: { version: string; releaseDate?: string }) => void,
@@ -175,6 +190,22 @@ interface ElectronApi {
     ) => void;
     onUpdateDownloaded: (
       callback: (info: { version: string; releaseDate?: string }) => void,
+    ) => void;
+    onEnforcementUpdated?: (
+      callback: (status: {
+        hasPendingUpdate: boolean;
+        version: string | null;
+        releaseDate?: string;
+        firstDetectedAt: number | null;
+        deadlineAt: number | null;
+        isDownloaded: boolean;
+        isGracePeriodActive: boolean;
+        isEnforced: boolean;
+        remainingMs: number;
+        remainingHours: number;
+        remainingMinutes: number;
+        isSimulated?: boolean;
+      }) => void,
     ) => void;
     onError: (callback: (err: { message: string }) => void) => void;
   };
@@ -429,12 +460,26 @@ const fallbackApi: ElectronApi = {
   updates: {
     check: async () => ({ success: false, error: "API not ready" }),
     install: async () => {},
-    getVersion: async () => "1.0.1",
+    getVersion: async () => "0.1.0",
+    getEnforcementStatus: async () => ({
+      hasPendingUpdate: false,
+      version: null,
+      firstDetectedAt: null,
+      deadlineAt: null,
+      isDownloaded: false,
+      isGracePeriodActive: false,
+      isEnforced: false,
+      remainingMs: 0,
+      remainingHours: 0,
+      remainingMinutes: 0,
+    }),
+    simulateEnforcement: async () => {},
     onChecking: () => {},
     onUpdateAvailable: () => {},
     onUpdateNotAvailable: () => {},
     onProgress: () => {},
     onUpdateDownloaded: () => {},
+    onEnforcementUpdated: () => {},
     onError: () => {},
   },
 };

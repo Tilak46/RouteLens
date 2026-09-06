@@ -359,6 +359,25 @@ export const api = {
     getVersion: (): Promise<string> => {
       return ipcRenderer.invoke("updates:get-version");
     },
+    getEnforcementStatus: (): Promise<{
+      hasPendingUpdate: boolean;
+      version: string | null;
+      releaseDate?: string;
+      firstDetectedAt: number | null;
+      deadlineAt: number | null;
+      isDownloaded: boolean;
+      isGracePeriodActive: boolean;
+      isEnforced: boolean;
+      remainingMs: number;
+      remainingHours: number;
+      remainingMinutes: number;
+      isSimulated?: boolean;
+    }> => {
+      return ipcRenderer.invoke("updates:get-enforcement");
+    },
+    simulateEnforcement: (mode: "expire" | "reset"): Promise<any> => {
+      return ipcRenderer.invoke("updates:simulate-enforcement", mode);
+    },
     onChecking: (callback: () => void) => {
       ipcRenderer.on("update:checking", () => callback());
     },
@@ -386,6 +405,24 @@ export const api = {
       callback: (info: { version: string; releaseDate?: string }) => void,
     ) => {
       ipcRenderer.on("update:downloaded", (_event, info) => callback(info));
+    },
+    onEnforcementUpdated: (
+      callback: (status: {
+        hasPendingUpdate: boolean;
+        version: string | null;
+        releaseDate?: string;
+        firstDetectedAt: number | null;
+        deadlineAt: number | null;
+        isDownloaded: boolean;
+        isGracePeriodActive: boolean;
+        isEnforced: boolean;
+        remainingMs: number;
+        remainingHours: number;
+        remainingMinutes: number;
+        isSimulated?: boolean;
+      }) => void,
+    ) => {
+      ipcRenderer.on("update:enforcement", (_event, status) => callback(status));
     },
     onError: (callback: (err: { message: string }) => void) => {
       ipcRenderer.on("update:error", (_event, err) => callback(err));
