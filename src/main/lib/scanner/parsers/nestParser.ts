@@ -128,21 +128,46 @@ function extractPathParams(routePath: string): string[] {
   return params;
 }
 
-function extractClassFieldNames(classNode: any): string[] {
+function extractDtoFieldNames(node: any): string[] {
   const fields = new Set<string>();
-  if (!classNode?.body?.body) return [];
-  for (const member of classNode.body.body) {
-    if (member.type === "ClassProperty" && !member.static) {
-      if (member.key.type === "Identifier") fields.add(member.key.name);
-      else if (member.key.type === "StringLiteral") fields.add(member.key.value);
-    } else if (member.type === "ClassMethod" && member.kind === "constructor") {
-      for (const param of member.params) {
-        if (param.type === "TSParameterProperty" && param.parameter.type === "Identifier") {
-          fields.add(param.parameter.name);
+  if (!node) return [];
+
+  if (node.type === "ClassDeclaration" && node.body?.body) {
+    for (const member of node.body.body) {
+      if (member.type === "ClassProperty" && !member.static) {
+        if (member.key.type === "Identifier") fields.add(member.key.name);
+        else if (member.key.type === "StringLiteral") fields.add(member.key.value);
+      } else if (member.type === "ClassMethod" && member.kind === "constructor") {
+        for (const param of member.params) {
+          if (param.type === "TSParameterProperty" && param.parameter.type === "Identifier") {
+            fields.add(param.parameter.name);
+          }
         }
       }
     }
   }
+
+  if (node.type === "TSInterfaceDeclaration" && node.body?.body) {
+    for (const member of node.body.body) {
+      if (member.type === "TSPropertySignature") {
+        if (member.key.type === "Identifier") fields.add(member.key.name);
+        else if (member.key.type === "StringLiteral") fields.add(member.key.value);
+      }
+    }
+  }
+
+  if (node.type === "TSTypeAliasDeclaration") {
+    const annot = node.typeAnnotation;
+    if (annot?.type === "TSTypeLiteral" && Array.isArray(annot.members)) {
+      for (const member of annot.members) {
+        if (member.type === "TSPropertySignature") {
+          if (member.key.type === "Identifier") fields.add(member.key.name);
+          else if (member.key.type === "StringLiteral") fields.add(member.key.value);
+        }
+      }
+    }
+  }
+
   return Array.from(fields);
 }
 
@@ -159,13 +184,23 @@ async function resolveDtoFieldNames(
   const ast = await ctx.getAst(filePath);
   if (!ast) return [];
 
-  let localClassNode: any = null;
+  let localNode: any = null;
   let importSource: string | null = null;
 
   traverse(ast, {
     ClassDeclaration(p) {
-      if (!localClassNode && p.node.id?.name === typeName) {
-        localClassNode = p.node;
+      if (!localNode && p.node.id?.name === typeName) {
+        localNode = p.node;
+      }
+    },
+    TSInterfaceDeclaration(p) {
+      if (!localNode && p.node.id?.name === typeName) {
+        localNode = p.node;
+      }
+    },
+    TSTypeAliasDeclaration(p) {
+      if (!localNode && p.node.id?.name === typeName) {
+        localNode = p.node;
       }
     },
     ImportDeclaration(p) {
@@ -181,7 +216,7 @@ async function resolveDtoFieldNames(
     },
   });
 
-  if (localClassNode) return extractClassFieldNames(localClassNode);
+  if (localNode) return extractDtoFieldNames(localNode);
 
   if (importSource) {
     const resolved = ctx.resolveImport(filePath, importSource);

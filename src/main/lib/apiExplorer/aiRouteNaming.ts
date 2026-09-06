@@ -18,6 +18,7 @@ type NameCacheSchema = {
 
 const cacheStore = new Store<NameCacheSchema>({
   name: "api-explorer-ai-names",
+  projectName: "routelens",
   defaults: { v: 1, names: {}, updatedAt: {} },
 });
 

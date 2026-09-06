@@ -41,6 +41,8 @@ type FileInfo = {
       | { kind: "import"; filePath: string; exportName: string }
       | { kind: "require"; filePath: string; exportName?: string };
   }>;
+  tsoaModels: Map<string, string[]>;
+  ast: any;
 };
 
 function extractJSDocDescription(node: any): string | undefined {
@@ -130,6 +132,34 @@ async function analyzeFunctionNode(
         } else if (val.type === "ObjectPattern") {
           extractFieldsFromObjectPattern(val, result.pathParams);
         }
+      }
+    }
+  }
+
+  // Inspect TypeScript type annotations on reqParam:
+  // e.g. req: Request<Params, ResBody, ReqBody, ReqQuery>
+  // e.g. req: TypedRequest<ReqBody> or Body<ReqBody>
+  const typeAnnot = (reqParam as any).typeAnnotation?.typeAnnotation;
+  if (typeAnnot?.type === "TSTypeReference") {
+    const typeName = typeAnnot.typeName?.type === "Identifier" ? typeAnnot.typeName.name : "";
+    const typeParams = typeAnnot.typeParameters?.params;
+    if (Array.isArray(typeParams)) {
+      if (/^(Request|ExRequest|NextApiRequest)$/i.test(typeName)) {
+        if (typeParams.length >= 1 && typeParams[0].type === "TSTypeReference" && typeParams[0].typeName?.name) {
+          const pKeys = await resolveDtoFieldNames(typeParams[0].typeName.name, currentFilePath, ctx);
+          for (const k of pKeys) result.pathParams.add(k);
+        }
+        if (typeParams.length >= 3 && typeParams[2].type === "TSTypeReference" && typeParams[2].typeName?.name) {
+          const bKeys = await resolveDtoFieldNames(typeParams[2].typeName.name, currentFilePath, ctx);
+          for (const k of bKeys) result.inferredBodyFields.add(k);
+        }
+        if (typeParams.length >= 4 && typeParams[3].type === "TSTypeReference" && typeParams[3].typeName?.name) {
+          const qKeys = await resolveDtoFieldNames(typeParams[3].typeName.name, currentFilePath, ctx);
+          for (const k of qKeys) result.inferredQueryFields.add(k);
+        }
+      } else if (/body/i.test(typeName) && typeParams.length >= 1 && typeParams[0].type === "TSTypeReference" && typeParams[0].typeName?.name) {
+        const bKeys = await resolveDtoFieldNames(typeParams[0].typeName.name, currentFilePath, ctx);
+        for (const k of bKeys) result.inferredBodyFields.add(k);
       }
     }
   }
@@ -634,12 +664,266 @@ function extractKeysFromObjectExpression(node: any): string[] {
   return keys;
 }
 
+function extractDtoFieldNames(node: any): string[] {
+  const fields = new Set<string>();
+  if (!node) return [];
+
+  if (node.type === "ClassDeclaration" && node.body?.body) {
+    for (const member of node.body.body) {
+      if (member.type === "ClassProperty" && !member.static) {
+        if (member.key.type === "Identifier") fields.add(member.key.name);
+        else if (member.key.type === "StringLiteral") fields.add(member.key.value);
+      } else if (member.type === "ClassMethod" && member.kind === "constructor") {
+        for (const param of member.params) {
+          if (param.type === "TSParameterProperty" && param.parameter.type === "Identifier") {
+            fields.add(param.parameter.name);
+          }
+        }
+      }
+    }
+  }
+
+  if (node.type === "TSInterfaceDeclaration" && node.body?.body) {
+    for (const member of node.body.body) {
+      if (member.type === "TSPropertySignature") {
+        if (member.key.type === "Identifier") fields.add(member.key.name);
+        else if (member.key.type === "StringLiteral") fields.add(member.key.value);
+      }
+    }
+  }
+
+  if (node.type === "TSTypeAliasDeclaration") {
+    const annot = node.typeAnnotation;
+    if (annot?.type === "TSTypeLiteral" && Array.isArray(annot.members)) {
+      for (const member of annot.members) {
+        if (member.type === "TSPropertySignature") {
+          if (member.key.type === "Identifier") fields.add(member.key.name);
+          else if (member.key.type === "StringLiteral") fields.add(member.key.value);
+        }
+      }
+    }
+  }
+
+  return Array.from(fields);
+}
+
+async function resolveDtoFieldNames(
+  typeName: string,
+  filePath: string,
+  ctx: ScannerContext,
+  visited = new Set<string>(),
+): Promise<string[]> {
+  const key = `${filePath}|${typeName}`;
+  if (visited.has(key)) return [];
+  visited.add(key);
+
+  const ast = await ctx.getAst(filePath);
+  if (!ast) return [];
+
+  let localNode: any = null;
+  let importSource: string | null = null;
+
+  traverse(ast, {
+    ClassDeclaration(p) {
+      if (!localNode && p.node.id?.name === typeName) {
+        localNode = p.node;
+      }
+    },
+    TSInterfaceDeclaration(p) {
+      if (!localNode && p.node.id?.name === typeName) {
+        localNode = p.node;
+      }
+    },
+    TSTypeAliasDeclaration(p) {
+      if (!localNode && p.node.id?.name === typeName) {
+        localNode = p.node;
+      }
+    },
+    ImportDeclaration(p) {
+      if (importSource) return;
+      for (const spec of p.node.specifiers) {
+        if (
+          spec.local.name === typeName &&
+          (spec.type === "ImportSpecifier" || spec.type === "ImportDefaultSpecifier")
+        ) {
+          importSource = p.node.source.value;
+        }
+      }
+    },
+  });
+
+  if (localNode) return extractDtoFieldNames(localNode);
+
+  if (importSource) {
+    const resolved = ctx.resolveImport(filePath, importSource);
+    if (resolved) return resolveDtoFieldNames(typeName, resolved, ctx, visited);
+  }
+
+  return [];
+}
+
+function extractTsoaModels(ast: any): Map<string, string[]> {
+  const models = new Map<string, string[]>();
+  if (!ast) return models;
+  traverse(ast, {
+    VariableDeclarator(p) {
+      if (p.node.id?.type === "Identifier" && p.node.id.name === "models") {
+        const init = unwrapTSExpression(p.node.init);
+        if (init?.type === "ObjectExpression") {
+          for (const modelProp of init.properties) {
+            if (modelProp.type !== "ObjectProperty") continue;
+            const modelName =
+              modelProp.key.type === "Identifier"
+                ? modelProp.key.name
+                : modelProp.key.type === "StringLiteral"
+                ? modelProp.key.value
+                : "";
+            if (!modelName) continue;
+            const modelDef = unwrapTSExpression(modelProp.value);
+            if (modelDef?.type === "ObjectExpression") {
+              for (const field of modelDef.properties) {
+                if (
+                  field.type === "ObjectProperty" &&
+                  (field.key.name === "properties" || field.key.value === "properties")
+                ) {
+                  const propsVal = unwrapTSExpression(field.value);
+                  if (propsVal?.type === "ObjectExpression") {
+                    const keys = propsVal.properties
+                      .filter((pr: any) => pr.type === "ObjectProperty")
+                      .map((pr: any) =>
+                        pr.key.type === "Identifier" ? pr.key.name : pr.key.value
+                      )
+                      .filter(Boolean);
+                    models.set(modelName, keys);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+  });
+  return models;
+}
+
+function extractTsoaArgsForHandler(
+  handlerNode: any,
+  fileAst: any,
+  tsoaModels: Map<string, string[]>,
+): { bodyFields: string[]; queryFields: string[]; pathParams: string[] } {
+  const res = { bodyFields: [] as string[], queryFields: [] as string[], pathParams: [] as string[] };
+  if (!handlerNode || tsoaModels.size === 0 || !fileAst) return res;
+
+  let argsIdentName: string | null = null;
+  traverse(
+    { type: "File", program: { type: "Program", body: [handlerNode] } } as any,
+    {
+      Identifier(p) {
+        if (p.node.name.startsWith("args")) {
+          argsIdentName = p.node.name;
+        }
+      },
+    },
+  );
+
+  if (!argsIdentName) return res;
+
+  let argsNode: any = null;
+  traverse(fileAst, {
+    VariableDeclarator(p) {
+      if (p.node.id?.type === "Identifier" && p.node.id.name === argsIdentName) {
+        argsNode = unwrapTSExpression(p.node.init);
+        p.stop();
+      }
+    },
+  });
+
+  if (!argsNode || argsNode.type !== "ObjectExpression") return res;
+
+  for (const prop of argsNode.properties) {
+    if (prop.type !== "ObjectProperty") continue;
+    const val = unwrapTSExpression(prop.value);
+    if (val?.type !== "ObjectExpression") continue;
+
+    let inType = "";
+    let refName = "";
+    let paramName = "";
+
+    for (const sub of val.properties) {
+      if (sub.type !== "ObjectProperty") continue;
+      const key = sub.key.type === "Identifier" ? sub.key.name : sub.key.value;
+      const strVal = literalString(sub.value);
+      if (key === "in" && strVal) inType = strVal;
+      if (key === "ref" && strVal) refName = strVal;
+      if (key === "name" && strVal) paramName = strVal;
+    }
+
+    const fields = refName && tsoaModels.has(refName)
+      ? tsoaModels.get(refName)!
+      : paramName
+      ? [paramName]
+      : [];
+
+    if (inType === "body") {
+      res.bodyFields.push(...fields);
+    } else if (inType === "query") {
+      res.queryFields.push(...fields);
+    } else if (inType === "path") {
+      res.pathParams.push(...fields);
+    }
+  }
+
+  return res;
+}
+
 async function resolveIdentifierDefinition(
   identifierName: string,
   filePath: string,
   ctx: ScannerContext,
   visited = new Set<string>()
 ): Promise<{ node: any; filePath: string } | null> {
+  const currentAst = await ctx.getAst(filePath);
+  if (currentAst) {
+    let localFound: any = null;
+    traverse(currentAst, {
+      VariableDeclarator(p) {
+        const id = unwrapTSExpression(p.node.id);
+        if (id && id.type === "Identifier" && id.name === identifierName) {
+          localFound = p.node.init;
+          p.stop();
+        }
+      },
+      FunctionDeclaration(p) {
+        if (p.node.id && p.node.id.name === identifierName) {
+          localFound = p.node;
+          p.stop();
+        }
+      },
+      ClassDeclaration(p) {
+        if (p.node.id && p.node.id.name === identifierName) {
+          localFound = p.node;
+          p.stop();
+        }
+      },
+      ExportNamedDeclaration(p) {
+        const decl = p.node.declaration;
+        if (decl && decl.type === "VariableDeclaration") {
+          for (const d of decl.declarations) {
+            const id = unwrapTSExpression(d.id);
+            if (id && id.type === "Identifier" && id.name === identifierName) {
+              localFound = d.init;
+              p.stop();
+            }
+          }
+        }
+      }
+    });
+    if (localFound) {
+      return { node: localFound, filePath };
+    }
+  }
+
   const resolved = await resolveImportedIdentifier(identifierName, filePath, ctx);
   if (!resolved) return null;
 
@@ -708,6 +992,62 @@ async function extractSchemaKeys(
     return [];
   }
 
+  if (node.type === "MemberExpression" && !node.computed) {
+    if (node.object.type === "Identifier" && node.property.type === "Identifier") {
+      const resolved = await resolveMemberExpression(node.object.name, node.property.name, filePath, ctx);
+      if (resolved) {
+        return extractSchemaKeys(resolved.node, resolved.filePath, ctx, visited);
+      }
+    } else if (node.object.type === "ThisExpression" && node.property.type === "Identifier") {
+      const propName = node.property.name;
+      const currentAst = await ctx.getAst(filePath);
+      if (currentAst) {
+        let foundVal: any = null;
+        traverse(currentAst, {
+          ClassProperty(p) {
+            if (p.node.key.type === "Identifier" && p.node.key.name === propName) {
+              foundVal = p.node.value;
+              p.stop();
+            }
+          },
+        });
+        if (foundVal) {
+          return extractSchemaKeys(foundVal, filePath, ctx, visited);
+        }
+      }
+    } else if (node.object.type === "MemberExpression" && node.property.type === "Identifier") {
+      const parentObj = node.object;
+      const subPropName = node.property.name;
+      if (parentObj.object.type === "ThisExpression" && parentObj.property.type === "Identifier") {
+        const parentPropName = parentObj.property.name;
+        const currentAst = await ctx.getAst(filePath);
+        if (currentAst) {
+          let foundVal: any = null;
+          traverse(currentAst, {
+            ClassProperty(p) {
+              if (p.node.key.type === "Identifier" && p.node.key.name === parentPropName) {
+                foundVal = p.node.value;
+                p.stop();
+              }
+            },
+          });
+          if (foundVal && foundVal.type === "ObjectExpression") {
+            for (const prop of foundVal.properties) {
+              if (
+                prop.type === "ObjectProperty" &&
+                prop.key.type === "Identifier" &&
+                prop.key.name === subPropName
+              ) {
+                return extractSchemaKeys(prop.value, filePath, ctx, visited);
+              }
+            }
+          }
+        }
+      }
+    }
+    return [];
+  }
+
   if (node.type === "CallExpression") {
     const callee = unwrapTSExpression(node.callee);
 
@@ -715,16 +1055,20 @@ async function extractSchemaKeys(
       const methodName = callee.property.name;
       const baseObject = unwrapTSExpression(callee.object);
 
+      if ((methodName === "items" || methodName === "element") && node.arguments.length > 0) {
+        return extractSchemaKeys(node.arguments[0], filePath, ctx, visited);
+      }
+
       const schemaChainMethods = [
-        "refine", "partial", "omit", "pick", "extend", "shape", 
+        "refine", "partial", "omit", "pick", "extend", "shape", "keys",
         "parse", "parseAsync", "safeParse", "validate", "validateSync", "validateAsync",
-        "required", "optional", "nullable", "default"
+        "required", "optional", "nullable", "default", "with", "without", "xor", "or", "and", "nand", "unknown", "strip"
       ];
 
       if (schemaChainMethods.includes(methodName)) {
         let baseKeys = await extractSchemaKeys(baseObject, filePath, ctx, visited);
         
-        if ((methodName === "extend" || methodName === "shape") && node.arguments.length > 0) {
+        if ((methodName === "extend" || methodName === "shape" || methodName === "keys") && node.arguments.length > 0) {
           const arg = unwrapTSExpression(node.arguments[0]);
           if (arg.type === "ObjectExpression") {
             const extraKeys = extractKeysFromObjectExpression(arg);
@@ -734,6 +1078,12 @@ async function extractSchemaKeys(
             baseKeys = Array.from(new Set([...baseKeys, ...extraKeys]));
           }
         }
+        return baseKeys;
+      }
+
+      // Check if baseObject resolves to schema keys (e.g. chained helper method like .trim(), .strip(), etc.)
+      const baseKeys = await extractSchemaKeys(baseObject, filePath, ctx, visited);
+      if (baseKeys.length > 0) {
         return baseKeys;
       }
     }
@@ -747,12 +1097,14 @@ async function extractSchemaKeys(
 
         if (
           (objName === "z" || objName === "joi" || objName === "yup") &&
-          propName === "object" &&
+          (propName === "object" || propName === "keys") &&
           node.arguments.length > 0
         ) {
           const arg = unwrapTSExpression(node.arguments[0]);
           if (arg.type === "ObjectExpression") {
             return extractKeysFromObjectExpression(arg);
+          } else if (arg.type === "Identifier") {
+            return extractSchemaKeys(arg, filePath, ctx, visited);
           }
         }
       }
@@ -829,6 +1181,13 @@ async function resolveMemberExpression(
           member.key.name === propName
         ) {
           return { node: member, filePath: resolvedObj.filePath };
+        }
+        if (
+          (member.type === "ClassProperty" || member.type === "PropertyDefinition") &&
+          member.key.type === "Identifier" &&
+          member.key.name === propName
+        ) {
+          return { node: member.value, filePath: resolvedObj.filePath };
         }
       }
     }
@@ -982,6 +1341,13 @@ function evalStringExpr(
     const r = evalStringExpr(node.right, constStrings);
     if (typeof l === "string" && typeof r === "string") return `${l}${r}`;
   }
+  if (node.type === "MemberExpression" && !node.computed) {
+    const prop = node.property?.type === "Identifier" ? node.property.name : "";
+    const lower = prop.toLowerCase();
+    if (lower.includes("prefix") || lower === "baseurl" || lower === "basepath") {
+      return "/api";
+    }
+  }
   return null;
 }
 
@@ -1108,6 +1474,7 @@ function extractExpressInfo(
             importSpecifiers.set(s.local.name, { filePath: resolved, importedName });
           }
         } else if (s.type === "ImportNamespaceSpecifier") {
+          if (src === "express") expressDefault = s.local.name;
           const resolved = ctx.resolveImport(filePath, src);
           if (resolved) {
             importToFile.set(s.local.name, resolved);
@@ -1123,8 +1490,25 @@ function extractExpressInfo(
       if (!init) return;
 
       // Destructured require: const { router: productsRouter } = require('./x')
+      // OR: const { Router } = require('express')
       if (p.node.id?.type === "ObjectPattern" && isRequireCall(init)) {
         const src = literalString(init.arguments[0] as any);
+        if (src === "express") {
+          for (const prop of p.node.id.properties) {
+            if (prop.type !== "ObjectProperty") continue;
+            const keyName =
+              prop.key.type === "Identifier"
+                ? prop.key.name
+                : prop.key.type === "StringLiteral"
+                ? prop.key.value
+                : null;
+            const valName =
+              prop.value.type === "Identifier" ? prop.value.name : null;
+            if (keyName === "Router" && valName) {
+              expressRouters.add(valName);
+            }
+          }
+        }
         const resolved = src ? ctx.resolveImport(filePath, src) : null;
         if (!resolved) return;
         for (const prop of p.node.id.properties) {
@@ -1154,8 +1538,11 @@ function extractExpressInfo(
         return;
       }
 
-      // const app = express()
-      if (init.type === "CallExpression" && isIdent(init.callee)) {
+      // const app = express() or const router = Router() or new Router()
+      if (
+        (init.type === "CallExpression" || init.type === "NewExpression") &&
+        isIdent(init.callee)
+      ) {
         if (expressDefault && init.callee.name === expressDefault) {
           appVars.add(localName);
           return;
@@ -1166,36 +1553,110 @@ function extractExpressInfo(
         }
       }
 
-      // const router = express.Router()
+      // const app = require('express')()
       if (
         init.type === "CallExpression" &&
+        isRequireCall(init.callee) &&
+        literalString(init.callee.arguments[0] as any) === "express"
+      ) {
+        appVars.add(localName);
+        return;
+      }
+
+      // const router = express.Router() or new express.Router() or require('express').Router()
+      if (
+        (init.type === "CallExpression" || init.type === "NewExpression") &&
         init.callee &&
         init.callee.type === "MemberExpression"
       ) {
         const callee = init.callee;
         if (
           !callee.computed &&
-          callee.object.type === "Identifier" &&
           callee.property.type === "Identifier" &&
-          callee.property.name === "Router" &&
-          expressDefault &&
-          callee.object.name === expressDefault
+          callee.property.name === "Router"
         ) {
-          routerVars.add(localName);
-          return;
+          if (
+            (callee.object.type === "Identifier" && expressDefault && callee.object.name === expressDefault) ||
+            (callee.object.type === "CallExpression" && isRequireCall(callee.object) && literalString(callee.object.arguments[0] as any) === "express")
+          ) {
+            routerVars.add(localName);
+            return;
+          }
+        }
+      }
+    },
+
+    ClassDeclaration(p) {
+      if (p.node.id?.name) {
+        const className = p.node.id.name;
+        let hasRoutes = false;
+        p.traverse({
+          CallExpression(subP) {
+            if (hasRoutes) return;
+            const subCallee = subP.node.callee;
+            if (
+              subCallee.type === "MemberExpression" &&
+              !subCallee.computed &&
+              subCallee.object.type === "ThisExpression" &&
+              subCallee.property.type === "Identifier"
+            ) {
+              const prop = subCallee.property.name;
+              if (prop === "route" || isHttpMethodName(prop)) {
+                hasRoutes = true;
+              }
+            }
+          },
+        });
+        if (hasRoutes) {
+          routerVars.add(className);
+          markExported(className);
+        }
+      }
+    },
+
+    "FunctionDeclaration|FunctionExpression|ArrowFunctionExpression"(p: any) {
+      if (!Array.isArray(p.node.params) || p.node.params.length === 0) return;
+
+      for (const param of p.node.params) {
+        let ident: any = param;
+        if (ident.type === "AssignmentPattern") ident = ident.left;
+        if (!ident || ident.type !== "Identifier") continue;
+
+        const name = ident.name;
+        const lower = name.toLowerCase();
+
+        let typeName = "";
+        const typeAnnot = ident.typeAnnotation?.typeAnnotation;
+        if (typeAnnot?.type === "TSTypeReference") {
+          if (typeAnnot.typeName?.type === "Identifier") {
+            typeName = typeAnnot.typeName.name;
+          } else if (typeAnnot.typeName?.type === "TSQualifiedName") {
+            typeName = typeAnnot.typeName.right?.name || "";
+          }
         }
 
-        // const router = require('express').Router()
-        if (
-          !callee.computed &&
-          callee.property.type === "Identifier" &&
-          callee.property.name === "Router" &&
-          callee.object.type === "CallExpression" &&
-          isRequireCall(callee.object) &&
-          literalString(callee.object.arguments[0] as any) === "express"
-        ) {
-          routerVars.add(localName);
-          return;
+        const isRouterType = /^(Router|IRouter)$/i.test(typeName);
+        const isAppType = /^(Express|Application|IApplication)$/i.test(typeName);
+
+        const isRouterName =
+          lower === "router" ||
+          lower === "r" ||
+          lower.endsWith("router") ||
+          lower.endsWith("routes");
+        const isAppName =
+          lower === "app" ||
+          lower === "server" ||
+          lower.endsWith("app");
+
+        if (isRouterType || isRouterName || isAppType || isAppName) {
+          routerVars.add(name);
+          if (p.node.type === "FunctionDeclaration" && p.node.id?.name) {
+            reExports.set(p.node.id.name, { filePath, localName: name });
+            const ent = routerEntity(filePath, name);
+            if (!exportedRouterEntities.includes(ent)) {
+              exportedRouterEntities.push(ent);
+            }
+          }
         }
       }
     },
@@ -1217,7 +1678,10 @@ function extractExpressInfo(
               markExported(d.id.name);
             }
           }
-        } else if (decl.type === "FunctionDeclaration" && decl.id?.type === "Identifier") {
+        } else if (
+          (decl.type === "FunctionDeclaration" || decl.type === "ClassDeclaration") &&
+          decl.id?.type === "Identifier"
+        ) {
           markExported(decl.id.name);
         }
       }
@@ -1261,13 +1725,74 @@ function extractExpressInfo(
         }
       } else if (decl.type === "CallExpression") {
         // export default Router() etc. (no named entity)
+      } else if (
+        decl.type === "ArrowFunctionExpression" ||
+        decl.type === "FunctionDeclaration" ||
+        decl.type === "FunctionExpression"
+      ) {
+        if (decl.params?.length > 0) {
+          const firstParam = decl.params[0];
+          if (firstParam.type === "Identifier") {
+            const paramName = firstParam.name;
+            routerVars.add(paramName);
+            markExported(paramName);
+            reExports.set("default", { filePath, localName: paramName });
+          }
+        }
+        let returnedRouter: string | null = null;
+        traverse(
+          {
+            type: "File",
+            program: {
+              type: "Program",
+              body: [
+                decl.body.type === "BlockStatement"
+                  ? decl.body
+                  : { type: "ReturnStatement", argument: decl.body },
+              ],
+            },
+          } as any,
+          {
+            ReturnStatement(retP) {
+              const arg = retP.node.argument;
+              if (arg && arg.type === "Identifier" && routerVars.has(arg.name)) {
+                returnedRouter = arg.name;
+              }
+            },
+          },
+        );
+        if (returnedRouter) {
+          markExported(returnedRouter);
+          reExports.set("default", { filePath, localName: returnedRouter });
+        }
       }
     },
 
     AssignmentExpression(p) {
-      // module.exports = router
       const left = p.node.left;
       const right = p.node.right;
+
+      if (left.type === "Identifier") {
+        const varName = left.name;
+        if (right.type === "CallExpression" && isIdent(right.callee)) {
+          if (expressDefault && right.callee.name === expressDefault) {
+            appVars.add(varName);
+          } else if (expressRouters.has(right.callee.name)) {
+            routerVars.add(varName);
+          }
+        } else if (
+          (right.type === "CallExpression" || right.type === "NewExpression") &&
+          right.callee &&
+          right.callee.type === "MemberExpression" &&
+          !right.callee.computed &&
+          right.callee.property.type === "Identifier" &&
+          right.callee.property.name === "Router"
+        ) {
+          routerVars.add(varName);
+        }
+      }
+
+      // module.exports = router
       if (
         left.type === "MemberExpression" &&
         !left.computed &&
@@ -1283,11 +1808,203 @@ function extractExpressInfo(
 
     CallExpression(p) {
       const callee = p.node.callee;
+
+      // Direct function call mount: RegisterRoutes(app)
+      if (callee.type === "Identifier" && p.node.arguments.length > 0) {
+        const fnName = callee.name;
+        const firstArg = p.node.arguments[0];
+        if (firstArg && firstArg.type === "Identifier") {
+          const argName = firstArg.name;
+          if (appVars.has(argName) || routerVars.has(argName)) {
+            const importedFile = importToFile.get(fnName);
+            if (importedFile) {
+              const imp = importSpecifiers.get(fnName);
+              const from = appVars.has(argName)
+                ? appEntity(filePath, argName)
+                : routerEntity(filePath, argName);
+              mounts.push({
+                from,
+                mountPath: "/",
+                to: {
+                  kind: "import",
+                  filePath: importedFile,
+                  exportName: imp ? imp.importedName : "default",
+                },
+              });
+            }
+          }
+        }
+      }
+
+      // require('./routes')(app)
+      if (isRequireCall(callee) && p.node.arguments.length > 0) {
+        const firstArg = p.node.arguments[0];
+        if (firstArg && firstArg.type === "Identifier") {
+          const argName = firstArg.name;
+          if (appVars.has(argName) || routerVars.has(argName)) {
+            const src = literalString(callee.arguments[0] as any);
+            const resolved = src ? ctx.resolveImport(filePath, src) : null;
+            if (resolved) {
+              const from = appVars.has(argName)
+                ? appEntity(filePath, argName)
+                : routerEntity(filePath, argName);
+              mounts.push({
+                from,
+                mountPath: "/",
+                to: { kind: "require", filePath: resolved, exportName: "default" },
+              });
+            }
+          }
+        }
+      }
+
       if (callee.type !== "MemberExpression" || callee.computed) return;
       if (callee.property.type !== "Identifier") return;
 
       const prop = callee.property.name;
       const obj = callee.object;
+
+      // Class-based router: this.route('METHOD', path, ...handlers)
+      if (
+        obj.type === "ThisExpression" &&
+        prop === "route" &&
+        p.node.arguments.length >= 2
+      ) {
+        const methodRaw = literalString(p.node.arguments[0] as any);
+        const routePath = literalString(p.node.arguments[1] as any);
+        if (methodRaw && routePath && isHttpMethodName(methodRaw.toLowerCase())) {
+          const method = methodToUpper(methodRaw) as Method;
+          const classParent = p.findParent((path: any) => path.isClass()) as any;
+          const className = classParent?.node?.id?.name || "ThisRouter";
+          routerVars.add(className);
+          markExported(className);
+          const owner = routerEntity(filePath, className);
+
+          const rest = p.node.arguments.slice(2);
+          const handlerNode = rest.length > 0 ? rest[rest.length - 1] : null;
+          const middlewareNodes = rest.slice(0, Math.max(0, rest.length - 1));
+          const inlineMiddlewares = middlewareNodes
+            .map((a) => exprToString(a as any))
+            .filter(Boolean);
+          const middlewares = [
+            ...(activeMiddlewares.get(className) || []),
+            ...inlineMiddlewares,
+          ];
+          const handler = handlerNode
+            ? exprToString(handlerNode as any)
+            : undefined;
+
+          const routeDescription =
+            extractJSDocDescription(p.parentPath?.node) ||
+            extractJSDocDescription(p.node) ||
+            "";
+
+          routes.push({
+            owner,
+            method,
+            path: routePath,
+            handler,
+            handlerNode,
+            routeDescription,
+            middlewares,
+            middlewareNodes,
+          });
+          return;
+        }
+      }
+
+      // Class-based router: this.get('/x', ...) or this.post('/x', ...)
+      // OR this.router.get('/x', ...) or this.app.post('/x', ...)
+      const isThisOrThisProp =
+        obj.type === "ThisExpression" ||
+        (obj.type === "MemberExpression" &&
+          !obj.computed &&
+          obj.object.type === "ThisExpression" &&
+          obj.property.type === "Identifier" &&
+          (obj.property.name === "router" || obj.property.name === "app"));
+
+      if (isThisOrThisProp && isHttpMethodName(prop) && p.node.arguments.length >= 1) {
+        let routePath = literalString(p.node.arguments[0] as any);
+        if (typeof routePath === "string") {
+          const method = methodToUpper(prop) as Method;
+          const classParent = p.findParent((path: any) => path.isClass()) as any;
+          const className = classParent?.node?.id?.name || "ThisRouter";
+          routerVars.add(className);
+          markExported(className);
+          const owner = routerEntity(filePath, className);
+
+          let classPrefix = "";
+          if (classParent?.node) {
+            traverse(
+              { type: "File", program: { type: "Program", body: [classParent.node] } } as any,
+              {
+                CallExpression(subP) {
+                  if (classPrefix) return;
+                  if (subP.node.callee.type === "Super") {
+                    for (const arg of subP.node.arguments) {
+                      const str = literalString(arg as any);
+                      if (str && str.startsWith("/")) {
+                        classPrefix = str;
+                        break;
+                      }
+                    }
+                  }
+                },
+                AssignmentExpression(subP) {
+                  if (classPrefix) return;
+                  const left = subP.node.left;
+                  if (
+                    left.type === "MemberExpression" &&
+                    left.object.type === "ThisExpression" &&
+                    left.property.type === "Identifier" &&
+                    (left.property.name === "path" || left.property.name === "prefix")
+                  ) {
+                    const str = literalString(subP.node.right as any);
+                    if (str) classPrefix = str;
+                  }
+                },
+              },
+            );
+          }
+
+          if (classPrefix) {
+            routePath = joinPaths(classPrefix, routePath);
+          } else if (!routePath.startsWith("/")) {
+            routePath = "/" + routePath;
+          }
+
+          const rest = p.node.arguments.slice(1);
+          const handlerNode = rest.length > 0 ? rest[rest.length - 1] : null;
+          const middlewareNodes = rest.slice(0, Math.max(0, rest.length - 1));
+          const inlineMiddlewares = middlewareNodes
+            .map((a) => exprToString(a as any))
+            .filter(Boolean);
+          const middlewares = [
+            ...(activeMiddlewares.get(className) || []),
+            ...inlineMiddlewares,
+          ];
+          const handler = handlerNode
+            ? exprToString(handlerNode as any)
+            : undefined;
+
+          const routeDescription =
+            extractJSDocDescription(p.parentPath?.node) ||
+            extractJSDocDescription(p.node) ||
+            "";
+
+          routes.push({
+            owner,
+            method,
+            path: routePath,
+            handler,
+            handlerNode,
+            routeDescription,
+            middlewares,
+            middlewareNodes,
+          });
+          return;
+        }
+      }
 
       // router.route('/x').get(...)
       if (isHttpMethodName(prop) && obj.type === "CallExpression") {
@@ -1336,12 +2053,33 @@ function extractExpressInfo(
         }
       }
 
-      // app.get('/x', ...)
+      // app.get('/x', ...) or router.post('/x', ...)
       if (isHttpMethodName(prop) && obj.type === "Identifier") {
         const ownerIdent = obj.name;
-        if (!appVars.has(ownerIdent) && !routerVars.has(ownerIdent)) return;
-
         const routePath = literalString(p.node.arguments[0] as any);
+
+        // Broad heuristic fallback: any target.[method]('/path', ...)
+        const HTTP_CLIENTS = new Set([
+          "axios", "client", "httpclient", "http", "https",
+          "request", "needle", "got", "superagent", "fetch", "apiclient",
+        ]);
+
+        if (
+          !appVars.has(ownerIdent) &&
+          !routerVars.has(ownerIdent) &&
+          routePath &&
+          routePath.startsWith("/") &&
+          p.node.arguments.length >= 2 &&
+          !HTTP_CLIENTS.has(ownerIdent.toLowerCase())
+        ) {
+          if (ownerIdent.toLowerCase() === "app" || ownerIdent.toLowerCase() === "server") {
+            appVars.add(ownerIdent);
+          } else {
+            routerVars.add(ownerIdent);
+          }
+        }
+
+        if (!appVars.has(ownerIdent) && !routerVars.has(ownerIdent)) return;
         if (!routePath) return;
 
         const rest = p.node.arguments.slice(1);
@@ -1470,6 +2208,8 @@ function extractExpressInfo(
     },
   });
 
+  const tsoaModels = extractTsoaModels(ast);
+
   return {
     filePath,
     appVars,
@@ -1480,6 +2220,8 @@ function extractExpressInfo(
     wildcardReExports,
     routes,
     mounts,
+    tsoaModels,
+    ast,
   };
 }
 
@@ -1574,6 +2316,20 @@ function computeRouterPrefixes(
     }
   }
 
+  const hasIncoming = new Set<EntityId>();
+  for (const list of edges.values()) {
+    for (const e of list) {
+      hasIncoming.add(e.to);
+    }
+  }
+  for (const fromEntity of edges.keys()) {
+    if (!hasIncoming.has(fromEntity)) {
+      if (!starts.some((s) => s.entity === fromEntity)) {
+        starts.push({ entity: fromEntity, prefix: "" });
+      }
+    }
+  }
+
   const maxDepth = 20;
   for (const s of starts) {
     const queue: Array<{ entity: EntityId; prefix: string; depth: number }> = [
@@ -1661,25 +2417,206 @@ export const expressParser: FrameworkParser = {
         if (Array.isArray(r.middlewareNodes)) {
           for (const mw of r.middlewareNodes) {
             const unwrappedMw = unwrapTSExpression(mw);
-            if (unwrappedMw && unwrappedMw.type === "CallExpression") {
-              const callee = unwrapTSExpression(unwrappedMw.callee);
-              if (callee.type === "Identifier" && unwrappedMw.arguments.length > 0) {
-                const mwName = callee.name.toLowerCase();
-                const schemaArg = unwrappedMw.arguments[0];
+            if (!unwrappedMw) continue;
 
-                const keys = await extractSchemaKeys(schemaArg, info.filePath, ctx);
-                if (keys.length > 0) {
-                  if (mwName.includes("query")) {
-                    for (const k of keys) schemaQueryFields.add(k);
-                  } else if (mwName.includes("param")) {
-                    for (const k of keys) schemaPathParams.add(k);
-                  } else {
+            const mwsToCheck =
+              unwrappedMw.type === "ArrayExpression"
+                ? unwrappedMw.elements.map((el: any) => unwrapTSExpression(el)).filter(Boolean)
+                : [unwrappedMw];
+
+            for (const singleMw of mwsToCheck) {
+              if (singleMw && singleMw.type === "Identifier" && info.ast) {
+                const mwFunc = findFunctionInFile(info.ast, singleMw.name);
+                if (mwFunc) {
+                  let foundSchemaNode: any = null;
+                  traverse(
+                    { type: "File", program: { type: "Program", body: [mwFunc] } } as any,
+                    {
+                      VariableDeclarator(subP) {
+                        const init = unwrapTSExpression(subP.node.init);
+                        if (!init) return;
+
+                        if (init.type === "ObjectExpression") {
+                          const hasValidatorProps = init.properties.some((prop: any) => {
+                            if (prop.type !== "ObjectProperty") return false;
+                            const val = unwrapTSExpression(prop.value);
+                            if (val?.type === "CallExpression") {
+                              const c = unwrapTSExpression(val.callee);
+                              if (c?.type === "MemberExpression") {
+                                const o = unwrapTSExpression(c.object);
+                                const on = o?.type === "Identifier" ? o.name.toLowerCase() : "";
+                                if (on === "joi" || on === "z" || on === "yup") return true;
+                              }
+                            }
+                            return false;
+                          });
+                          if (hasValidatorProps) {
+                            foundSchemaNode = init;
+                          }
+                        } else {
+                          let curr: any = init;
+                          while (curr && curr.type === "CallExpression") {
+                            const callee = unwrapTSExpression(curr.callee);
+                            if (callee?.type === "MemberExpression" && !callee.computed) {
+                              const obj = unwrapTSExpression(callee.object);
+                              const prop = callee.property;
+                              const objName = obj?.type === "Identifier" ? obj.name.toLowerCase() : "";
+                              const propName = prop?.type === "Identifier" ? prop.name : "";
+                              if ((objName === "joi" || objName === "z" || objName === "yup") && (propName === "object" || propName === "keys")) {
+                                foundSchemaNode = init;
+                                break;
+                              }
+                              curr = obj;
+                            } else {
+                              break;
+                            }
+                          }
+                        }
+                      },
+                      AssignmentExpression(subP) {
+                        const left = unwrapTSExpression(subP.node.left);
+                        if (left?.type === "MemberExpression" && !left.computed && left.property.type === "Identifier") {
+                          schemaBodyFields.add(left.property.name);
+                        }
+                      }
+                    },
+                  );
+
+                  if (foundSchemaNode) {
+                    const keys = await extractSchemaKeys(foundSchemaNode, info.filePath, ctx);
                     for (const k of keys) schemaBodyFields.add(k);
+                  }
+                }
+              }
+
+              if (singleMw && singleMw.type === "CallExpression") {
+                const callee = unwrapTSExpression(singleMw.callee);
+                if (callee.type === "Identifier" && singleMw.arguments.length > 0) {
+                  const mwName = callee.name.toLowerCase();
+                  const schemaArg = singleMw.arguments[0];
+
+                  // Express-validator: body('x'), check('x'), param('x'), query('x')
+                  if (mwName === "body" || mwName === "check") {
+                    const field = literalString(schemaArg);
+                    if (field) schemaBodyFields.add(field);
+                    continue;
+                  } else if (mwName === "param") {
+                    const field = literalString(schemaArg);
+                    if (field) schemaPathParams.add(field);
+                    continue;
+                  } else if (mwName === "query") {
+                    const field = literalString(schemaArg);
+                    if (field) schemaQueryFields.add(field);
+                    continue;
+                  }
+
+                  // Celebrate / validation object: validate({ body: schema, query: schema, params: schema })
+                  // or validate(authValidation.register) / validate(schema)
+                  let resolvedSchemaObj = schemaArg;
+                  let schemaFilePath = info.filePath;
+
+                  const extractObjFromDef = (defNode: any) => {
+                    if (!defNode) return null;
+                    if (defNode.type === "ObjectExpression") return defNode;
+                    if (defNode.type === "CallExpression") {
+                      const callee = unwrapTSExpression(defNode.callee);
+                      if (callee?.type === "MemberExpression" && !callee.computed) {
+                        const prop = callee.property;
+                        if (prop?.type === "Identifier" && (prop.name === "object" || prop.name === "keys")) {
+                          if (defNode.arguments.length > 0) {
+                            const firstArg = unwrapTSExpression(defNode.arguments[0]);
+                            if (firstArg.type === "ObjectExpression") return firstArg;
+                          }
+                        }
+                      }
+                    }
+                    return null;
+                  };
+
+                  if (schemaArg && schemaArg.type === "Identifier") {
+                    const def = await resolveIdentifierDefinition(schemaArg.name, info.filePath, ctx);
+                    if (def && def.node) {
+                      const obj = extractObjFromDef(def.node);
+                      if (obj) {
+                        resolvedSchemaObj = obj;
+                        schemaFilePath = def.filePath;
+                      }
+                    }
+                  } else if (
+                    schemaArg &&
+                    schemaArg.type === "MemberExpression" &&
+                    !schemaArg.computed &&
+                    schemaArg.object.type === "Identifier" &&
+                    schemaArg.property.type === "Identifier"
+                  ) {
+                    const def = await resolveMemberExpression(schemaArg.object.name, schemaArg.property.name, info.filePath, ctx);
+                    if (def && def.node) {
+                      const obj = extractObjFromDef(def.node);
+                      if (obj) {
+                        resolvedSchemaObj = obj;
+                        schemaFilePath = def.filePath;
+                      }
+                    }
+                  }
+
+                  if (resolvedSchemaObj && resolvedSchemaObj.type === "ObjectExpression") {
+                    let hasStructuredKey = false;
+                    for (const prop of resolvedSchemaObj.properties) {
+                      if (prop.type !== "ObjectProperty") continue;
+                      const propKey =
+                        prop.key.type === "Identifier"
+                          ? prop.key.name
+                          : prop.key.type === "StringLiteral"
+                          ? prop.key.value
+                          : "";
+                      const lowerKey = propKey.toLowerCase();
+                      if (
+                        lowerKey === "body" ||
+                        lowerKey.includes("body") ||
+                        lowerKey === "query" ||
+                        lowerKey.includes("query") ||
+                        lowerKey === "params" ||
+                        lowerKey.includes("param")
+                      ) {
+                        hasStructuredKey = true;
+                        const subKeys = await extractSchemaKeys(prop.value, schemaFilePath, ctx);
+                        if (subKeys.length > 0) {
+                          if (lowerKey === "body" || lowerKey.includes("body")) {
+                            for (const k of subKeys) schemaBodyFields.add(k);
+                          } else if (lowerKey === "query" || lowerKey.includes("query")) {
+                            for (const k of subKeys) schemaQueryFields.add(k);
+                          } else if (lowerKey === "params" || lowerKey.includes("param")) {
+                            for (const k of subKeys) schemaPathParams.add(k);
+                          }
+                        }
+                      }
+                    }
+                    if (hasStructuredKey) {
+                      continue;
+                    }
+                  }
+
+                  const keys = await extractSchemaKeys(schemaArg, info.filePath, ctx);
+                  if (keys.length > 0) {
+                    if (mwName.includes("query")) {
+                      for (const k of keys) schemaQueryFields.add(k);
+                    } else if (mwName.includes("param")) {
+                      for (const k of keys) schemaPathParams.add(k);
+                    } else {
+                      for (const k of keys) schemaBodyFields.add(k);
+                    }
                   }
                 }
               }
             }
           }
+        }
+
+        if (info.tsoaModels.size > 0 && r.handlerNode) {
+          const tsoaArgs = extractTsoaArgsForHandler(r.handlerNode, info.ast, info.tsoaModels);
+          for (const k of tsoaArgs.bodyFields) schemaBodyFields.add(k);
+          for (const k of tsoaArgs.queryFields) schemaQueryFields.add(k);
+          for (const k of tsoaArgs.pathParams) schemaPathParams.add(k);
         }
 
         if (resolved) {

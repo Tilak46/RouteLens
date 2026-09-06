@@ -32,6 +32,51 @@ function checkFileExtensions(basePath: string): string | null {
   return null;
 }
 
+function stripJsonComments(jsonString: string): string {
+  let insideString = false;
+  let insideSingleComment = false;
+  let insideMultiComment = false;
+  let output = "";
+  for (let i = 0; i < jsonString.length; i++) {
+    const ch = jsonString[i];
+    const next = jsonString[i + 1];
+
+    if (insideString) {
+      output += ch;
+      if (ch === "\\" && i + 1 < jsonString.length) {
+        output += next;
+        i++;
+      } else if (ch === '"') {
+        insideString = false;
+      }
+    } else if (insideSingleComment) {
+      if (ch === "\n" || ch === "\r") {
+        insideSingleComment = false;
+        output += ch;
+      }
+    } else if (insideMultiComment) {
+      if (ch === "*" && next === "/") {
+        insideMultiComment = false;
+        i++;
+      }
+    } else {
+      if (ch === '"') {
+        insideString = true;
+        output += ch;
+      } else if (ch === "/" && next === "/") {
+        insideSingleComment = true;
+        i++;
+      } else if (ch === "/" && next === "*") {
+        insideMultiComment = true;
+        i++;
+      } else {
+        output += ch;
+      }
+    }
+  }
+  return output.replace(/,(\s*[\]}])/g, "$1");
+}
+
 function parseTsConfigRecursively(
   configPath: string,
   visited = new Set<string>(),
@@ -42,9 +87,7 @@ function parseTsConfigRecursively(
   try {
     if (!fs.existsSync(configPath)) return {};
     const rawContent = fs.readFileSync(configPath, "utf-8");
-    const cleaned = rawContent
-      .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1")
-      .replace(/,(\s*[\]}])/g, "$1");
+    const cleaned = stripJsonComments(rawContent);
     const parsed = JSON.parse(cleaned);
 
     let baseOptions: TsConfigPaths = {};
@@ -126,14 +169,14 @@ function resolveTsconfigAlias(
       }
     }
 
-    // Wildcard match: e.g. "@/*" -> ["src/*"]
+    // Wildcard match: e.g. "@/*" -> ["src/*"] or "@/*" -> ["*"]
     if (pattern.endsWith("/*")) {
-      const prefix = pattern.slice(0, -2);
+      const prefix = pattern.slice(0, -1); // e.g. "@/"
       if (importSource.startsWith(prefix)) {
         const matched = importSource.slice(prefix.length);
         for (const rep of replacements) {
-          const repWithMatch = rep.replace(/\*/g, matched);
-          const resolved = path.resolve(baseDir, repWithMatch);
+          const repClean = rep.replace(/\*/g, matched).replace(/^[/\\]+/, "");
+          const resolved = path.resolve(baseDir, repClean);
           const filePath = checkFileExtensions(resolved);
           if (filePath) return filePath;
         }

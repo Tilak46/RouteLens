@@ -1,6 +1,6 @@
 export function normalizePath(p: string): string {
   const s = String(p || "").trim();
-  if (!s) return s;
+  if (!s || s === "/") return "/";
 
   let out = s.startsWith("/") ? s : `/${s}`;
   out = out.replace(/\\+/g, "/");
@@ -13,10 +13,11 @@ export function joinPaths(basePrefix: string, childPath: string): string {
   const base = String(basePrefix || "").trim();
   const child = String(childPath || "").trim();
 
+  if (!base && !child) return "/";
   if (!base) return normalizePath(child);
   if (!child || child === "/") return normalizePath(base);
 
   const b = normalizePath(base);
   const c = child.startsWith("/") ? child : `/${child}`;
-  return normalizePath(`${b}${c}`);
+  return normalizePath(`${b === "/" ? "" : b}${c}`);
 }
