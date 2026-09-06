@@ -275,7 +275,11 @@ function App() {
 
       // 4. Restore layout
       if (storedSidebarTab) {
-        setActiveSidebarTab(storedSidebarTab as SidebarTab);
+        if (!import.meta.env.DEV && storedSidebarTab === "settings") {
+          setActiveSidebarTab("explorer");
+        } else {
+          setActiveSidebarTab(storedSidebarTab as SidebarTab);
+        }
       }
       if (typeof storedSidebarExpanded === "boolean") {
         setIsSidebarExpanded(storedSidebarExpanded);

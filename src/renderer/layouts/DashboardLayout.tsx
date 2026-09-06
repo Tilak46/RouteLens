@@ -181,13 +181,15 @@ export function DashboardLayout({
               </Tooltip>
             )}
 
-            {/* Settings & Updates */}
-            <div className="relative">
-              <ToolbarButton tabId="settings" icon={Settings} label="Settings & Updates" />
-              {hasUpdatePending && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-background animate-pulse" />
-              )}
-            </div>
+            {/* Settings (Development Only) */}
+            {import.meta.env.DEV && (
+              <div className="relative">
+                <ToolbarButton tabId="settings" icon={Settings} label="Settings (Dev Only)" />
+                {hasUpdatePending && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-background animate-pulse" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
