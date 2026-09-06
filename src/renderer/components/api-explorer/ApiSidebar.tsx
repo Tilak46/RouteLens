@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, Folder, FileCode, Edit2, Trash, MoreHorizontal, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiFolder, ApiRoute, isRoute } from "../../../types";
@@ -187,16 +187,16 @@ type TreeNodeProps = {
   onCopyNode?: (route: ApiRoute) => void;
 };
 
-function TreeNode({
+export function TreeNode({
   node,
-  level,
+  level = 0,
   selectedKey,
   onSelect,
   onRenameNode,
   onDeleteNode,
+  onMoveNode,
   onAddFolder,
   onAddRequest,
-  onMoveNode,
   expandedFolderIds = [],
   onToggleFolderExpanded,
   newlyCreatedNodeId,
@@ -210,6 +210,7 @@ function TreeNode({
   const [renameVal, setRenameVal] = useState(node.name);
   const [dragOverPosition, setDragOverPosition] = useState<"before" | "after" | "inside" | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (newlyCreatedNodeId === node.id) {
@@ -218,6 +219,24 @@ function TreeNode({
       onClearNewlyCreatedNodeId?.();
     }
   }, [newlyCreatedNodeId, node.id]);
+
+  useEffect(() => {
+    if (!isRenaming) {
+      setRenameVal(node.name);
+    }
+  }, [node.name, isRenaming]);
+
+  useEffect(() => {
+    if (isRenaming) {
+      const timer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [isRenaming]);
   
   const paddingLeft = level * 20 + 8; // Indent
 
@@ -225,7 +244,7 @@ function TreeNode({
     const isSelected = selectedKey === node.id || selectedKey === toRouteKey(node);
     return (
       <div
-        draggable={true}
+        draggable={!isRenaming}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", node.id);
           e.stopPropagation();
@@ -288,23 +307,21 @@ function TreeNode({
         
         {isRenaming ? (
           <input
+            ref={inputRef}
             type="text"
             value={renameVal}
-            ref={(el) => {
-              if (el) {
-                el.focus();
-                el.select();
-              }
-            }}
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             onChange={(e) => setRenameVal(e.target.value)}
             onKeyDown={(e) => {
+              e.stopPropagation();
               if (e.key === "Enter") {
                 if (renameVal.trim() && onRenameNode) {
                   onRenameNode(node.id, renameVal.trim());
                 }
                 setIsRenaming(false);
               } else if (e.key === "Escape") {
+                setRenameVal(node.name);
                 setIsRenaming(false);
               }
             }}
@@ -314,7 +331,7 @@ function TreeNode({
               }
               setIsRenaming(false);
             }}
-            className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary w-[110px] font-medium text-foreground text-left"
+            className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-medium text-foreground text-left"
           />
         ) : (
           <span className="flex-1 min-w-0 truncate text-left">{node.name}</span>
@@ -430,7 +447,7 @@ function TreeNode({
   return (
     <div className="group/node relative">
       <div
-        draggable={true}
+        draggable={!isRenaming}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", node.id);
           e.stopPropagation();
@@ -521,23 +538,21 @@ function TreeNode({
 
         {isRenaming ? (
           <input
+            ref={inputRef}
             type="text"
             value={renameVal}
-            ref={(el) => {
-              if (el) {
-                el.focus();
-                el.select();
-              }
-            }}
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             onChange={(e) => setRenameVal(e.target.value)}
             onKeyDown={(e) => {
+              e.stopPropagation();
               if (e.key === "Enter") {
                 if (renameVal.trim() && onRenameNode) {
                   onRenameNode(node.id, renameVal.trim());
                 }
                 setIsRenaming(false);
               } else if (e.key === "Escape") {
+                setRenameVal(node.name);
                 setIsRenaming(false);
               }
             }}
@@ -547,7 +562,7 @@ function TreeNode({
               }
               setIsRenaming(false);
             }}
-            className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary w-[110px] font-medium text-foreground text-left"
+            className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-medium text-foreground text-left"
           />
         ) : (
           <span className="flex-1 min-w-0 truncate text-left font-medium">{node.name}</span>
