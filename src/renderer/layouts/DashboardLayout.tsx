@@ -35,6 +35,8 @@ type DashboardLayoutProps = {
   onTestExpiryClick?: () => void;
   onDevTriggerScanAnimation?: () => void;
   appVersion?: string;
+  updateBanner?: React.ReactNode;
+  hasUpdatePending?: boolean;
 };
 
 export function DashboardLayout({
@@ -51,6 +53,8 @@ export function DashboardLayout({
   onTestExpiryClick,
   onDevTriggerScanAnimation,
   appVersion,
+  updateBanner,
+  hasUpdatePending,
 }: DashboardLayoutProps) {
   // Helper for leftmost toolbar icons
   const ToolbarButton = ({
@@ -176,6 +180,14 @@ export function DashboardLayout({
                 </TooltipContent>
               </Tooltip>
             )}
+
+            {/* Settings & Updates */}
+            <div className="relative">
+              <ToolbarButton tabId="settings" icon={Settings} label="Settings & Updates" />
+              {hasUpdatePending && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-background animate-pulse" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -243,6 +255,7 @@ export function DashboardLayout({
 
         {/* 3. MAIN WORKSPACE AREA */}
         <div className="flex-1 flex flex-col min-w-0 bg-[hsl(240,5%,11%)] overflow-hidden relative">
+          {updateBanner}
           {/* Main workspace container (no padding so request/response tab layouts can fit edge-to-edge) */}
           <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
             {children}

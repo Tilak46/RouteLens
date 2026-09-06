@@ -387,7 +387,7 @@ function App() {
           label: "Restart & Update",
           onClick: () => window.api?.updates?.install?.(),
         },
-        duration: 15000,
+        duration: 45000,
       });
     });
 
@@ -1393,7 +1393,6 @@ function App() {
   return (
     <TooltipProvider>
       <Toaster position="top-right" richColors closeButton theme="dark" />
-      <UpdateGraceBanner enforcement={enforcementStatus} onInstall={handleInstallUpdate} />
       {isBetaExpired ? (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[9999] backdrop-blur-md text-foreground select-none p-6">
           <div className="max-w-md w-full bg-bg-card border border-border-main rounded-xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-300">
@@ -1441,6 +1440,8 @@ function App() {
           onTestExpiryClick={() => setTestForceExpired(true)}
           onDevTriggerScanAnimation={handleDevTriggerScanAnimation}
           appVersion={appVersion}
+          updateBanner={<UpdateGraceBanner enforcement={enforcementStatus} onInstall={handleInstallUpdate} />}
+          hasUpdatePending={!!(enforcementStatus?.hasPendingUpdate)}
         >
           {/* Settings Modals */}
           <AddProjectModal
