@@ -11,6 +11,7 @@ import {
   ApiRoute,
   ApiFolder,
   ApiHttpResponse,
+  isRoute,
 } from "@/../types";
 import { AddProjectModal } from "@/components/AddProjectModal";
 import { EditProjectModal } from "@/components/EditProjectModal";
@@ -737,6 +738,7 @@ function App() {
                 ...n,
                 name: updatedTab.name,
                 method: updatedTab.method,
+                url: updatedTab.url,
                 path: derivedPath !== undefined && derivedPath !== "" ? derivedPath : n.path,
                 params: updatedTab.params,
                 headers: updatedTab.headers,
@@ -796,6 +798,7 @@ function App() {
       id: routeId,
       name: targetTab.name || "New Request",
       method: targetTab.method || "GET",
+      url: targetTab.url || "",
       path: derivedPath || "",
       isManual: true,
       params: targetTab.params || [],
@@ -913,15 +916,23 @@ function App() {
     );
 
     if (existing) {
-      const cleanBase = baseUrl.replace(/\/+$/, "");
-      const newUrl = route.path ? `${cleanBase}${route.path}` : "";
-      if (existing.url !== newUrl) {
-        setProjectTabsMap((prevMap) => ({
-          ...prevMap,
-          [projectId]: (prevMap[projectId] || []).map((t) =>
-            t.id === existing.id ? { ...t, url: newUrl } : t
-          ),
-        }));
+      // Do NOT overwrite existing.url if the user already has a URL in the tab!
+      // Only set a fallback URL if existing tab has no URL at all
+      if (!existing.url) {
+        const cleanBase = baseUrl.replace(/\/+$/, "");
+        const fallbackUrl = route.url || (route.path
+          ? (route.path.startsWith("http://") || route.path.startsWith("https://")
+              ? route.path
+              : `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`)
+          : (cleanBase ? `${cleanBase}/` : ""));
+        if (fallbackUrl) {
+          setProjectTabsMap((prevMap) => ({
+            ...prevMap,
+            [projectId]: (prevMap[projectId] || []).map((t) =>
+              t.id === existing.id ? { ...t, url: fallbackUrl } : t
+            ),
+          }));
+        }
       }
       setProjectActiveTabIdMap((prevActiveMap) => ({
         ...prevActiveMap,
@@ -953,9 +964,11 @@ function App() {
     const finalMethod = (route.method === "ALL" ? "GET" : route.method) as Method;
 
     const cleanBase = baseUrl.replace(/\/+$/, "");
-    const initialUrl = route.path
-      ? `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`
-      : `${cleanBase}/`;
+    const initialUrl = route.url || (route.path
+      ? (route.path.startsWith("http://") || route.path.startsWith("https://")
+          ? route.path
+          : `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`)
+      : (cleanBase ? `${cleanBase}/` : ""));
 
     const newTab: RequestTab = {
       id: `scanned_${projectId}_${route.id}`,

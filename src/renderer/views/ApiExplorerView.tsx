@@ -212,6 +212,7 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
       name: finalName,
       method: userRoute?.method || scannedRoute.method,
       path: userRoute?.path || scannedRoute.path,
+      url: userRoute?.url,
       // Preserve all user request configuration:
       params: userRoute?.params !== undefined ? userRoute.params : (scannedRoute.inferredQueryFields?.map((field) => ({
         id: `query_${field}_${Math.random().toString(36).slice(2, 5)}`,

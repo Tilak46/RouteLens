@@ -164,6 +164,7 @@ export type ApiRoute = {
   name: string;
   method: Method;
   path: string;
+  url?: string;
 
   // Optional metadata for API Explorer details panels
   file?: string;
