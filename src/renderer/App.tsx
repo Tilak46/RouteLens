@@ -46,7 +46,7 @@ import { MandatoryUpdateModal } from "@/components/updates/MandatoryUpdateModal"
 
 const defaultTab = (projectId?: string | null): RequestTab => ({
   id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-  name: "Untitled Request",
+  name: "New Request",
   method: "GET",
   url: "",
   params: [],
@@ -60,6 +60,7 @@ const defaultTab = (projectId?: string | null): RequestTab => ({
   lastCompletedAt: 0,
   response: null,
   projectId: projectId || undefined,
+  isNew: true,
   preRequestScript: "",
   postResponseScript: "",
   activeScriptSubTab: "prerequest",
@@ -1118,6 +1119,7 @@ function App() {
       ...defaultTab(activeProjectId),
       name: "Quick Request",
       url: "https://httpbin.org/get",
+      isNew: false,
     };
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);

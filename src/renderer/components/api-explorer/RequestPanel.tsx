@@ -255,16 +255,23 @@ export function RequestPanel({
   const [nameInput, setNameInput] = useState(tab.name);
   const [isCookiesModalOpen, setIsCookiesModalOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoSelectedTabsRef = useRef<Set<string>>(new Set());
+  const shouldSelectOnMouseUpRef = useRef(false);
 
   useEffect(() => {
     setNameInput(tab.name);
   }, [tab.name, tab.id]);
 
   useEffect(() => {
-    if (tab.isNew && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-      onChangeTab({ ...tab, isNew: false });
+    if (tab.isNew && !autoSelectedTabsRef.current.has(tab.id)) {
+      autoSelectedTabsRef.current.add(tab.id);
+      const timer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
     }
   }, [tab.id, tab.isNew]);
 
@@ -275,9 +282,12 @@ export function RequestPanel({
   const handleCommitName = () => {
     const trimmed = nameInput.trim();
     if (trimmed && trimmed !== tab.name) {
-      onChangeTab({ ...tab, name: trimmed });
+      onChangeTab({ ...tab, name: trimmed, isNew: false });
     } else {
       setNameInput(tab.name);
+      if (tab.isNew) {
+        onChangeTab({ ...tab, isNew: false });
+      }
     }
   };
 
@@ -1099,9 +1109,20 @@ export function RequestPanel({
             type="text"
             value={nameInput}
             onChange={(e) => handleNameChange(e.target.value)}
-            onFocus={(e) => e.target.select()}
-            onClick={(e) => (e.target as HTMLInputElement).select()}
-            onBlur={handleCommitName}
+            onFocus={(e) => {
+              e.target.select();
+              shouldSelectOnMouseUpRef.current = true;
+            }}
+            onMouseUp={(e) => {
+              if (shouldSelectOnMouseUpRef.current) {
+                shouldSelectOnMouseUpRef.current = false;
+                e.preventDefault();
+              }
+            }}
+            onBlur={() => {
+              shouldSelectOnMouseUpRef.current = false;
+              handleCommitName();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 handleCommitName();
