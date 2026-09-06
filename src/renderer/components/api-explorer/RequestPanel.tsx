@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequestTab } from "./WorkspaceTabs";
 import { ApiVariable } from "./ManageEnvironmentsModal";
 import { RichUrlInput } from "./RichUrlInput";
+import { extractRoutePath } from "@/views/ApiExplorerView";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -261,6 +262,7 @@ export function RequestPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const autoSelectedTabsRef = useRef<Set<string>>(new Set());
   const shouldSelectOnMouseUpRef = useRef(false);
+  const isEscapePressedRef = useRef(false);
 
   useEffect(() => {
     setNameInput(tab.name);
@@ -388,22 +390,6 @@ export function RequestPanel({
     }
     return null;
   }, [treeCache, tab.projectId, tab.routeId, tab.id, tab.routePath, projects]);
-
-  const handleSave = () => {
-    if (onSaveTab) {
-      onSaveTab(tab);
-    } else {
-      toast.success(`Saved "${tab.name}" successfully!`);
-    }
-  };
-
-  const handleSaveAs = () => {
-    if (onSaveAsTab) {
-      onSaveAsTab(tab);
-    } else {
-      toast.success(`Created copy of "${tab.name}"`);
-    }
-  };
 
   const handleShare = () => {
     const requestUrl = url || "http://localhost:3000";
@@ -623,6 +609,41 @@ export function RequestPanel({
       ...tab,
       ...patch,
     });
+  };
+
+  const getLatestTabState = (): RequestTab => ({
+    ...tab,
+    url,
+    method,
+    params,
+    headers,
+    auth,
+    bodyMode,
+    bodyText,
+    formFields,
+    urlencodedFields,
+    binaryFilePath,
+    preRequestScript,
+    postResponseScript,
+    pathVariables,
+  });
+
+  const handleSave = () => {
+    const latest = getLatestTabState();
+    if (onSaveTab) {
+      onSaveTab(latest);
+    } else {
+      toast.success(`Saved "${latest.name}" successfully!`);
+    }
+  };
+
+  const handleSaveAs = () => {
+    const latest = getLatestTabState();
+    if (onSaveAsTab) {
+      onSaveAsTab(latest);
+    } else {
+      toast.success(`Created copy of "${latest.name}"`);
+    }
   };
 
   const handleBeautifyJson = () => {
@@ -1139,6 +1160,11 @@ export function RequestPanel({
             }}
             onBlur={() => {
               shouldSelectOnMouseUpRef.current = false;
+              if (isEscapePressedRef.current) {
+                isEscapePressedRef.current = false;
+                setNameInput(tab.name);
+                return;
+              }
               handleCommitName();
             }}
             onKeyDown={(e) => {
@@ -1146,6 +1172,7 @@ export function RequestPanel({
                 handleCommitName();
                 inputRef.current?.blur();
               } else if (e.key === "Escape") {
+                isEscapePressedRef.current = true;
                 setNameInput(tab.name); // Revert
                 inputRef.current?.blur();
               }
@@ -1280,11 +1307,18 @@ export function RequestPanel({
           value={url}
           onChange={(val) => {
             setUrl(val);
-            // Deduce a name for tab based on URL path if it wasn't a custom named tab
+            const derived = extractRoutePath(val);
+            // Deduce a name for tab based on URL path if user hasn't given it a custom business name
             let newName = tab.name;
-            if (!tab.projectId) {
-              const cleaned = val.replace(/^https?:\/\/[^\/]+/, "");
-              newName = cleaned || val;
+            const isDefaultOrPathName =
+              !tab.name ||
+              tab.name === "New Request" ||
+              tab.name === "New Request Copy" ||
+              tab.name.startsWith("/") ||
+              tab.name.startsWith("http://") ||
+              tab.name.startsWith("https://");
+            if (isDefaultOrPathName && derived) {
+              newName = derived;
             }
             updateParentTab({ url: val, name: newName });
           }}

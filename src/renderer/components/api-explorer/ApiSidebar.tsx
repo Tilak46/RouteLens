@@ -37,9 +37,7 @@ type SidebarProps = {
   onCopyNode?: (route: ApiRoute) => void;
 };
 
-const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
-  return `${String(route.method).toUpperCase()}:${route.path}`;
-};
+import { toRouteKey } from "@/views/ApiExplorerView";
 
 const findNodeInTree = (id: string, nodes: (ApiFolder | ApiRoute)[]): ApiFolder | ApiRoute | null => {
   for (const n of nodes) {
@@ -211,6 +209,7 @@ export function TreeNode({
   const [dragOverPosition, setDragOverPosition] = useState<"before" | "after" | "inside" | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isEscapePressedRef = useRef(false);
 
   useEffect(() => {
     if (newlyCreatedNodeId === node.id) {
@@ -321,11 +320,18 @@ export function TreeNode({
                 }
                 setIsRenaming(false);
               } else if (e.key === "Escape") {
+                isEscapePressedRef.current = true;
                 setRenameVal(node.name);
                 setIsRenaming(false);
               }
             }}
             onBlur={() => {
+              if (isEscapePressedRef.current) {
+                isEscapePressedRef.current = false;
+                setRenameVal(node.name);
+                setIsRenaming(false);
+                return;
+              }
               if (renameVal.trim() && onRenameNode) {
                 onRenameNode(node.id, renameVal.trim());
               }
@@ -561,11 +567,18 @@ export function TreeNode({
                 }
                 setIsRenaming(false);
               } else if (e.key === "Escape") {
+                isEscapePressedRef.current = true;
                 setRenameVal(node.name);
                 setIsRenaming(false);
               }
             }}
             onBlur={() => {
+              if (isEscapePressedRef.current) {
+                isEscapePressedRef.current = false;
+                setRenameVal(node.name);
+                setIsRenaming(false);
+                return;
+              }
               if (renameVal.trim() && onRenameNode) {
                 onRenameNode(node.id, renameVal.trim());
               }

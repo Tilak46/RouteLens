@@ -27,7 +27,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send, RefreshCw, ArrowRight, FolderOpen, Layers, Code2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { ApiExplorerSidebarPanel, mergeTrees } from "@/views/ApiExplorerView";
+import { ApiExplorerSidebarPanel, mergeTrees, extractRoutePath, toRouteKey } from "@/views/ApiExplorerView";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
 import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarPanel";
 
@@ -722,7 +722,7 @@ function App() {
 
       // Derive clean relative path from URL if present
       const derivedPath = updatedTab.url
-        ? updatedTab.url.replace(/^https?:\/\/[^\/]+/, "")
+        ? extractRoutePath(updatedTab.url)
         : undefined;
 
       for (const projectPath of Object.keys(prev)) {
@@ -783,7 +783,7 @@ function App() {
 
   const handleSaveTabToTree = (targetTab: RequestTab, parentFolderId: string | null = null) => {
     const projId = targetTab.projectId || activeProjectId;
-    const project = projects.find((p) => p.id === projId);
+    const project = projects.find((p) => p.id === projId) || projects[0];
     if (!project) {
       toast.error("No active project to save request to");
       return;
@@ -791,7 +791,7 @@ function App() {
 
     const routeId = targetTab.routeId || `request_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const derivedPath = targetTab.url
-      ? targetTab.url.replace(/^https?:\/\/[^\/]+/, "")
+      ? extractRoutePath(targetTab.url)
       : "";
 
     const newRoute: ApiRoute = {
@@ -893,8 +893,15 @@ function App() {
     );
   };
 
-  const handleSidebarDeleteNode = (nodeId: string) => {
-    setTabs((prev) => prev.filter((t) => t.routeId !== nodeId && t.id !== nodeId));
+  const handleSidebarDeleteNode = (nodeIds: string | string[]) => {
+    const idSet = new Set(Array.isArray(nodeIds) ? nodeIds : [nodeIds]);
+    setTabs((prev) => {
+      const next = prev.filter((t) => !idSet.has(t.routeId || "") && !idSet.has(t.id));
+      if (activeTabId && (idSet.has(activeTab?.routeId || "") || idSet.has(activeTabId))) {
+        setActiveTabId(next[next.length - 1]?.id || null);
+      }
+      return next;
+    });
   };
 
   const handleUpdateTabResponse = (tabId: string, response: ApiHttpResponse) => {
@@ -912,7 +919,9 @@ function App() {
     // 2. Look up existing tab within this project's scoped tabs
     const currentProjTabs = projectTabsMap[projectId] || [];
     const existing = currentProjTabs.find(
-      (t) => t.routeId === route.id || (t.routePath === route.path && !t.routeId)
+      (t) =>
+        (route.id && t.routeId === route.id) ||
+        (Boolean(t.routePath) && t.routePath === route.path && t.method === route.method && !t.routeId)
     );
 
     if (existing) {
@@ -920,11 +929,14 @@ function App() {
       // Only set a fallback URL if existing tab has no URL at all
       if (!existing.url) {
         const cleanBase = baseUrl.replace(/\/+$/, "");
-        const fallbackUrl = route.url || (route.path
-          ? (route.path.startsWith("http://") || route.path.startsWith("https://")
-              ? route.path
-              : `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`)
-          : (cleanBase ? `${cleanBase}/` : ""));
+        const fallbackUrl =
+          route.url !== undefined && route.url !== ""
+            ? route.url
+            : (route.path
+                ? (route.path.startsWith("http://") || route.path.startsWith("https://")
+                    ? route.path
+                    : `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`)
+                : (cleanBase ? `${cleanBase}/` : ""));
         if (fallbackUrl) {
           setProjectTabsMap((prevMap) => ({
             ...prevMap,
@@ -964,11 +976,14 @@ function App() {
     const finalMethod = (route.method === "ALL" ? "GET" : route.method) as Method;
 
     const cleanBase = baseUrl.replace(/\/+$/, "");
-    const initialUrl = route.url || (route.path
-      ? (route.path.startsWith("http://") || route.path.startsWith("https://")
-          ? route.path
-          : `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`)
-      : (cleanBase ? `${cleanBase}/` : ""));
+    const initialUrl =
+      route.url !== undefined && route.url !== ""
+        ? route.url
+        : (route.path
+            ? (route.path.startsWith("http://") || route.path.startsWith("https://")
+                ? route.path
+                : `${cleanBase}${route.path.startsWith("/") ? route.path : `/${route.path}`}`)
+            : (cleanBase ? `${cleanBase}/` : ""));
 
     const newTab: RequestTab = {
       id: `scanned_${projectId}_${route.id}`,
@@ -1021,9 +1036,10 @@ function App() {
     setProjectTabsMap((prevMap) => {
       const projTabs = prevMap[projectId] || [];
       const updated = projTabs.map((t) => {
+        const queryAndHash = (t.url.match(/[?#].*$/) || [""])[0];
         if (t.routePath) {
           const pathWithSlash = t.routePath.startsWith("/") ? t.routePath : `/${t.routePath}`;
-          return { ...t, url: `${cleanNoSlash}${pathWithSlash}` };
+          return { ...t, url: `${cleanNoSlash}${pathWithSlash}${queryAndHash}` };
         }
         if (proj?.url) {
           const oldClean = proj.url.replace(/\/+$/, "");
@@ -1393,7 +1409,7 @@ function App() {
     if (!activeTab) return null;
     if (activeTab.routeId) return activeTab.routeId;
     if (activeTab.method && activeTab.routePath) {
-      return `${String(activeTab.method).toUpperCase()}:${activeTab.routePath}`;
+      return toRouteKey({ method: activeTab.method, path: activeTab.routePath });
     }
     return null;
   }, [activeTab]);

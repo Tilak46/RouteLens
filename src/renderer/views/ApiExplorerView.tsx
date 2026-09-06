@@ -41,7 +41,7 @@ export type ApiExplorerSidebarPanelProps = {
   onRemoveProject?: (id: string) => void;
   onRescanProject?: (project: Project) => void;
   onRenameNode?: (nodeId: string, newName: string) => void;
-  onDeleteNode?: (nodeId: string) => void;
+  onDeleteNode?: (nodeIds: string | string[]) => void;
   isScanning?: boolean;
   scanningProjectId?: string | null;
 };
@@ -52,8 +52,31 @@ function guessNameFromPath(p: string) {
   return parts[parts.length - 1] || "Project";
 }
 
-const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
-  return `${String(route.method).toUpperCase()}:${route.path}`;
+export function extractRoutePath(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== "string") return "";
+  let s = rawUrl.trim();
+  // Strip protocol (http://, https://)
+  s = s.replace(/^https?:\/\//i, "");
+  // Strip environment variable host placeholders, e.g. {{baseUrl}}, {{host}}:{{port}}
+  s = s.replace(/^(\{\{[^}]+\}\}:?)+/, "");
+  // Strip host/port
+  s = s.replace(/^[a-zA-Z0-9.-]+(:\d+)?/, "");
+  // Strip query string and fragment
+  s = s.replace(/[?#].*$/, "");
+  // Ensure leading slash if not empty
+  if (s && !s.startsWith("/")) {
+    s = "/" + s;
+  }
+  return s;
+}
+
+export const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
+  const method = String(route.method || "GET").toUpperCase();
+  let p = String(route.path || "").trim();
+  if (p && !p.startsWith("/")) {
+    p = "/" + p;
+  }
+  return `${method}:${p}`;
 };
 
 type UserRouteItem = ApiRoute & { parentId: string | null };
@@ -540,6 +563,21 @@ export function ApiExplorerSidebarPanel({
   };
 
   const handleDeleteNode = (nodeId: string) => {
+    // 1. Collect all descendant IDs to cleanly cascade tab closures
+    const deletedIds: string[] = [];
+    const collectIds = (n: ApiFolder | ApiRoute) => {
+      deletedIds.push(n.id);
+      if (!isRoute(n) && Array.isArray(n.children)) {
+        n.children.forEach(collectIds);
+      }
+    };
+    const target = findNode(nodeId, currentTree);
+    if (target) {
+      collectIds(target);
+    } else {
+      deletedIds.push(nodeId);
+    }
+
     const deleteRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
       return nodes
         .filter((n) => n.id !== nodeId)
@@ -552,7 +590,7 @@ export function ApiExplorerSidebarPanel({
     };
     const next = deleteRecursive(currentTree) as ApiFolder[];
     saveTreeCache(next);
-    onDeleteNode?.(nodeId);
+    onDeleteNode?.(deletedIds);
   };
 
   const handleDuplicateNode = (nodeId: string) => {
@@ -567,7 +605,15 @@ export function ApiExplorerSidebarPanel({
             ...n,
             id: `request_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
             name: `${n.name} Copy`,
+            isManual: true,
+            isStale: false,
             isNew: true,
+            params: (n.params || []).map((p) => ({ ...p })),
+            headers: (n.headers || []).map((h) => ({ ...h })),
+            auth: n.auth ? JSON.parse(JSON.stringify(n.auth)) : { type: "none" },
+            formFields: (n.formFields || []).map((f) => ({ ...f })),
+            urlencodedFields: (n.urlencodedFields || []).map((u) => ({ ...u })),
+            pathVariables: (n.pathVariables || []).map((pv) => ({ ...pv })),
           };
           result.push(duplicatedRequest);
         } else if (!isRoute(n) && Array.isArray(n.children)) {
@@ -611,6 +657,9 @@ export function ApiExplorerSidebarPanel({
       return;
     }
 
+    // Auto-expand parent folder so the new folder is visible
+    handleToggleFolderExpanded(parentFolderId, true);
+
     const addRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
       return nodes.map((n) => {
         if (n.id === parentFolderId && !isRoute(n)) {
@@ -653,6 +702,9 @@ export function ApiExplorerSidebarPanel({
       handleRouteClick(newRequest);
       return;
     }
+
+    // Auto-expand parent folder so the new request is visible
+    handleToggleFolderExpanded(parentFolderId, true);
 
     const addRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
       return nodes.map((n) => {
@@ -725,9 +777,11 @@ export function ApiExplorerSidebarPanel({
     const treeWithoutDragged = removeNode(currentTree) as ApiFolder[];
     if (!draggedNode) return;
 
+    let inserted = false;
     const insertNode = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
       const idx = nodes.findIndex((n) => n.id === targetNodeId);
       if (idx !== -1) {
+        inserted = true;
         const result = [...nodes];
         if (position === "inside" && !isRoute(result[idx])) {
           const folder = result[idx] as ApiFolder;
@@ -756,6 +810,14 @@ export function ApiExplorerSidebarPanel({
       next = [...treeWithoutDragged, draggedNode as ApiFolder];
     } else {
       next = insertNode(treeWithoutDragged) as ApiFolder[];
+      // Fallback: if target wasn't found, keep node at root to prevent data loss
+      if (!inserted) {
+        next = [...treeWithoutDragged, draggedNode as ApiFolder];
+      }
+    }
+
+    if (position === "inside" && targetNodeId) {
+      handleToggleFolderExpanded(targetNodeId, true);
     }
 
     saveTreeCache(next);
