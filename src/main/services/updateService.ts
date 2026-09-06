@@ -256,8 +256,8 @@ export function initUpdateService(getMainWindow: () => BrowserWindow | null): vo
   });
 
   ipcMain.handle("updates:install", () => {
-    console.log("[UpdateService] Quitting and installing update...");
-    autoUpdater.quitAndInstall(false, true);
+    console.log("[UpdateService] Quitting and installing update (silent = true, forceRunAfter = true)...");
+    autoUpdater.quitAndInstall(true, true);
   });
 
   ipcMain.handle("updates:get-version", () => {

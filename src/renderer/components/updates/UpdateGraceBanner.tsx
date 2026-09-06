@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, ArrowUpCircle, X, Clock } from "lucide-react";
+import { Sparkles, ArrowUpCircle, X } from "lucide-react";
 
 export type UpdateEnforcementData = {
   hasPendingUpdate: boolean;
@@ -24,46 +24,42 @@ type UpdateGraceBannerProps = {
 export function UpdateGraceBanner({ enforcement, onInstall }: UpdateGraceBannerProps) {
   const [isDismissed, setIsDismissed] = useState(false);
 
-  if (!enforcement || !enforcement.hasPendingUpdate || !enforcement.isGracePeriodActive || isDismissed) {
+  if (!enforcement || !enforcement.hasPendingUpdate || isDismissed) {
     return null;
   }
 
-  const hours = enforcement.remainingHours;
-  const minutes = enforcement.remainingMinutes;
-  const timeText = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} minutes`;
-
   return (
-    <div className="relative z-40 bg-gradient-to-r from-amber-500/15 via-amber-500/20 to-orange-500/15 border-b border-amber-500/30 px-3 py-1.5 flex items-center justify-between text-xs text-amber-200 backdrop-blur-sm shadow-sm select-none">
-      <div className="flex items-center gap-2 overflow-hidden mr-2">
-        <div className="p-1 rounded-full bg-amber-500/20 text-amber-400 shrink-0">
-          <AlertTriangle size={13} className="animate-pulse" />
+    <div className="relative z-40 bg-[hsl(240,6%,13%)]/95 border-b border-primary/25 px-4 py-2 flex items-center justify-between text-xs text-foreground/90 backdrop-blur-md shadow-md select-none transition-all duration-200">
+      <div className="flex items-center gap-2.5 overflow-hidden mr-3">
+        <div className="w-6 h-6 rounded-md bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-sm">
+          <Sparkles size={13} className="animate-pulse" />
         </div>
-        <div className="truncate">
-          <span className="font-semibold text-amber-300">Mandatory Update: </span>
-          <span className="text-foreground/90">
-            RouteLens <span className="font-mono font-medium text-amber-300">v{enforcement.version}</span> is ready to install.
+        <div className="truncate flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-white">Update Ready:</span>
+          <span className="text-zinc-300">RouteLens</span>
+          <span className="font-mono font-medium text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[11px]">
+            v{enforcement.version}
           </span>
-          <span className="ml-1.5 inline-flex items-center gap-1 text-amber-300 font-mono text-[11px] bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/20">
-            <Clock size={10} />
-            Required in {timeText}
+          <span className="text-zinc-400 hidden sm:inline text-[11px]">
+            is ready to install. Restart to apply the latest improvements.
           </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={onInstall}
-          className="py-1 px-2.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-semibold text-[11px] flex items-center gap-1.5 shadow-sm transition-all duration-150 cursor-pointer"
+          className="py-1 px-3 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-[11px] flex items-center gap-1.5 shadow-sm transition-all duration-150 cursor-pointer hover:shadow-primary/20 hover:shadow-md active:scale-95"
         >
-          <ArrowUpCircle size={12} />
+          <ArrowUpCircle size={13} />
           <span>Restart & Update</span>
         </button>
         <button
           onClick={() => setIsDismissed(true)}
-          className="p-1 rounded hover:bg-amber-500/20 text-amber-300/80 hover:text-amber-200 transition-colors"
+          className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
           title="Dismiss banner for this session"
         >
-          <X size={13} />
+          <X size={14} />
         </button>
       </div>
     </div>

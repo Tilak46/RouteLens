@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Project,
   Group,
@@ -88,6 +88,7 @@ function App() {
   // Mandatory Auto-Update Enforcement State
   const [enforcementStatus, setEnforcementStatus] = useState<UpdateEnforcementData | null>(null);
   const [appVersion, setAppVersion] = useState<string>("0.1.0");
+  const [isApplyingUpdate, setIsApplyingUpdate] = useState<boolean>(false);
 
   // Layout UI state
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>("explorer");
@@ -336,6 +337,23 @@ function App() {
     apiClient.storeSet("isSidebarExpanded", isSidebarExpanded);
   }, [isSidebarExpanded, isLayoutRestored]);
 
+  const handleInstallUpdate = useCallback(async () => {
+    try {
+      setIsApplyingUpdate(true);
+      setTimeout(async () => {
+        try {
+          await window.api?.updates?.install?.();
+        } catch (err: any) {
+          setIsApplyingUpdate(false);
+          toast.error("Failed to apply update: " + (err?.message || err));
+        }
+      }, 600);
+    } catch (err: any) {
+      setIsApplyingUpdate(false);
+      toast.error("Failed to apply update: " + (err?.message || err));
+    }
+  }, []);
+
   // Load initial configurations from Electron Store
   useEffect(() => {
     apiClient.getSettings();
@@ -375,17 +393,17 @@ function App() {
     // Auto-update notifications
     window.api?.updates?.onUpdateAvailable?.((info) => {
       toast.info(`Update Available (v${info.version})`, {
-        description: "A new version of RouteLens is downloading in the background.",
-        duration: 6000,
+        description: "Downloading the latest version in the background...",
+        duration: 8000,
       });
     });
 
     window.api?.updates?.onUpdateDownloaded?.((info) => {
-      toast.success(`Update Ready (v${info.version})`, {
-        description: "RouteLens has downloaded the new version and is ready to install.",
+      toast.success(`RouteLens v${info.version} Ready`, {
+        description: "Update downloaded! Restart anytime to apply automatically.",
         action: {
           label: "Restart & Update",
-          onClick: () => window.api?.updates?.install?.(),
+          onClick: handleInstallUpdate,
         },
         duration: 45000,
       });
@@ -1382,17 +1400,26 @@ function App() {
     toast.success(`Variable saved: ${key}`);
   };
 
-  const handleInstallUpdate = async () => {
-    try {
-      await window.api?.updates?.install?.();
-    } catch (err: any) {
-      toast.error("Failed to apply update: " + (err?.message || err));
-    }
-  };
-
   return (
     <TooltipProvider>
       <Toaster position="top-right" richColors closeButton theme="dark" />
+      {/* Updating & Auto-Relaunch Screen */}
+      {isApplyingUpdate && (
+        <div className="fixed inset-0 z-[10000] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary mb-5 shadow-2xl shadow-primary/20">
+            <RefreshCw size={28} className="animate-spin text-primary" />
+          </div>
+          <h2 className="text-xl font-bold text-white tracking-tight mb-2">
+            Updating RouteLens...
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-sm leading-relaxed mb-6">
+            Applying the latest update. RouteLens will close and reopen automatically in a few moments.
+          </p>
+          <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="w-full h-full bg-primary animate-pulse rounded-full" />
+          </div>
+        </div>
+      )}
       {isBetaExpired ? (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[9999] backdrop-blur-md text-foreground select-none p-6">
           <div className="max-w-md w-full bg-bg-card border border-border-main rounded-xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-300">

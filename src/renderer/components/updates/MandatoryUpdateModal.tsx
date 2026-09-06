@@ -1,4 +1,4 @@
-import { ShieldAlert, ArrowUpCircle, RefreshCw } from "lucide-react";
+import { Sparkles, ArrowUpCircle } from "lucide-react";
 import { UpdateEnforcementData } from "./UpdateGraceBanner";
 
 type MandatoryUpdateModalProps = {
@@ -17,33 +17,33 @@ export function MandatoryUpdateModal({ enforcement, onInstall }: MandatoryUpdate
       onKeyDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="w-full max-w-md bg-card/95 border border-red-500/40 rounded-xl p-6 shadow-2xl shadow-red-950/40 text-center relative overflow-hidden">
+      <div className="w-full max-w-md bg-card/95 border border-primary/30 rounded-xl p-6 shadow-2xl shadow-black/60 text-center relative overflow-hidden">
         {/* Top decorative glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-red-500/10 blur-2xl rounded-full pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-primary/15 blur-2xl rounded-full pointer-events-none" />
 
-        {/* Warning Icon Badge */}
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 mb-4 shadow-inner">
-          <ShieldAlert size={28} className="animate-pulse" />
+        {/* Update Icon Badge */}
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary mb-4 shadow-inner">
+          <Sparkles size={26} className="animate-pulse" />
         </div>
 
         {/* Headline */}
         <h2 className="text-lg font-bold text-foreground tracking-tight mb-1.5">
-          Update Required to Continue
+          RouteLens Update Ready
         </h2>
         
         <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-          RouteLens <span className="font-mono text-primary font-semibold">v{enforcement.version}</span> is a mandatory update. The 48-hour grace period for this release has expired. Please restart now to apply critical updates and ensure workspace stability.
+          RouteLens <span className="font-mono text-primary font-semibold">v{enforcement.version}</span> has been downloaded. Restart RouteLens to apply the latest improvements and continue exploring.
         </p>
 
         {/* Release Specs Pill */}
         <div className="p-2.5 rounded-lg bg-secondary/50 border border-border/60 text-left space-y-1.5 mb-5 text-[11px]">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Required Version:</span>
-            <span className="font-mono font-semibold text-foreground">v{enforcement.version}</span>
+            <span className="text-muted-foreground">New Version:</span>
+            <span className="font-mono font-semibold text-primary">v{enforcement.version}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Grace Window:</span>
-            <span className="font-mono text-red-400 font-medium">Expired (48h reached)</span>
+            <span className="text-muted-foreground">Status:</span>
+            <span className="font-mono text-emerald-400 font-medium">Ready to install</span>
           </div>
           {enforcement.isSimulated && (
             <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-amber-400">
@@ -56,14 +56,14 @@ export function MandatoryUpdateModal({ enforcement, onInstall }: MandatoryUpdate
         {/* Primary Action Button */}
         <button
           onClick={onInstall}
-          className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/30 transition-all duration-150 cursor-pointer"
+          className="w-full py-2.5 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all duration-150 cursor-pointer active:scale-98"
         >
           <ArrowUpCircle size={16} />
           <span>Restart & Update Now</span>
         </button>
 
         <p className="text-[10px] text-muted-foreground/70 mt-3">
-          Your open tabs, project states, and environments will be preserved automatically upon restart.
+          Your open tabs, project states, and environments are preserved automatically.
         </p>
       </div>
     </div>

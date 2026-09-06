@@ -337,13 +337,13 @@ export function SettingsSidebarPanel({
           </div>
         )}
 
-        {/* Mandatory Policy & Test Simulator */}
+        {/* Update Status Details */}
         {enforcement?.hasPendingUpdate && (
           <div className="pt-2 border-t border-border/50 text-[10px] space-y-1">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span>Mandatory Deadline:</span>
-              <span className="font-mono text-amber-400 font-medium">
-                {enforcement.isEnforced ? "Expired" : `${enforcement.remainingHours}h ${enforcement.remainingMinutes}m`}
+              <span>Status:</span>
+              <span className="font-mono text-emerald-400 font-medium">
+                v{enforcement.version} ready to install
               </span>
             </div>
           </div>

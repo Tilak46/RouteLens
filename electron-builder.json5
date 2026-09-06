@@ -30,10 +30,14 @@
     artifactName: "${productName}-Windows-${version}-Setup.${ext}",
   },
   nsis: {
-    oneClick: false,
+    oneClick: true,
     perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    allowElevation: true,
     deleteAppDataOnUninstall: false,
+    runAfterFinish: true,
+    createDesktopShortcut: "always",
+    createStartMenuShortcut: true,
+    shortcutName: "RouteLens",
   },
   linux: {
     target: ["AppImage"],
