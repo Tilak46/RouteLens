@@ -506,21 +506,43 @@ function findFunctionInFile(ast: any, functionName: string): any {
 
 function unwrapFunctionNode(node: any): any {
   if (!node) return null;
+  node = unwrapTSExpression(node);
   if (
     node.type === "ArrowFunctionExpression" ||
-    node.type === "FunctionExpression"
+    node.type === "FunctionExpression" ||
+    node.type === "FunctionDeclaration" ||
+    node.type === "ClassMethod" ||
+    node.type === "MethodDefinition" ||
+    node.type === "ObjectMethod"
   ) {
     return node;
   }
-  if (node.type === "CallExpression" && Array.isArray(node.arguments)) {
-    for (const arg of node.arguments) {
-      const unwrapped = unwrapFunctionNode(arg);
-      if (unwrapped) {
-        if (node.leadingComments && !unwrapped.leadingComments) {
-          unwrapped.leadingComments = node.leadingComments;
+  if (node.type === "CallExpression") {
+    const callee = unwrapTSExpression(node.callee);
+    if (
+      callee &&
+      (callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression") &&
+      !callee.computed &&
+      callee.property.type === "Identifier" &&
+      callee.property.name === "bind"
+    ) {
+      const unwrapped = unwrapFunctionNode(callee.object);
+      if (unwrapped) return unwrapped;
+    }
+    if (Array.isArray(node.arguments)) {
+      for (const arg of node.arguments) {
+        const unwrapped = unwrapFunctionNode(arg);
+        if (unwrapped) {
+          if (node.leadingComments && !unwrapped.leadingComments) {
+            unwrapped.leadingComments = node.leadingComments;
+          }
+          return unwrapped;
         }
-        return unwrapped;
       }
+    }
+    if (callee && callee.type === "CallExpression") {
+      const unwrapped = unwrapFunctionNode(callee);
+      if (unwrapped) return unwrapped;
     }
   }
   return null;
@@ -1129,29 +1151,38 @@ async function resolveMemberExpression(
   if (visited.has(k)) return null;
   visited.add(k);
 
-  const resolvedObj = await resolveImportedIdentifier(objName, filePath, ctx);
-  if (!resolvedObj) return null;
+  let resolvedObj = await resolveImportedIdentifier(objName, filePath, ctx);
+  let ast: any = null;
 
-  const ast = await ctx.getAst(resolvedObj.filePath);
-  if (!ast) return null;
+  if (resolvedObj) {
+    ast = await ctx.getAst(resolvedObj.filePath);
+  } else {
+    const localAst = await ctx.getAst(filePath);
+    if (localAst) {
+      resolvedObj = { filePath, localName: objName };
+      ast = localAst;
+    }
+  }
+
+  if (!resolvedObj || !ast) return null;
 
   let declNode: any = null;
   traverse(ast, {
     VariableDeclarator(p) {
       const id = unwrapTSExpression(p.node.id);
-      if (id && id.type === "Identifier" && id.name === resolvedObj.localName) {
+      if (id && id.type === "Identifier" && id.name === resolvedObj!.localName) {
         declNode = p.node.init;
         p.stop();
       }
     },
     ClassDeclaration(p) {
-      if (p.node.id && p.node.id.name === resolvedObj.localName) {
+      if (p.node.id && p.node.id.name === resolvedObj!.localName) {
         declNode = p.node;
         p.stop();
       }
     },
     FunctionDeclaration(p) {
-      if (p.node.id && p.node.id.name === resolvedObj.localName) {
+      if (p.node.id && p.node.id.name === resolvedObj!.localName) {
         declNode = p.node;
         p.stop();
       }
@@ -1219,21 +1250,74 @@ async function resolveMemberExpression(
 async function resolveHandlerNode(
   handlerNode: any,
   currentFilePath: string,
-  ctx: ScannerContext
+  ctx: ScannerContext,
+  visited = new Set<string>()
 ): Promise<{ node: any; filePath: string } | null> {
   if (!handlerNode) return null;
   handlerNode = unwrapTSExpression(handlerNode);
 
   if (
     handlerNode.type === "ArrowFunctionExpression" ||
-    handlerNode.type === "FunctionExpression"
+    handlerNode.type === "FunctionExpression" ||
+    handlerNode.type === "FunctionDeclaration" ||
+    handlerNode.type === "ClassMethod" ||
+    handlerNode.type === "MethodDefinition" ||
+    handlerNode.type === "ObjectMethod"
   ) {
     const unwrapped = unwrapFunctionNode(handlerNode);
     return unwrapped ? { node: unwrapped, filePath: currentFilePath } : null;
   }
 
+  if (handlerNode.type === "CallExpression") {
+    const callee = unwrapTSExpression(handlerNode.callee);
+
+    // 1. Check for .bind(thisArg)
+    // e.g. controller.method.bind(controller)
+    if (
+      callee &&
+      (callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression") &&
+      !callee.computed &&
+      callee.property.type === "Identifier" &&
+      callee.property.name === "bind"
+    ) {
+      const res = await resolveHandlerNode(callee.object, currentFilePath, ctx, visited);
+      if (res) return res;
+    }
+
+    // 2. Check arguments for wrapper functions
+    // e.g. asyncHandler(async (req, res) => ...), catchAsync(controller.method), wrap(fn)
+    if (Array.isArray(handlerNode.arguments) && handlerNode.arguments.length > 0) {
+      for (const arg of handlerNode.arguments) {
+        const res = await resolveHandlerNode(arg, currentFilePath, ctx, visited);
+        if (res) return res;
+      }
+    }
+
+    // 3. Curried wrappers: e.g. authorize("admin")(actualHandler)
+    if (callee && callee.type === "CallExpression") {
+      const res = await resolveHandlerNode(callee, currentFilePath, ctx, visited);
+      if (res) return res;
+    }
+  }
+
   if (handlerNode.type === "Identifier") {
     const localName = handlerNode.name;
+    const k = `${currentFilePath}#${localName}`;
+    if (visited.has(k)) return null;
+    visited.add(k);
+
+    // Check current file first
+    const currentAst = await ctx.getAst(currentFilePath);
+    if (currentAst) {
+      const funcNode = findFunctionInFile(currentAst, localName);
+      if (funcNode) {
+        const unwrapped = unwrapFunctionNode(funcNode);
+        if (unwrapped) return { node: unwrapped, filePath: currentFilePath };
+        const res = await resolveHandlerNode(funcNode, currentFilePath, ctx, visited);
+        if (res) return res;
+      }
+    }
+
     const resolved = await resolveImportedIdentifier(localName, currentFilePath, ctx);
     if (!resolved) return null;
 
@@ -1244,6 +1328,8 @@ async function resolveHandlerNode(
     if (funcNode) {
       const unwrapped = unwrapFunctionNode(funcNode);
       if (unwrapped) return { node: unwrapped, filePath: resolved.filePath };
+      const res = await resolveHandlerNode(funcNode, resolved.filePath, ctx, visited);
+      if (res) return res;
     }
   }
 
@@ -1260,6 +1346,8 @@ async function resolveHandlerNode(
       if (resolved) {
         const unwrapped = unwrapFunctionNode(resolved.node);
         if (unwrapped) return { node: unwrapped, filePath: resolved.filePath };
+        const res = await resolveHandlerNode(resolved.node, resolved.filePath, ctx, visited);
+        if (res) return res;
       }
     }
 
@@ -1269,6 +1357,8 @@ async function resolveHandlerNode(
       if (resolved) {
         const unwrapped = unwrapFunctionNode(resolved.node);
         if (unwrapped) return { node: unwrapped, filePath: resolved.filePath };
+        const res = await resolveHandlerNode(resolved.node, resolved.filePath, ctx, visited);
+        if (res) return res;
       }
     }
   }
@@ -2371,6 +2461,36 @@ function computeRouterPrefixes(
   return prefixes;
 }
 
+function extractExpressValidatorCall(callNode: any): { type: "body" | "check" | "query" | "param"; field: string } | null {
+  if (!callNode) return null;
+  callNode = unwrapTSExpression(callNode);
+  if (!callNode || callNode.type !== "CallExpression") return null;
+  let curr = callNode;
+  while (curr && curr.type === "CallExpression") {
+    const callee = unwrapTSExpression(curr.callee);
+    if (!callee) break;
+    if (callee.type === "Identifier") {
+      const name = callee.name.toLowerCase();
+      if (name === "body" || name === "check") {
+        const field = curr.arguments.length > 0 ? literalString(curr.arguments[0]) : null;
+        if (field) return { type: "body", field };
+      } else if (name === "param") {
+        const field = curr.arguments.length > 0 ? literalString(curr.arguments[0]) : null;
+        if (field) return { type: "param", field };
+      } else if (name === "query") {
+        const field = curr.arguments.length > 0 ? literalString(curr.arguments[0]) : null;
+        if (field) return { type: "query", field };
+      }
+      break;
+    } else if (callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression") {
+      curr = unwrapTSExpression(callee.object);
+    } else {
+      break;
+    }
+  }
+  return null;
+}
+
 export const expressParser: FrameworkParser = {
   id: "express",
   detectProject: () => true,
@@ -2425,8 +2545,39 @@ export const expressParser: FrameworkParser = {
                 : [unwrappedMw];
 
             for (const singleMw of mwsToCheck) {
-              if (singleMw && singleMw.type === "Identifier" && info.ast) {
-                const mwFunc = findFunctionInFile(info.ast, singleMw.name);
+              if (!singleMw) continue;
+
+              const directEv = extractExpressValidatorCall(singleMw);
+              if (directEv) {
+                if (directEv.type === "body" || directEv.type === "check") schemaBodyFields.add(directEv.field);
+                else if (directEv.type === "param") schemaPathParams.add(directEv.field);
+                else if (directEv.type === "query") schemaQueryFields.add(directEv.field);
+                continue;
+              }
+
+              if (singleMw.type === "Identifier") {
+                const def = await resolveIdentifierDefinition(singleMw.name, info.filePath, ctx);
+                if (def && def.node) {
+                  const unwrappedDef = unwrapTSExpression(def.node);
+                  if (unwrappedDef && unwrappedDef.type === "ArrayExpression") {
+                    for (const el of unwrappedDef.elements) {
+                      const unwrappedEl = unwrapTSExpression(el);
+                      if (!unwrappedEl) continue;
+                      const elEv = extractExpressValidatorCall(unwrappedEl);
+                      if (elEv) {
+                        if (elEv.type === "body" || elEv.type === "check") schemaBodyFields.add(elEv.field);
+                        else if (elEv.type === "param") schemaPathParams.add(elEv.field);
+                        else if (elEv.type === "query") schemaQueryFields.add(elEv.field);
+                      } else {
+                        const keys = await extractSchemaKeys(unwrappedEl, def.filePath, ctx);
+                        for (const k of keys) schemaBodyFields.add(k);
+                      }
+                    }
+                  }
+                }
+
+                if (info.ast) {
+                  const mwFunc = findFunctionInFile(info.ast, singleMw.name);
                 if (mwFunc) {
                   let foundSchemaNode: any = null;
                   traverse(
@@ -2488,6 +2639,7 @@ export const expressParser: FrameworkParser = {
                   }
                 }
               }
+            }
 
               if (singleMw && singleMw.type === "CallExpression") {
                 const callee = unwrapTSExpression(singleMw.callee);
