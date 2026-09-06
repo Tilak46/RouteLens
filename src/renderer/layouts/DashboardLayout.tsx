@@ -12,11 +12,11 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  FolderCode,
   Terminal,
   Lock,
   Ghost,
 } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 
 export type SidebarTab = "explorer" | "automations" | "settings";
@@ -114,9 +114,10 @@ export function DashboardLayout({
               <TooltipTrigger asChild>
                 <button
                   onClick={onToggleSidebar}
-                  className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(255,108,55,0.1)] hover:bg-primary/20 hover:scale-105 transition-all cursor-pointer"
+                  className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center p-0.5 bg-black/40 border border-white/10 mb-2 shadow-[0_0_15px_rgba(255,108,55,0.15)] hover:border-primary/50 hover:scale-105 transition-all cursor-pointer"
+                  title="RouteLens"
                 >
-                  <FolderCode size={16} />
+                  <img src={logoImg} alt="RouteLens" className="w-full h-full object-contain rounded-md select-none" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">

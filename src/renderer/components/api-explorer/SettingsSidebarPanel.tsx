@@ -13,6 +13,7 @@ import {
   ArrowUpCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import logoImg from "@/assets/logo.png";
 
 type SettingsSidebarPanelProps = {
   settings: WorkspaceSettings;
@@ -364,7 +365,10 @@ export function SettingsSidebarPanel({
       </div>
 
       {/* About Box */}
-      <div className="p-3 rounded-lg border border-border/50 bg-primary/5 text-center">
+      <div className="p-3.5 rounded-lg border border-border/50 bg-primary/5 text-center flex flex-col items-center">
+        <div className="w-10 h-10 rounded-lg overflow-hidden p-1 bg-black/40 border border-white/10 shadow-sm mb-2">
+          <img src={logoImg} alt="RouteLens Logo" className="w-full h-full object-contain" />
+        </div>
         <div className="text-xs font-bold text-primary mb-1">RouteLens v{appVersion}</div>
         <div className="text-[10px] text-muted-foreground leading-normal">
           AST Route Scanner and API Client for Modern Full-Stack Workspaces.

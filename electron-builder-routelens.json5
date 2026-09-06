@@ -18,9 +18,11 @@
   ],
   mac: {
     target: ["dmg"],
+    icon: "resources/icon.png",
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
   win: {
+    icon: "resources/icon.ico",
     target: [
       {
         target: "nsis",
@@ -38,9 +40,12 @@
     createDesktopShortcut: "always",
     createStartMenuShortcut: true,
     shortcutName: "RouteLens",
+    installerIcon: "resources/icon.ico",
+    uninstallerIcon: "resources/icon.ico",
   },
   linux: {
     target: ["AppImage"],
+    icon: "resources/icon.png",
     artifactName: "${productName}-Linux-${version}.${ext}",
   },
 }

@@ -174,7 +174,7 @@ function createWindow(): void {
     height,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === "linux" ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
@@ -270,6 +270,7 @@ function createGhostWindow(): void {
     alwaysOnTop: true,
     resizable: false,
     backgroundColor: "#00000000",
+    icon,
     // skipTaskbar: true, // User requested taskbar item
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
