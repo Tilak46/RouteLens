@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,9 +13,306 @@
       href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #090A0F;
+        color: #F1F5F9;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      #splash-screen {
+        position: fixed;
+        inset: 0;
+        background-color: #090A0F;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1), transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: auto;
+      }
+
+      #splash-screen.splash-hidden {
+        opacity: 0;
+        transform: scale(1.03);
+        pointer-events: none;
+      }
+
+      .splash-logo-wrapper {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        margin-bottom: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .splash-ambient-glow {
+        position: absolute;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 108, 55, 0.3) 0%, rgba(255, 108, 55, 0) 70%);
+        animation: ambient-glow 1.8s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      .splash-logo-shadow {
+        position: absolute;
+        bottom: 0px;
+        width: 68px;
+        height: 12px;
+        background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.8) 0%, transparent 72%);
+        border-radius: 50%;
+        animation: discord-shadow 1.8s ease-in-out infinite;
+      }
+
+      .splash-logo-badge {
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
+        background: #0B0D13;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0 35px rgba(255, 108, 55, 0.25), 0 12px 30px rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        animation: discord-bounce 1.8s ease-in-out infinite;
+        transform-origin: bottom center;
+      }
+
+      .splash-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      @keyframes discord-bounce {
+        0%, 100% {
+          transform: translateY(0) scale(1, 1);
+        }
+        28% {
+          transform: translateY(-16px) scale(0.95, 1.05);
+        }
+        48% {
+          transform: translateY(0) scale(1.08, 0.92);
+        }
+        66% {
+          transform: translateY(-6px) scale(0.98, 1.02);
+        }
+        82% {
+          transform: translateY(0) scale(1.02, 0.98);
+        }
+      }
+
+      @keyframes discord-shadow {
+        0%, 100% {
+          transform: scale(1);
+          opacity: 0.6;
+        }
+        28% {
+          transform: scale(0.65);
+          opacity: 0.25;
+        }
+        48% {
+          transform: scale(1.25);
+          opacity: 0.85;
+        }
+        66% {
+          transform: scale(0.85);
+          opacity: 0.45;
+        }
+        82% {
+          transform: scale(1.06);
+          opacity: 0.7;
+        }
+      }
+
+      @keyframes ambient-glow {
+        0%, 100% {
+          opacity: 0.4;
+          transform: scale(0.95);
+        }
+        48% {
+          opacity: 0.8;
+          transform: scale(1.15);
+        }
+      }
+
+      .splash-title {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #FFFFFF;
+        margin-bottom: 4px;
+      }
+
+      .splash-tagline {
+        font-size: 11px;
+        color: #71717A;
+        margin-bottom: 26px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+
+      .splash-fact-card {
+        max-width: 460px;
+        margin: 0 24px;
+        padding: 14px 20px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.025);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .splash-fact-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 108, 55, 0.12);
+        color: #FF6C37;
+        border: 1px solid rgba(255, 108, 55, 0.28);
+        border-radius: 9999px;
+        padding: 2.5px 11px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .splash-fact-text {
+        font-size: 12px;
+        line-height: 1.55;
+        color: #A1A1AA;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+
+      .splash-fact-text.fact-transition {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      .splash-loader-bar {
+        width: 150px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 9999px;
+        margin-top: 24px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .splash-loader-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 45%;
+        background: linear-gradient(90deg, #FF6C37, #FFA26B);
+        border-radius: 9999px;
+        box-shadow: 0 0 10px rgba(255, 108, 55, 0.5);
+        animation: loader-slide 1.4s ease-in-out infinite;
+      }
+
+      @keyframes loader-slide {
+        0% {
+          left: -45%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash-screen">
+      <div class="splash-logo-wrapper">
+        <div class="splash-ambient-glow"></div>
+        <div class="splash-logo-shadow"></div>
+        <div class="splash-logo-badge">
+          <img src="/icon.png" class="splash-logo-img" alt="RouteLens" />
+        </div>
+      </div>
+      <div class="splash-title">RouteLens</div>
+      <div class="splash-tagline">AST Route Scanner &amp; API Client</div>
+      <div class="splash-fact-card">
+        <div class="splash-fact-badge">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Fun Fact
+        </div>
+        <div id="splash-fact-text" class="splash-fact-text">
+          RouteLens parses Express and NestJS ASTs faster than your backend can throw a 500 error.
+        </div>
+      </div>
+      <div class="splash-loader-bar">
+        <div class="splash-loader-fill"></div>
+      </div>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+      (function() {
+        const facts = [
+          "RouteLens parses Express and NestJS ASTs faster than your backend can throw a 500 error.",
+          "The Ghost Hunter mini-game was born to keep developers entertained during 10,000-route monorepo scans.",
+          "AST static scanning means 0 runtime overhead—your servers don't even need to be running to discover all endpoints.",
+          "Regex route matching failed 47 edge cases before we switched to full Babel AST traversal.",
+          "The RouteLens 'R' emblem represents route paths converging into an optical focus core.",
+          "RouteLens preserves all your tab states, headers, and path variables across restarts so you never lose your flow.",
+          "You can press Ctrl+S anywhere in the request panel to instantly commit endpoint modifications.",
+          "RouteLens can detect chained Express routers down to 8 nested sub-directory levels deep.",
+          "Zero telemetry trackers were harmed in the making of this 100% offline-first API client.",
+          "RouteLens extracts routes from string literals, template literals, and concatenated expressions with zero config.",
+          "No cloud sync required—all your collections, workspaces, and environment variables stay strictly on your machine.",
+          "RouteLens can simulate API status codes and latency without modifying a single line of backend code."
+        ];
+        let idx = Math.floor(Math.random() * facts.length);
+        const el = document.getElementById("splash-fact-text");
+        if (el) el.textContent = facts[idx];
+
+        const timer = setInterval(function() {
+          if (!el) return;
+          el.classList.add("fact-transition");
+          setTimeout(function() {
+            idx = (idx + 1) % facts.length;
+            el.textContent = facts[idx];
+            el.classList.remove("fact-transition");
+          }, 250);
+        }, 3200);
+
+        window.__routeLensDismissSplash = function() {
+          clearInterval(timer);
+          var splash = document.getElementById("splash-screen");
+          if (!splash) return;
+          splash.classList.add("splash-hidden");
+          setTimeout(function() {
+            if (splash.parentNode) splash.parentNode.removeChild(splash);
+          }, 450);
+        };
+      })();
+    </script>
+
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>

@@ -105,6 +105,7 @@ function App() {
   const [scanningProjectId, setScanningProjectId] = useState<string | null>(null);
   const scanGameContainerRef = useRef<HTMLDivElement>(null);
   const [isTabsRestored, setIsTabsRestored] = useState(false);
+  const [isProjectsLoaded, setIsProjectsLoaded] = useState(false);
   const [isEnvsRestored, setIsEnvsRestored] = useState(false);
   const [isLayoutRestored, setIsLayoutRestored] = useState(false);
 
@@ -343,6 +344,36 @@ function App() {
     apiClient.storeSet("isSidebarExpanded", isSidebarExpanded);
   }, [isSidebarExpanded, isLayoutRestored]);
 
+  // Dismiss initial splash screen once projects and tabs are hydrated
+  useEffect(() => {
+    const launchTime = Date.now();
+    let dismissed = false;
+
+    const tryDismiss = () => {
+      if (dismissed) return;
+      if (isTabsRestored && isProjectsLoaded) {
+        dismissed = true;
+        const elapsed = Date.now() - launchTime;
+        const delay = Math.max(0, 1000 - elapsed);
+        setTimeout(() => {
+          (window as any).__routeLensDismissSplash?.();
+        }, delay);
+      }
+    };
+
+    tryDismiss();
+
+    // Safety fallback: guaranteed dismissal after 2.5s even if an event is delayed
+    const fallbackTimer = setTimeout(() => {
+      if (!dismissed) {
+        dismissed = true;
+        (window as any).__routeLensDismissSplash?.();
+      }
+    }, 2500);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [isTabsRestored, isProjectsLoaded]);
+
   const handleInstallUpdate = useCallback(async () => {
     try {
       setIsApplyingUpdate(true);
@@ -366,6 +397,7 @@ function App() {
     apiClient.onGroupsLoaded(setGroups);
     apiClient.onProjectsLoaded((loadedProjects) => {
       setProjects(loadedProjects);
+      setIsProjectsLoaded(true);
 
       setGitSummaries((prev) => {
         const next: Record<string, GitSummary> = {};
@@ -1702,7 +1734,7 @@ function App() {
           )}
 
           {/* Center Request Workspace Area */}
-          {projects.length === 0 && tabs.length === 0 ? (
+          {isProjectsLoaded && isTabsRestored && projects.length === 0 && tabs.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
               <OnboardingView
                 onOpenFolder={handleAddBackendFolder}
