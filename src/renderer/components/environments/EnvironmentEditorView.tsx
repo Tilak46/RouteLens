@@ -23,7 +23,7 @@ import {
   VariableType,
   createNewVariable,
 } from "../../types/environments";
-import { Project } from "@/types";
+import { Project } from "@/../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";

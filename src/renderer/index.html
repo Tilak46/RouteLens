@@ -318,6 +318,13 @@
             if (splash.parentNode) splash.parentNode.removeChild(splash);
           }, 450);
         };
+
+        // Absolute maximum failsafe: Dismiss the splash screen after 1.8s
+        setTimeout(function() {
+          if (window.__routeLensDismissSplash) {
+            window.__routeLensDismissSplash();
+          }
+        }, 1800);
       })();
     </script>
 

@@ -402,13 +402,13 @@ function App() {
 
     tryDismiss();
 
-    // Safety fallback: guaranteed dismissal after 2.5s even if an event is delayed
+    // Safety fallback: guaranteed dismissal after 1.5s even if an event is delayed
     const fallbackTimer = setTimeout(() => {
       if (!dismissed) {
         dismissed = true;
         (window as any).__routeLensDismissSplash?.();
       }
-    }, 2500);
+    }, 1500);
 
     return () => clearTimeout(fallbackTimer);
   }, [isTabsRestored, isProjectsLoaded]);
@@ -458,6 +458,14 @@ function App() {
           });
       });
     });
+
+    // Proactively fetch projects to avoid race condition with did-finish-load
+    apiClient.getProjects?.()?.then((projs) => {
+      if (Array.isArray(projs)) {
+        setProjects(projs);
+        setIsProjectsLoaded(true);
+      }
+    }).catch(() => {});
 
     apiClient.onGitSummaryUpdated(({ projectId, summary }) => {
       setGitSummaries((prev) => ({ ...prev, [projectId]: summary }));
@@ -1485,114 +1493,30 @@ function App() {
     return null;
   }, [activeTab]);
 
-  // Render secondary sidebar based on selected vertical tab
-  const sidebarContent = useMemo(() => {
-    switch (activeSidebarTab) {
-      case "explorer":
-        return (
-          <ApiExplorerSidebarPanel
-            projects={projects}
-            activeProjectId={activeProjectId}
-            onActiveProjectIdChange={setActiveProjectId}
-            onSelectRoute={handleSelectRoute}
-            onBaseUrlChange={handleBaseUrlChange}
-            treeCache={treeCache}
-            setTreeCache={setTreeCache}
-            activeRouteKey={activeRouteKey}
-            onAddProjectClick={handleAddBackendFolder}
-            onRemoveProject={handleRemoveProject}
-            onRescanProject={handleRescanProject}
-            onRenameNode={handleSidebarRenameNode}
-            onDeleteNode={handleSidebarDeleteNode}
-            isScanning={Boolean(scanningProjectId)}
-            scanningProjectId={scanningProjectId}
-          />
-        );
-      case "automations":
-        return (
-          <AutomationsPanel
-            appWorkspaces={appWorkspaces}
-            workspaces={workspaces}
-            onNewAutomation={() => {
-              setEditingAppWorkspace(null);
-              setIsCreateAppWorkspaceModalOpen(true);
-            }}
-            onAddWorkspace={handleAddWorkspaceFile}
-            onLaunchAppWorkspace={handleLaunchAppWorkspace}
-            onDeleteAppWorkspace={apiClient.deleteAppWorkspace}
-            onEditAppWorkspace={handleEditAppWorkspace}
-            onOpenWorkspace={handleOpenWorkspace}
-            onTogglePin={handleToggleWorkspacePin}
-            onRemoveWorkspace={handleRemoveWorkspace}
-          />
-        );
-      case "settings":
-        return (
-          <SettingsSidebarPanel
-            settings={settings}
-            onToggleWorkspaces={handleToggleWorkspaces}
-            onSelectWorkspacePath={handleSelectWorkspacePath}
-          />
-        );
-      case "environments":
-        return (
-          <EnvironmentsSidebarPanel
-            globals={globals}
-            backendEnvironments={backendEnvironments}
-            activeBackendEnvMap={activeBackendEnvMap}
-            projects={projects}
-            selectedEnvId={selectedEnvId}
-            onSelectEnv={setSelectedEnvId}
-            onCreateEnvironment={handleCreateEnvironment}
-            onSetActiveBackendEnv={handleSetActiveBackendEnv}
-            onDuplicateEnvironment={handleDuplicateEnvironment}
-            onDeleteEnvironment={handleDeleteEnvironment}
-            onRenameEnvironment={handleRenameEnvironment}
-            onOpenCopyModal={(id) => setCopyModalSourceEnvId(id)}
-            onExportEnvironment={handleExportEnvironment}
-          />
-        );
-      default:
-        return null;
-    }
-  }, [
-    activeSidebarTab,
-    projects,
-    appWorkspaces,
-    workspaces,
-    settings,
-    activeProjectId,
-    activeRouteKey,
-    scanningProjectId,
-    treeCache,
-    globals,
-    backendEnvironments,
-    activeBackendEnvMap,
-    selectedEnvId,
-  ]);
-
   // Compute the currently selected environment for the Environment Editor View
   const currentSelectedEnv = useMemo<ApiEnvironment>(() => {
     if (selectedEnvId === GLOBALS_ENV_ID || !selectedEnvId) {
-      return globals;
+      return globals || createDefaultGlobals();
     }
-    for (const envs of Object.values(backendEnvironments)) {
-      const match = envs.find((e) => e.id === selectedEnvId);
-      if (match) return match;
+    for (const envs of Object.values(backendEnvironments || {})) {
+      if (Array.isArray(envs)) {
+        const match = envs.find((e) => e && e.id === selectedEnvId);
+        if (match) return match;
+      }
     }
-    return globals;
+    return globals || createDefaultGlobals();
   }, [selectedEnvId, globals, backendEnvironments]);
 
   // Compute active environment variables for the current workspace request
   const { activeVariables, activeEnvName } = useMemo(() => {
     const projId = activeProjectId;
-    const backendEnvId = projId ? activeBackendEnvMap[projId] : null;
-    const backendEnvs = projId ? backendEnvironments[projId] || [] : [];
-    const activeBackendEnv = backendEnvs.find((e) => e.id === backendEnvId) || null;
+    const backendEnvId = projId ? activeBackendEnvMap?.[projId] : null;
+    const backendEnvs = projId && Array.isArray(backendEnvironments?.[projId]) ? backendEnvironments[projId] : [];
+    const activeBackendEnv = backendEnvs.find((e) => e && e.id === backendEnvId) || null;
 
     const scoped = mergeScopedVariables(
-      globals.variables,
-      activeBackendEnv ? activeBackendEnv.variables : [],
+      globals?.variables || [],
+      activeBackendEnv ? activeBackendEnv.variables || [] : [],
       activeBackendEnv ? activeBackendEnv.name : "Globals"
     );
 
@@ -1725,10 +1649,12 @@ function App() {
       source = globals;
     } else {
       for (const envs of Object.values(backendEnvironments)) {
-        const match = envs.find((e) => e.id === envId);
-        if (match) {
-          source = match;
-          break;
+        if (Array.isArray(envs)) {
+          const match = envs.find((e) => e.id === envId);
+          if (match) {
+            source = match;
+            break;
+          }
         }
       }
     }
@@ -1777,7 +1703,9 @@ function App() {
     setBackendEnvironments((prev) => {
       const next = { ...prev };
       for (const [projId, envs] of Object.entries(next)) {
-        next[projId] = envs.filter((e) => e.id !== envId);
+        if (Array.isArray(envs)) {
+          next[projId] = envs.filter((e) => e.id !== envId);
+        }
       }
       return next;
     });
@@ -1803,7 +1731,9 @@ function App() {
     setBackendEnvironments((prev) => {
       const next = { ...prev };
       for (const [projId, envs] of Object.entries(next)) {
-        next[projId] = envs.map((e) => (e.id === envId ? { ...e, name: newName } : e));
+        if (Array.isArray(envs)) {
+          next[projId] = envs.map((e) => (e.id === envId ? { ...e, name: newName } : e));
+        }
       }
       return next;
     });
@@ -1860,7 +1790,9 @@ function App() {
       setBackendEnvironments((prev) => {
         const next = { ...prev };
         for (const [projId, envs] of Object.entries(next)) {
-          next[projId] = envs.map((e) => (e.id === targetEnvId ? applyCopy(e) : e));
+          if (Array.isArray(envs)) {
+            next[projId] = envs.map((e) => (e.id === targetEnvId ? applyCopy(e) : e));
+          }
         }
         return next;
       });
@@ -1886,6 +1818,92 @@ function App() {
     }
     return newId;
   };
+
+  // Render secondary sidebar based on selected vertical tab
+  const sidebarContent = useMemo(() => {
+    switch (activeSidebarTab) {
+      case "explorer":
+        return (
+          <ApiExplorerSidebarPanel
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onActiveProjectIdChange={setActiveProjectId}
+            onSelectRoute={handleSelectRoute}
+            onBaseUrlChange={handleBaseUrlChange}
+            treeCache={treeCache}
+            setTreeCache={setTreeCache}
+            activeRouteKey={activeRouteKey}
+            onAddProjectClick={handleAddBackendFolder}
+            onRemoveProject={handleRemoveProject}
+            onRescanProject={handleRescanProject}
+            onRenameNode={handleSidebarRenameNode}
+            onDeleteNode={handleSidebarDeleteNode}
+            isScanning={Boolean(scanningProjectId)}
+            scanningProjectId={scanningProjectId}
+          />
+        );
+      case "automations":
+        return (
+          <AutomationsPanel
+            appWorkspaces={appWorkspaces}
+            workspaces={workspaces}
+            onNewAutomation={() => {
+              setEditingAppWorkspace(null);
+              setIsCreateAppWorkspaceModalOpen(true);
+            }}
+            onAddWorkspace={handleAddWorkspaceFile}
+            onLaunchAppWorkspace={handleLaunchAppWorkspace}
+            onDeleteAppWorkspace={apiClient.deleteAppWorkspace}
+            onEditAppWorkspace={handleEditAppWorkspace}
+            onOpenWorkspace={handleOpenWorkspace}
+            onTogglePin={handleToggleWorkspacePin}
+            onRemoveWorkspace={handleRemoveWorkspace}
+          />
+        );
+      case "settings":
+        return (
+          <SettingsSidebarPanel
+            settings={settings}
+            onToggleWorkspaces={handleToggleWorkspaces}
+            onSelectWorkspacePath={handleSelectWorkspacePath}
+          />
+        );
+      case "environments":
+        return (
+          <EnvironmentsSidebarPanel
+            globals={globals}
+            backendEnvironments={backendEnvironments}
+            activeBackendEnvMap={activeBackendEnvMap}
+            projects={projects}
+            selectedEnvId={selectedEnvId}
+            onSelectEnv={setSelectedEnvId}
+            onCreateEnvironment={handleCreateEnvironment}
+            onSetActiveBackendEnv={handleSetActiveBackendEnv}
+            onDuplicateEnvironment={handleDuplicateEnvironment}
+            onDeleteEnvironment={handleDeleteEnvironment}
+            onRenameEnvironment={handleRenameEnvironment}
+            onOpenCopyModal={(id) => setCopyModalSourceEnvId(id)}
+            onExportEnvironment={handleExportEnvironment}
+          />
+        );
+      default:
+        return null;
+    }
+  }, [
+    activeSidebarTab,
+    projects,
+    appWorkspaces,
+    workspaces,
+    settings,
+    activeProjectId,
+    activeRouteKey,
+    scanningProjectId,
+    treeCache,
+    globals,
+    backendEnvironments,
+    activeBackendEnvMap,
+    selectedEnvId,
+  ]);
 
   return (
     <TooltipProvider>

@@ -25,6 +25,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+    try {
+      (window as any).__routeLensDismissSplash?.();
+    } catch {
+      // ignore
+    }
     this.setState({ error, errorInfo });
   }
 

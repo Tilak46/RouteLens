@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
-import { Project } from "@/types";
+import { Project } from "@/../types";
 import { ApiEnvironment, GLOBALS_ENV_ID } from "../../types/environments";
 import { Input } from "@/components/ui/input";
 import {
