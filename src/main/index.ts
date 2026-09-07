@@ -1,6 +1,11 @@
 import dotenv from "dotenv";
-import { app, BrowserWindow, shell, ipcMain, screen } from "electron"; // 1. Added ipcMain
+import { app, BrowserWindow, shell, ipcMain, screen, nativeTheme } from "electron";
 import { join, resolve } from "node:path";
+
+// Force Chromium and OS compositor to use RouteLens dark background from 0ms
+app.commandLine.appendSwitch("force-dark-mode");
+app.commandLine.appendSwitch("background-color", "#090A0F");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
 import fs from "node:fs";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
@@ -166,6 +171,7 @@ async function updateWorkspaceFile(group: Group, projectsInGroup: Project[]) {
 }
 
 function createWindow(): void {
+  nativeTheme.themeSource = "dark";
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
@@ -183,6 +189,8 @@ function createWindow(): void {
       backgroundThrottling: false,
     },
   });
+
+  mainWindow.setBackgroundColor("#090A0F");
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.maximize();
