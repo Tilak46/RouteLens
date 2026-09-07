@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequestTab } from "./WorkspaceTabs";
-import { ApiVariable } from "./ManageEnvironmentsModal";
+import { ApiVariable } from "../../types/environments";
+import { interpolate, ScopedVariable } from "@/lib/interpolationEngine";
 import { RichUrlInput } from "./RichUrlInput";
 import { extractRoutePath } from "@/views/ApiExplorerView";
 import { toast } from "sonner";
@@ -46,9 +47,9 @@ type RequestPanelProps = {
   tab: RequestTab;
   onChangeTab: (updatedTab: RequestTab) => void;
   onRun: (response: ApiHttpResponse) => void;
-  activeVariables?: ApiVariable[];
+  activeVariables?: (ApiVariable | ScopedVariable)[];
   activeEnvName?: string;
-  onAddOrUpdateVariable?: (key: string, value: string) => void;
+  onAddOrUpdateVariable?: (key: string, value: string, scope?: "global" | "environment") => void;
   projects?: Project[];
   treeCache?: Record<string, any>;
   onSaveTab?: (tab: RequestTab) => void;
@@ -664,30 +665,28 @@ export function RequestPanel({
     updateParentTab({ bodyText: beautified });
   };
 
-  const interpolate = (str: string, vars: ApiVariable[]) => {
-    if (!str || !vars || vars.length === 0) return str;
-    let result = str;
-    vars.forEach((v) => {
-      if (v.enabled && v.key) {
-        const escapedKey = v.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const pattern = new RegExp(`\\{\\{\\s*${escapedKey}\\s*\\}\\}`, "g");
-        result = result.replace(pattern, v.value);
-      }
-    });
-    return result;
-  };
-
   const handleSend = async () => {
     const localVars = [...(activeVariables || [])];
-    const localOnAddOrUpdateVariable = (key: string, value: string) => {
+    const localOnAddOrUpdateVariable = (
+      key: string,
+      value: string,
+      scope: "global" | "environment" = "environment"
+    ) => {
       if (onAddOrUpdateVariable) {
-        onAddOrUpdateVariable(key, value);
+        onAddOrUpdateVariable(key, value, scope);
       }
       const idx = localVars.findIndex((v) => v.key === key);
       if (idx !== -1) {
-        localVars[idx] = { ...localVars[idx], value };
+        localVars[idx] = { ...localVars[idx], currentValue: value, value };
       } else {
-        localVars.push({ key, value, enabled: true });
+        localVars.push({
+          id: `var_${Date.now()}`,
+          key,
+          currentValue: value,
+          value,
+          enabled: true,
+          type: "default",
+        });
       }
     };
 
@@ -700,22 +699,31 @@ export function RequestPanel({
     // 1. Pre-request Script execution
     if (preRequestScript && preRequestScript.trim()) {
       const pm = {
-        environment: {
+        globals: {
           set: (key: string, value: any) => {
-            localOnAddOrUpdateVariable(key, String(value));
+            localOnAddOrUpdateVariable(key, String(value), "global");
           },
           get: (key: string) => {
             const v = localVars.find((x) => x.key === key);
-            return v ? v.value : undefined;
+            return v ? (v.currentValue ?? v.value) : undefined;
+          },
+        },
+        environment: {
+          set: (key: string, value: any) => {
+            localOnAddOrUpdateVariable(key, String(value), "environment");
+          },
+          get: (key: string) => {
+            const v = localVars.find((x) => x.key === key);
+            return v ? (v.currentValue ?? v.value) : undefined;
           },
         },
         variables: {
           set: (key: string, value: any) => {
-            localOnAddOrUpdateVariable(key, String(value));
+            localOnAddOrUpdateVariable(key, String(value), "environment");
           },
           get: (key: string) => {
             const v = localVars.find((x) => x.key === key);
-            return v ? v.value : undefined;
+            return v ? (v.currentValue ?? v.value) : undefined;
           },
         },
         request: {
@@ -770,7 +778,8 @@ export function RequestPanel({
     if (bodyMode === "json" && method !== "GET" && method !== "HEAD") {
       const raw = String(bodyText ?? "");
       const stripped = stripJsonComments(raw).trim();
-      if (stripped && !safeParseJson(stripped).ok) {
+      const interpolatedJson = interpolate(stripped, localVars);
+      if (interpolatedJson && !safeParseJson(interpolatedJson).ok) {
         setBodyError("Invalid JSON");
         return;
       }
@@ -871,22 +880,31 @@ export function RequestPanel({
       // 2. Post-response Script execution
       if (postResponseScript && postResponseScript.trim()) {
         const pm = {
-          environment: {
+          globals: {
             set: (key: string, value: any) => {
-              localOnAddOrUpdateVariable(key, String(value));
+              localOnAddOrUpdateVariable(key, String(value), "global");
             },
             get: (key: string) => {
               const v = localVars.find((x) => x.key === key);
-              return v ? v.value : undefined;
+              return v ? (v.currentValue ?? v.value) : undefined;
+            },
+          },
+          environment: {
+            set: (key: string, value: any) => {
+              localOnAddOrUpdateVariable(key, String(value), "environment");
+            },
+            get: (key: string) => {
+              const v = localVars.find((x) => x.key === key);
+              return v ? (v.currentValue ?? v.value) : undefined;
             },
           },
           variables: {
             set: (key: string, value: any) => {
-              localOnAddOrUpdateVariable(key, String(value));
+              localOnAddOrUpdateVariable(key, String(value), "environment");
             },
             get: (key: string) => {
               const v = localVars.find((x) => x.key === key);
-              return v ? v.value : undefined;
+              return v ? (v.currentValue ?? v.value) : undefined;
             },
           },
           response: {
@@ -1329,6 +1347,21 @@ export function RequestPanel({
           onSubmit={handleSend}
           pathVariables={pathVariables}
         />
+
+        {activeEnvName && (
+          <div
+            className="hidden md:flex items-center gap-1.5 px-2.5 h-[34px] rounded border border-border/60 bg-muted/20 text-muted-foreground text-[11px] font-medium shrink-0 select-none"
+            title={`Active Environment: ${activeEnvName}`}
+          >
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full",
+                activeEnvName === "Globals" ? "bg-emerald-400" : "bg-amber-400"
+              )}
+            />
+            <span className="truncate max-w-[110px]">{activeEnvName}</span>
+          </div>
+        )}
 
         <Button
           onClick={handleSend}

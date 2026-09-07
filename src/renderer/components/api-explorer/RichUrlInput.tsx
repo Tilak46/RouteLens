@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { ApiVariable } from "./ManageEnvironmentsModal";
+import { ApiVariable } from "../../types/environments";
+import { ScopedVariable } from "@/lib/interpolationEngine";
 import { cn } from "@/lib/utils";
 
 type RichUrlInputProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  activeVariables?: ApiVariable[];
+  activeVariables?: (ApiVariable | ScopedVariable)[];
   activeEnvName?: string;
-  onAddOrUpdateVariable?: (key: string, value: string) => void;
+  onAddOrUpdateVariable?: (key: string, value: string, scope?: "global" | "environment") => void;
   className?: string;
   onSubmit?: () => void;
   borderless?: boolean;
@@ -434,14 +435,24 @@ export function RichUrlInput({
                 )}
               >
                 <div className="flex items-center">
-                  <span className="w-3.5 h-3.5 bg-emerald-500/20 text-emerald-400 font-extrabold flex items-center justify-center border border-emerald-500/30 rounded-[3px] mr-1.5 text-[9px] select-none">
-                    E
+                  <span
+                    className={cn(
+                      "w-3.5 h-3.5 font-extrabold flex items-center justify-center border rounded-[3px] mr-1.5 text-[9px] select-none",
+                      (variable as any).source === "global"
+                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                        : "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    )}
+                    title={(variable as any).sourceName || "Variable"}
+                  >
+                    {(variable as any).source === "global" ? "G" : "E"}
                   </span>
                   <span className="font-semibold text-foreground truncate">{variable.key}</span>
                 </div>
-                {variable.value && (
+                {(variable.currentValue || variable.value) && (
                   <span className="text-[10px] text-muted-foreground truncate pl-5">
-                    {variable.value}
+                    {(variable as any).type === "secret"
+                      ? "••••••••"
+                      : variable.currentValue || variable.value}
                   </span>
                 )}
               </div>

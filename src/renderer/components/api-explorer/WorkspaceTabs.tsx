@@ -32,10 +32,10 @@ type WorkspaceTabsProps = {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNewTab: () => void;
-  environments: ApiEnvironment[];
-  activeEnvId: string | null;
-  onSelectEnv: (id: string | null) => void;
-  onManageEnvsClick: () => void;
+  environments?: any[];
+  activeEnvId?: string | null;
+  onSelectEnv?: (id: string | null) => void;
+  onManageEnvsClick?: () => void;
   onReorderTabs: (newTabs: RequestTab[]) => void;
   onDuplicateTab: (id: string) => void;
   onCloseOtherTabs: (id: string) => void;
@@ -282,49 +282,6 @@ export function WorkspaceTabs({
           </button>
         </div>
       </DndContext>
-
-      {/* Environment Selector Dropdown on Right */}
-      <div className="flex items-center shrink-0 border-l border-border/40 pl-3 pr-1 h-full py-1">
-        <Select
-          value={activeEnvId || "no-env"}
-          onValueChange={(val) => {
-            if (val === "__manage") {
-              onManageEnvsClick();
-            } else {
-              onSelectEnv(val === "no-env" ? null : val);
-            }
-          }}
-        >
-          <SelectTrigger className="h-7 bg-input border-border/60 text-xs text-foreground/80 hover:bg-white/5 w-[145px] shrink-0 font-medium">
-            <Globe
-              size={11}
-              className={cn(
-                "mr-1.5 shrink-0 transition-all",
-                activeEnvId ? "text-primary" : "text-muted-foreground"
-              )}
-            />
-            <SelectValue placeholder="No Environment" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover border-border text-foreground">
-            <SelectItem value="no-env" className="text-xs">No Environment</SelectItem>
-            {environments.map((env) => (
-              <SelectItem key={env.id} value={env.id} className="text-xs">
-                {env.name}
-              </SelectItem>
-            ))}
-            <div className="h-px bg-border/40 my-1" />
-            <SelectItem
-              value="__manage"
-              className="text-xs text-primary font-semibold focus:text-primary cursor-pointer"
-            >
-              <span className="flex items-center gap-1.5">
-                <Settings size={11} className="shrink-0" />
-                Manage Environments...
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       {/* Custom Right-Click Context Menu */}
       {contextMenu && (

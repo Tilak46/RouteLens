@@ -36,7 +36,6 @@ import { WorkspaceTabs, RequestTab } from "@/components/api-explorer/WorkspaceTa
 import { RequestPanel } from "@/components/api-explorer/RequestPanel";
 import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
 import { ResponseIdleMascot } from "@/components/api-explorer/ResponseIllustrations";
-import { ManageEnvironmentsModal, ApiEnvironment } from "@/components/api-explorer/ManageEnvironmentsModal";
 import { ManageCookiesModal } from "@/components/api-explorer/ManageCookiesModal";
 import { OnboardingView } from "@/components/onboarding/OnboardingView";
 import { ProjectIdleView } from "@/components/project/ProjectIdleView";
@@ -44,6 +43,21 @@ import GhostHunter from "@/components/game/GhostHunter";
 import GamingHUDCursor from "@/components/game/GamingHUDCursor";
 import { UpdateGraceBanner, UpdateEnforcementData } from "@/components/updates/UpdateGraceBanner";
 import { MandatoryUpdateModal } from "@/components/updates/MandatoryUpdateModal";
+
+// Environments system imports
+import {
+  ApiEnvironment,
+  ApiVariable,
+  GLOBALS_ENV_ID,
+  createDefaultGlobals,
+  createNewVariable,
+  normalizeEnvironment,
+  normalizeVariable,
+} from "./types/environments";
+import { mergeScopedVariables } from "./lib/interpolationEngine";
+import { EnvironmentsSidebarPanel } from "./components/environments/EnvironmentsSidebarPanel";
+import { EnvironmentEditorView } from "./components/environments/EnvironmentEditorView";
+import { CopyVariablesModal } from "./components/environments/CopyVariablesModal";
 
 const defaultTab = (projectId?: string | null): RequestTab => ({
   id: `tab_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -224,10 +238,12 @@ function App() {
   const [editingAppWorkspace, setEditingAppWorkspace] = useState<AppWorkspace | null>(null);
   const [isDevToolsModalOpen, setIsDevToolsModalOpen] = useState(false);
 
-  // Environment variables state
-  const [environments, setEnvironments] = useState<ApiEnvironment[]>([]);
-  const [activeEnvId, setActiveEnvId] = useState<string | null>(null);
-  const [isManageEnvsModalOpen, setIsManageEnvsModalOpen] = useState(false);
+  // Environment variables state (Globals + Per-Backend Environments)
+  const [globals, setGlobals] = useState<ApiEnvironment>(createDefaultGlobals());
+  const [backendEnvironments, setBackendEnvironments] = useState<Record<string, ApiEnvironment[]>>({});
+  const [activeBackendEnvMap, setActiveBackendEnvMap] = useState<Record<string, string | null>>({});
+  const [selectedEnvId, setSelectedEnvId] = useState<string | null>(GLOBALS_ENV_ID);
+  const [copyModalSourceEnvId, setCopyModalSourceEnvId] = useState<string | null>(null);
   const [treeCache, setTreeCache] = useState<Record<string, any>>({});
 
   // 1. Load persisted states from Electron Store on mount
@@ -236,20 +252,24 @@ function App() {
       apiClient.storeGet("projectTabsMap").catch(() => null),
       apiClient.storeGet("projectActiveTabIdMap").catch(() => null),
       apiClient.storeGet("activeProjectId").catch(() => null),
-      apiClient.storeGet("environments").catch(() => null),
-      apiClient.storeGet("activeEnvId").catch(() => null),
+      apiClient.storeGet("globalsEnvironment").catch(() => null),
+      apiClient.storeGet("backendEnvironments").catch(() => null),
+      apiClient.storeGet("activeBackendEnvMap").catch(() => null),
+      apiClient.storeGet("environments").catch(() => null), // Legacy fallback
       apiClient.storeGet("activeSidebarTab").catch(() => null),
       apiClient.storeGet("isSidebarExpanded").catch(() => null),
-      apiClient.storeGet("apiScannerTreeCache").catch(() => null)
+      apiClient.storeGet("apiScannerTreeCache").catch(() => null),
     ]).then(([
       storedMap,
       storedActiveIdMap,
       storedActiveProjectId,
-      storedEnvs,
-      storedEnvId,
+      storedGlobals,
+      storedBackendEnvs,
+      storedActiveBackendEnvMap,
+      storedLegacyEnvs,
       storedSidebarTab,
       storedSidebarExpanded,
-      storedTreeCache
+      storedTreeCache,
     ]) => {
       // 1. Restore tree cache
       if (storedTreeCache && typeof storedTreeCache === "object") {
@@ -268,12 +288,26 @@ function App() {
       const activeProj = typeof storedActiveProjectId === "string" ? storedActiveProjectId : null;
       setActiveProjectId(activeProj);
 
-      // 3. Restore environments
-      if (Array.isArray(storedEnvs)) {
-        setEnvironments(storedEnvs);
+      // 3. Restore environments (Globals + Per-Backend)
+      if (storedGlobals && typeof storedGlobals === "object") {
+        setGlobals(normalizeEnvironment(storedGlobals));
+      } else if (Array.isArray(storedLegacyEnvs) && storedLegacyEnvs.length > 0) {
+        // Migrate first legacy environment to Globals
+        const first = storedLegacyEnvs[0];
+        setGlobals({
+          ...normalizeEnvironment(first),
+          id: GLOBALS_ENV_ID,
+          name: "Globals",
+          projectId: null,
+        });
       }
-      if (typeof storedEnvId === "string") {
-        setActiveEnvId(storedEnvId);
+
+      if (storedBackendEnvs && typeof storedBackendEnvs === "object") {
+        setBackendEnvironments(storedBackendEnvs);
+      }
+
+      if (storedActiveBackendEnvMap && typeof storedActiveBackendEnvMap === "object") {
+        setActiveBackendEnvMap(storedActiveBackendEnvMap);
       }
 
       // 4. Restore layout
@@ -325,13 +359,18 @@ function App() {
   // Sync environment variables state to Electron Store
   useEffect(() => {
     if (!isEnvsRestored) return;
-    apiClient.storeSet("environments", environments);
-  }, [environments, isEnvsRestored]);
+    apiClient.storeSet("globalsEnvironment", globals);
+  }, [globals, isEnvsRestored]);
 
   useEffect(() => {
     if (!isEnvsRestored) return;
-    apiClient.storeSet("activeEnvId", activeEnvId);
-  }, [activeEnvId, isEnvsRestored]);
+    apiClient.storeSet("backendEnvironments", backendEnvironments);
+  }, [backendEnvironments, isEnvsRestored]);
+
+  useEffect(() => {
+    if (!isEnvsRestored) return;
+    apiClient.storeSet("activeBackendEnvMap", activeBackendEnvMap);
+  }, [activeBackendEnvMap, isEnvsRestored]);
 
   // Sync layout configuration state to Electron Store
   useEffect(() => {
@@ -1495,6 +1534,24 @@ function App() {
             onSelectWorkspacePath={handleSelectWorkspacePath}
           />
         );
+      case "environments":
+        return (
+          <EnvironmentsSidebarPanel
+            globals={globals}
+            backendEnvironments={backendEnvironments}
+            activeBackendEnvMap={activeBackendEnvMap}
+            projects={projects}
+            selectedEnvId={selectedEnvId}
+            onSelectEnv={setSelectedEnvId}
+            onCreateEnvironment={handleCreateEnvironment}
+            onSetActiveBackendEnv={handleSetActiveBackendEnv}
+            onDuplicateEnvironment={handleDuplicateEnvironment}
+            onDeleteEnvironment={handleDeleteEnvironment}
+            onRenameEnvironment={handleRenameEnvironment}
+            onOpenCopyModal={(id) => setCopyModalSourceEnvId(id)}
+            onExportEnvironment={handleExportEnvironment}
+          />
+        );
       default:
         return null;
     }
@@ -1508,98 +1565,326 @@ function App() {
     activeRouteKey,
     scanningProjectId,
     treeCache,
+    globals,
+    backendEnvironments,
+    activeBackendEnvMap,
+    selectedEnvId,
   ]);
 
-  // Compute active environment variables
-  const activeVariables = useMemo(() => {
-    const activeEnv = environments.find((e) => e.id === activeEnvId);
-    return activeEnv ? activeEnv.variables : [];
-  }, [environments, activeEnvId]);
+  // Compute the currently selected environment for the Environment Editor View
+  const currentSelectedEnv = useMemo<ApiEnvironment>(() => {
+    if (selectedEnvId === GLOBALS_ENV_ID || !selectedEnvId) {
+      return globals;
+    }
+    for (const envs of Object.values(backendEnvironments)) {
+      const match = envs.find((e) => e.id === selectedEnvId);
+      if (match) return match;
+    }
+    return globals;
+  }, [selectedEnvId, globals, backendEnvironments]);
 
-  const activeEnvName = useMemo(() => {
-    const activeEnv = environments.find((e) => e.id === activeEnvId);
-    return activeEnv ? activeEnv.name : null;
-  }, [environments, activeEnvId]);
+  // Compute active environment variables for the current workspace request
+  const { activeVariables, activeEnvName } = useMemo(() => {
+    const projId = activeProjectId;
+    const backendEnvId = projId ? activeBackendEnvMap[projId] : null;
+    const backendEnvs = projId ? backendEnvironments[projId] || [] : [];
+    const activeBackendEnv = backendEnvs.find((e) => e.id === backendEnvId) || null;
 
-  const handleAddOrUpdateVariable = (key: string, value: string) => {
-    // 1. Determine target environment ID and creation config synchronously.
-    let targetEnvId = activeEnvId;
-    let isNewEnvCreated = false;
-    let newEnvObj: ApiEnvironment | null = null;
+    const scoped = mergeScopedVariables(
+      globals.variables,
+      activeBackendEnv ? activeBackendEnv.variables : [],
+      activeBackendEnv ? activeBackendEnv.name : "Globals"
+    );
 
-    const envExists = targetEnvId ? environments.some((e) => e.id === targetEnvId) : false;
+    const envName = activeBackendEnv
+      ? `${activeBackendEnv.name}`
+      : "Globals";
 
-    if (!targetEnvId || !envExists) {
-      if (!targetEnvId) {
-        if (environments.length > 0) {
-          targetEnvId = environments[0].id;
+    return {
+      activeVariables: scoped,
+      activeEnvName: envName,
+    };
+  }, [globals, backendEnvironments, activeBackendEnvMap, activeProjectId]);
+
+  // Script & UI variable update handler
+  const handleAddOrUpdateVariable = (
+    key: string,
+    value: string,
+    scope: "global" | "environment" = "environment"
+  ) => {
+    const projId = activeProjectId;
+    const backendEnvId = projId ? activeBackendEnvMap[projId] : null;
+
+    if (scope === "global" || !projId || !backendEnvId) {
+      setGlobals((prev) => {
+        const nextVars = [...prev.variables];
+        const existingIdx = nextVars.findIndex((v) => v.key === key);
+        if (existingIdx !== -1) {
+          nextVars[existingIdx] = {
+            ...nextVars[existingIdx],
+            currentValue: value,
+            value,
+          };
         } else {
-          targetEnvId = `env_${Date.now()}`;
-          isNewEnvCreated = true;
+          nextVars.push(createNewVariable(key, value));
         }
-      } else {
-        isNewEnvCreated = true;
-      }
-
-      if (isNewEnvCreated) {
-        newEnvObj = {
-          id: targetEnvId,
-          name: "Default Environment",
-          variables: [],
+        return {
+          ...prev,
+          variables: nextVars,
+          updatedAt: Date.now(),
         };
+      });
+      toast.success(`Saved to Globals: ${key}`);
+    } else {
+      setBackendEnvironments((prev) => {
+        const envs = prev[projId] || [];
+        const nextEnvs = envs.map((env) => {
+          if (env.id === backendEnvId) {
+            const nextVars = [...env.variables];
+            const existingIdx = nextVars.findIndex((v) => v.key === key);
+            if (existingIdx !== -1) {
+              nextVars[existingIdx] = {
+                ...nextVars[existingIdx],
+                currentValue: value,
+                value,
+              };
+            } else {
+              nextVars.push(createNewVariable(key, value));
+            }
+            return {
+              ...env,
+              variables: nextVars,
+              updatedAt: Date.now(),
+            };
+          }
+          return env;
+        });
+        return {
+          ...prev,
+          [projId]: nextEnvs,
+        };
+      });
+      toast.success(`Saved to Environment: ${key}`);
+    }
+  };
+
+  const handleCreateEnvironment = (projectId?: string | null) => {
+    const newId = `env_${Date.now()}`;
+    const targetProjId = projectId ?? null;
+    const newEnv: ApiEnvironment = {
+      id: newId,
+      name: "New Environment",
+      projectId: targetProjId,
+      variables: [createNewVariable("baseUrl", "http://localhost:3000")],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    if (targetProjId) {
+      setBackendEnvironments((prev) => ({
+        ...prev,
+        [targetProjId]: [...(prev[targetProjId] || []), newEnv],
+      }));
+      // If backend has no active env, activate this new one
+      if (!activeBackendEnvMap[targetProjId]) {
+        setActiveBackendEnvMap((prev) => ({ ...prev, [targetProjId]: newId }));
       }
-      
-      // Update active environment ID safely outside the pure setEnvironments callback.
-      setActiveEnvId(targetEnvId);
+    }
+    setSelectedEnvId(newId);
+    setActiveSidebarTab("environments");
+    toast.success("Created new environment");
+  };
+
+  const handleSetActiveBackendEnv = (projectId: string, envId: string | null) => {
+    setActiveBackendEnvMap((prev) => ({ ...prev, [projectId]: envId }));
+    const env = (backendEnvironments[projectId] || []).find((e) => e.id === envId);
+    if (env) {
+      toast.success(`Activated ${env.name}`);
+    } else {
+      toast.info("Deactivated environment");
+    }
+  };
+
+  const handleUpdateEnvironment = (updated: ApiEnvironment) => {
+    if (updated.id === GLOBALS_ENV_ID) {
+      setGlobals(updated);
+    } else if (updated.projectId) {
+      setBackendEnvironments((prev) => {
+        const envs = prev[updated.projectId!] || [];
+        return {
+          ...prev,
+          [updated.projectId!]: envs.map((e) => (e.id === updated.id ? updated : e)),
+        };
+      });
+    }
+  };
+
+  const handleDuplicateEnvironment = (envId: string) => {
+    let source: ApiEnvironment | null = null;
+    if (envId === GLOBALS_ENV_ID) {
+      source = globals;
+    } else {
+      for (const envs of Object.values(backendEnvironments)) {
+        const match = envs.find((e) => e.id === envId);
+        if (match) {
+          source = match;
+          break;
+        }
+      }
     }
 
-    // 2. Perform functional environments update
-    setEnvironments((prevEnvs) => {
-      let updatedEnvs = [...prevEnvs];
+    if (!source) return;
 
-      if (isNewEnvCreated && newEnvObj) {
-        if (!updatedEnvs.some((e) => e.id === targetEnvId)) {
-          updatedEnvs.push(newEnvObj);
+    const newId = `env_${Date.now()}`;
+    const clone: ApiEnvironment = {
+      ...source,
+      id: newId,
+      name: `${source.name} (Copy)`,
+      variables: source.variables.map((v) => ({
+        ...v,
+        id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      })),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    if (source.projectId) {
+      setBackendEnvironments((prev) => ({
+        ...prev,
+        [source.projectId!]: [...(prev[source.projectId!] || []), clone],
+      }));
+    } else {
+      const targetProj = activeProjectId;
+      if (targetProj) {
+        clone.projectId = targetProj;
+        setBackendEnvironments((prev) => ({
+          ...prev,
+          [targetProj]: [...(prev[targetProj] || []), clone],
+        }));
+      }
+    }
+
+    setSelectedEnvId(newId);
+    toast.success(`Duplicated ${source.name}`);
+  };
+
+  const handleDeleteEnvironment = (envId: string) => {
+    if (envId === GLOBALS_ENV_ID) {
+      toast.error("Globals cannot be deleted.");
+      return;
+    }
+
+    setBackendEnvironments((prev) => {
+      const next = { ...prev };
+      for (const [projId, envs] of Object.entries(next)) {
+        next[projId] = envs.filter((e) => e.id !== envId);
+      }
+      return next;
+    });
+
+    setActiveBackendEnvMap((prev) => {
+      const next = { ...prev };
+      for (const [projId, activeId] of Object.entries(next)) {
+        if (activeId === envId) {
+          next[projId] = null;
+        }
+      }
+      return next;
+    });
+
+    if (selectedEnvId === envId) {
+      setSelectedEnvId(GLOBALS_ENV_ID);
+    }
+    toast.success("Deleted environment");
+  };
+
+  const handleRenameEnvironment = (envId: string, newName: string) => {
+    if (envId === GLOBALS_ENV_ID) return;
+    setBackendEnvironments((prev) => {
+      const next = { ...prev };
+      for (const [projId, envs] of Object.entries(next)) {
+        next[projId] = envs.map((e) => (e.id === envId ? { ...e, name: newName } : e));
+      }
+      return next;
+    });
+  };
+
+  const handleExportEnvironment = (env: ApiEnvironment) => {
+    const dataStr =
+      "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(env, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute(
+      "download",
+      `${env.name.toLowerCase().replace(/\s+/g, "_")}.environment.json`
+    );
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success(`Exported ${env.name}`);
+  };
+
+  const handleExecuteCopy = (
+    targetEnvId: string,
+    variablesToCopy: ApiVariable[],
+    conflictMode: "merge" | "overwrite"
+  ) => {
+    const applyCopy = (target: ApiEnvironment): ApiEnvironment => {
+      const currentVars = [...target.variables];
+      const copied = variablesToCopy.map((v) => ({
+        ...v,
+        id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      }));
+
+      for (const c of copied) {
+        const existingIdx = currentVars.findIndex((v) => v.key === c.key);
+        if (existingIdx !== -1) {
+          if (conflictMode === "overwrite") {
+            currentVars[existingIdx] = c;
+          }
+        } else {
+          currentVars.push(c);
         }
       }
 
-      return updatedEnvs.map((env) => {
-        if (env.id === targetEnvId) {
-          const existingVarIdx = env.variables.findIndex((v) => v.key === key);
-          let nextVars = [...env.variables];
-          
-          // If there's only one variable and it's empty, replace it
-          if (nextVars.length === 1 && !nextVars[0].key && !nextVars[0].value) {
-            nextVars[0] = {
-              ...nextVars[0],
-              key,
-              value,
-              enabled: true,
-            };
-          } else if (existingVarIdx !== -1) {
-            nextVars[existingVarIdx] = {
-              ...nextVars[existingVarIdx],
-              value,
-              enabled: true,
-            };
-          } else {
-            nextVars.push({
-              id: `var_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
-              enabled: true,
-              key,
-              value,
-            });
-          }
-          return {
-            ...env,
-            variables: nextVars,
-          };
-        }
-        return env;
-      });
-    });
+      return {
+        ...target,
+        variables: currentVars,
+        updatedAt: Date.now(),
+      };
+    };
 
-    toast.success(`Variable saved: ${key}`);
+    if (targetEnvId === GLOBALS_ENV_ID) {
+      setGlobals((prev) => applyCopy(prev));
+    } else {
+      setBackendEnvironments((prev) => {
+        const next = { ...prev };
+        for (const [projId, envs] of Object.entries(next)) {
+          next[projId] = envs.map((e) => (e.id === targetEnvId ? applyCopy(e) : e));
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleCreateTargetEnv = (projectId: string | null, name: string): string => {
+    const newId = `env_${Date.now()}`;
+    const newEnv: ApiEnvironment = {
+      id: newId,
+      name,
+      projectId,
+      variables: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    if (projectId) {
+      setBackendEnvironments((prev) => ({
+        ...prev,
+        [projectId]: [...(prev[projectId] || []), newEnv],
+      }));
+    }
+    return newId;
   };
 
   return (
@@ -1700,11 +1985,21 @@ function App() {
             projects={projects}
             workspaces={workspaces}
           />
-          <ManageEnvironmentsModal
-            isOpen={isManageEnvsModalOpen}
-            onClose={() => setIsManageEnvsModalOpen(false)}
-            environments={environments}
-            onUpdateEnvironments={setEnvironments}
+          <CopyVariablesModal
+            isOpen={Boolean(copyModalSourceEnvId)}
+            onClose={() => setCopyModalSourceEnvId(null)}
+            sourceEnv={
+              copyModalSourceEnvId === GLOBALS_ENV_ID
+                ? globals
+                : Object.values(backendEnvironments)
+                    .flat()
+                    .find((e) => e.id === copyModalSourceEnvId) || null
+            }
+            globals={globals}
+            backendEnvironments={backendEnvironments}
+            projects={projects}
+            onExecuteCopy={handleExecuteCopy}
+            onCreateTargetEnv={handleCreateTargetEnv}
           />
           <DevToolsModal
             isOpen={isDevToolsModalOpen}
@@ -1733,8 +2028,32 @@ function App() {
             </ErrorBoundary>
           )}
 
-          {/* Center Request Workspace Area */}
-          {isProjectsLoaded && isTabsRestored && projects.length === 0 && tabs.length === 0 ? (
+          {/* Center Workspace Area */}
+          {activeSidebarTab === "environments" ? (
+            <EnvironmentEditorView
+              environment={currentSelectedEnv}
+              project={projects.find((p) => p.id === currentSelectedEnv.projectId)}
+              isActiveForProject={
+                Boolean(
+                  currentSelectedEnv.projectId &&
+                    activeBackendEnvMap[currentSelectedEnv.projectId] === currentSelectedEnv.id
+                )
+              }
+              onUpdateEnvironment={handleUpdateEnvironment}
+              onToggleActive={() => {
+                if (currentSelectedEnv.projectId) {
+                  const currentActive = activeBackendEnvMap[currentSelectedEnv.projectId];
+                  handleSetActiveBackendEnv(
+                    currentSelectedEnv.projectId,
+                    currentActive === currentSelectedEnv.id ? null : currentSelectedEnv.id
+                  );
+                }
+              }}
+              onOpenCopyModal={(id) => setCopyModalSourceEnvId(id)}
+              onDuplicateEnvironment={handleDuplicateEnvironment}
+              onExportEnvironment={handleExportEnvironment}
+            />
+          ) : isProjectsLoaded && isTabsRestored && projects.length === 0 && tabs.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
               <OnboardingView
                 onOpenFolder={handleAddBackendFolder}
@@ -1753,10 +2072,6 @@ function App() {
                 onSelectTab={handleSelectTab}
                 onCloseTab={handleCloseTab}
                 onNewTab={handleNewTab}
-                environments={environments}
-                activeEnvId={activeEnvId}
-                onSelectEnv={setActiveEnvId}
-                onManageEnvsClick={() => setIsManageEnvsModalOpen(true)}
                 onReorderTabs={setTabs}
                 onDuplicateTab={handleDuplicateTab}
                 onCloseOtherTabs={handleCloseOtherTabs}

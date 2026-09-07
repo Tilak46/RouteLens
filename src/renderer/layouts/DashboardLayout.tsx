@@ -15,11 +15,12 @@ import {
   Terminal,
   Lock,
   Ghost,
+  SlidersHorizontal,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 
-export type SidebarTab = "explorer" | "automations" | "settings";
+export type SidebarTab = "explorer" | "environments" | "automations" | "settings";
 
 type DashboardLayoutProps = {
   children: React.ReactNode;
@@ -127,6 +128,7 @@ export function DashboardLayout({
 
             {/* Tabs */}
             <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
+            <ToolbarButton tabId="environments" icon={SlidersHorizontal} label="Environments" />
           </div>
 
           <div className="flex flex-col items-center gap-3 w-full">
