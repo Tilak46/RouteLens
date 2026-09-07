@@ -281,7 +281,7 @@ export function TreeNode({
         }}
         onClick={() => !isRenaming && onSelect(node)}
         className={cn(
-          "group flex items-center gap-2 py-1.5 pr-2 rounded-md cursor-pointer transition-all duration-150 text-sm relative border border-transparent",
+          "group flex items-center gap-1.5 py-1.5 pr-2 rounded-md cursor-pointer transition-all duration-150 text-sm relative border border-transparent",
           "hover:pr-8 data-[menu-open=true]:pr-8",
           isSelected
             ? "bg-primary/10 text-primary font-medium"
@@ -340,7 +340,9 @@ export function TreeNode({
             className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-medium text-foreground text-left"
           />
         ) : (
-          <span className="flex-1 min-w-0 truncate text-left">{node.name}</span>
+          <span className="flex-1 min-w-0 truncate text-left" title={node.name}>
+            {node.name}
+          </span>
         )}
 
         {node.isStale && !isRenaming && (
@@ -711,18 +713,36 @@ function MethodBadge({ method }: { method: string }) {
     POST: "text-amber-500",
     PUT: "text-blue-500",
     DELETE: "text-rose-500",
+    DEL: "text-rose-500",
     PATCH: "text-purple-500",
-    ALL: "text-gray-500",
+    PAT: "text-purple-500",
+    OPTIONS: "text-pink-500",
+    OPT: "text-pink-500",
+    HEAD: "text-emerald-400",
+    ALL: "text-gray-400",
   };
+
+  const raw = (method || "").toUpperCase().trim();
+  const formatted =
+    raw === "DELETE"
+      ? "DEL"
+      : raw === "PATCH"
+        ? "PAT"
+        : raw === "OPTIONS"
+          ? "OPT"
+          : raw.length > 4
+            ? raw.slice(0, 3)
+            : raw;
 
   return (
     <span
       className={cn(
-        "text-[10px] font-bold w-11 shrink-0 text-left tracking-wide",
-        colors[method] || "text-gray-400",
+        "text-[10px] font-bold w-8 shrink-0 text-center tracking-tight inline-block select-none",
+        colors[raw] || colors[formatted] || "text-gray-400",
       )}
+      title={raw}
     >
-      {method}
+      {formatted}
     </span>
   );
 }

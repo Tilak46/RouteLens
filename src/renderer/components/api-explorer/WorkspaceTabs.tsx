@@ -105,8 +105,19 @@ function SortableTab({
         isDragging && "shadow-md"
       )}
     >
-      <span className={cn("font-bold text-[9px] w-9 shrink-0 tracking-wide", colorClass)}>
-        {tab.method}
+      <span
+        className={cn("font-bold text-[9.5px] w-7 shrink-0 text-center tracking-tight inline-block select-none", colorClass)}
+        title={tab.method}
+      >
+        {tab.method === "DELETE"
+          ? "DEL"
+          : tab.method === "PATCH"
+            ? "PAT"
+            : tab.method === "OPTIONS"
+              ? "OPT"
+              : (tab.method?.length || 0) > 4
+                ? tab.method.slice(0, 3)
+                : tab.method}
       </span>
       <span className="max-w-[100px] truncate" title={tab.name}>
         {tab.name || "Untitled Request"}
@@ -150,7 +161,12 @@ export function WorkspaceTabs({
     POST: "text-amber-500",
     PUT: "text-blue-500",
     DELETE: "text-rose-500",
+    DEL: "text-rose-500",
     PATCH: "text-purple-500",
+    PAT: "text-purple-500",
+    OPTIONS: "text-pink-500",
+    OPT: "text-pink-500",
+    HEAD: "text-emerald-400",
     ALL: "text-zinc-500",
   };
 
@@ -239,7 +255,8 @@ export function WorkspaceTabs({
           >
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
-              const colorClass = methodColors[tab.method] || "text-zinc-400";
+              const colorClass =
+                methodColors[tab.method?.toUpperCase()] || "text-zinc-400";
               
               return (
                 <SortableTab
