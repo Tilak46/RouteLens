@@ -180,13 +180,13 @@ function createWindow(): void {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
       contextIsolation: true,
+      backgroundThrottling: false,
     },
   });
 
-  mainWindow.maximize();
-
-  mainWindow.on("ready-to-show", () => {
-    mainWindow.show();
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.maximize();
+    mainWindow?.show();
   });
 
   mainWindow.on("closed", () => {
