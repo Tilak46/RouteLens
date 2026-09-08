@@ -38,9 +38,10 @@ import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
 import { ResponseIdleMascot } from "@/components/api-explorer/ResponseIllustrations";
 import { ManageCookiesModal } from "@/components/api-explorer/ManageCookiesModal";
 import { OnboardingView } from "@/components/onboarding/OnboardingView";
-import { ProjectIdleView } from "@/components/project/ProjectIdleView";
-import GhostHunter from "@/components/game/GhostHunter";
-import GamingHUDCursor from "@/components/game/GamingHUDCursor";
+// Temporary Demo Video: GhostHunter mini-game commented out in favor of ScanningFactsOverlay
+// import GhostHunter from "@/components/game/GhostHunter";
+// import GamingHUDCursor from "@/components/game/GamingHUDCursor";
+import { ScanningFactsOverlay } from "@/components/scanner/ScanningFactsOverlay";
 import { UpdateGraceBanner, UpdateEnforcementData } from "@/components/updates/UpdateGraceBanner";
 import { MandatoryUpdateModal } from "@/components/updates/MandatoryUpdateModal";
 
@@ -1449,7 +1450,7 @@ function App() {
     }
 
     setScanningProjectId(targetProject.id);
-    toast.info("Hunt phantom bugs while AST scans your backend!");
+    toast.info("Scanning backend routes with Babel AST engine...");
 
     if (!targetProject.path.startsWith("mock://")) {
       const scanPromise = apiClient
@@ -2027,9 +2028,10 @@ function App() {
             treeCache={treeCache}
           />
 
-          {/* Interactive AST Scan Mini-Game: Only visible on the right workspace during scanning */}
+          {/* AST Scan Overlay: Temporarily showing ScanningFactsOverlay for video demo (Ghost game commented out) */}
           {Boolean(scanningProjectId) && (
             <ErrorBoundary fallback={null}>
+              {/* 
               <div
                 id="scan-game-container"
                 ref={scanGameContainerRef}
@@ -2043,6 +2045,11 @@ function App() {
                   onDismiss={() => setScanningProjectId(null)}
                 />
               </div>
+              */}
+              <ScanningFactsOverlay
+                projectName={projects.find((p) => p.id === scanningProjectId)?.name}
+                onDismiss={() => setScanningProjectId(null)}
+              />
             </ErrorBoundary>
           )}
 
