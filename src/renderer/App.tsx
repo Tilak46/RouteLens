@@ -38,6 +38,7 @@ import { ResponsePanel } from "@/components/api-explorer/ResponsePanel";
 import { ResponseIdleMascot } from "@/components/api-explorer/ResponseIllustrations";
 import { ManageCookiesModal } from "@/components/api-explorer/ManageCookiesModal";
 import { OnboardingView } from "@/components/onboarding/OnboardingView";
+import { ProjectIdleView } from "@/components/project/ProjectIdleView";
 // Temporary Demo Video: GhostHunter mini-game commented out in favor of ScanningFactsOverlay
 // import GhostHunter from "@/components/game/GhostHunter";
 // import GamingHUDCursor from "@/components/game/GamingHUDCursor";
