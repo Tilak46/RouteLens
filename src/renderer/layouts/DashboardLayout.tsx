@@ -156,13 +156,13 @@ export function DashboardLayout({
                   <button
                     onClick={onDevTriggerScanAnimation}
                     className="flex items-center justify-center w-9 h-9 rounded-lg text-cyan-400 hover:bg-cyan-500/15 hover:text-cyan-300 transition-all duration-200 group cursor-pointer"
-                    title="Dev: Test AST Scan Screen"
+                    title="Dev: Test Scan Screen"
                   >
                     <Ghost size={16} className="group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform duration-200" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-popover border-border text-xs font-medium text-cyan-300">
-                  Dev: Test AST Scan Screen
+                  Dev: Test Scan Screen
                 </TooltipContent>
               </Tooltip>
             )}

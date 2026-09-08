@@ -374,7 +374,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-all duration-200 shadow-sm hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={13} className={cn(isScanning && "animate-spin text-primary")} />
-            <span>{isScanning ? "Scanning..." : "Rescan AST"}</span>
+            <span>{isScanning ? "Scanning..." : "Rescan"}</span>
           </button>
         </div>
 

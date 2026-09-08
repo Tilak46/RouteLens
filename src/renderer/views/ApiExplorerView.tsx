@@ -1048,7 +1048,7 @@ export function ApiExplorerSidebarPanel({
             >
               {isScanning && scanningProjectId === activeProject?.id ? (
                 <div className="p-4 text-xs text-cyan-400 flex items-center justify-center gap-2">
-                  <RefreshCw size={12} className="animate-spin" /> Scanning AST routes...
+                  <RefreshCw size={12} className="animate-spin" /> Scanning endpoints...
                 </div>
               ) : filteredTree.length > 0 ? (
                 <Sidebar
@@ -1108,7 +1108,7 @@ export function ApiExplorerSidebarPanel({
                         className="h-6 text-[11px] px-2.5 bg-primary/10 hover:bg-primary/20 border-primary/20 text-primary cursor-pointer"
                       >
                         <RefreshCw size={10} className={cn("mr-1", isScanning && "animate-spin")} />
-                        Rescan AST
+                        Rescan Routes
                       </Button>
                     )}
                     <Button

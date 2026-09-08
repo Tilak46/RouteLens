@@ -20,11 +20,11 @@ const DID_YOU_KNOW_FACTS = [
 ];
 
 const SCAN_STEPS = [
-  "Indexing controllers and endpoints...",
-  "Mapping route paths and methods...",
-  "Organizing collection hierarchy...",
-  "Preparing request templates...",
-  "Finalizing workspace routes...",
+  "Indexing controllers and endpoints",
+  "Mapping route paths and methods",
+  "Organizing collection hierarchy",
+  "Preparing request templates",
+  "Finalizing workspace routes",
 ];
 
 export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
@@ -109,7 +109,7 @@ export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
           {/* Clean Status Pill */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-[11px] font-medium tracking-wide">
             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span>AST Analysis</span>
+            <span>Discovering Endpoints</span>
           </div>
 
           {/* Project Header */}
@@ -130,32 +130,11 @@ export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
           </p>
         </div>
 
-        {/* Precision Progress Indicator */}
-        <div className="w-full max-w-xs">
-          <div className="w-full h-1 bg-white/[0.06] rounded-full overflow-hidden">
-            <div className="h-full bg-primary/80 rounded-full animate-pulse shadow-sm shadow-primary/30 relative overflow-hidden" />
-          </div>
-        </div>
-
         {/* High-End "Did You Know?" Card */}
         <div className="w-full bg-[#12151E] border border-white/[0.08] rounded-xl p-5 shadow-2xl text-left space-y-2.5 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-              <Sparkles size={11} className="text-primary/90" />
-              <span>Did you know?</span>
-            </div>
-            {/* Step Dots */}
-            <div className="flex items-center gap-1">
-              {DID_YOU_KNOW_FACTS.map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "h-1 rounded-full transition-all duration-300",
-                    i === factIndex ? "w-3 bg-primary" : "w-1 bg-white/10"
-                  )}
-                />
-              ))}
-            </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            <Sparkles size={11} className="text-primary/90" />
+            <span>Did you know?</span>
           </div>
 
           {/* Fact Body */}

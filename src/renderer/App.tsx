@@ -1304,8 +1304,8 @@ function App() {
             [project.path]: {
               tree: demoTree,
               logs: [
-                "[AST Scanner] Rescanned demo routes...",
-                "[AST Scanner] Discovered 7 routes across 3 controllers",
+                "[Route Scanner] Rescanned demo routes...",
+                "[Route Scanner] Discovered 7 routes across 3 controllers",
               ],
               cachedAt: Date.now(),
               potentialRoutesCount: 7,
@@ -1316,7 +1316,7 @@ function App() {
           return next;
         });
         setScanningProjectId(null);
-        toast.success("AST scan complete", {
+        toast.success("Scan complete", {
           description: `Discovered 7 routes in ${project.name}`,
         });
       }, scanDuration);
@@ -1347,7 +1347,7 @@ function App() {
         return next;
       });
 
-      toast.success("AST scan complete", {
+      toast.success("Scan complete", {
         description: `Discovered ${result?.detectedRoutesCount || merged.length} routes in ${project.name}`,
       });
     } catch (err) {
@@ -1404,11 +1404,11 @@ function App() {
           [demoPath]: {
             tree: demoTree,
             logs: [
-              "[AST Scanner] Scanning demo routes...",
-              "[AST Scanner] Parsed express router in /controllers/auth.ts",
-              "[AST Scanner] Parsed express router in /controllers/products.ts",
-              "[AST Scanner] Parsed health check endpoint in /server.ts",
-              "[AST Scanner] Discovered 7 routes across 3 controllers",
+              "[Route Scanner] Scanning demo routes...",
+              "[Route Scanner] Parsed express router in /controllers/auth.ts",
+              "[Route Scanner] Parsed express router in /controllers/products.ts",
+              "[Route Scanner] Parsed health check endpoint in /server.ts",
+              "[Route Scanner] Discovered 7 routes across 3 controllers",
             ],
             cachedAt: Date.now(),
             potentialRoutesCount: 7,
@@ -1427,7 +1427,7 @@ function App() {
         handleSelectRoute(firstRoute, "http://localhost:3000", demoId);
       }
 
-      toast.success("AST scan complete", {
+      toast.success("Scan complete", {
         description: "Discovered 7 routes in RouteLens Demo API",
       });
     }, scanDuration);
@@ -1454,7 +1454,7 @@ function App() {
     }
 
     setScanningProjectId(targetProject.id);
-    toast.info("Scanning backend routes with Babel AST engine...");
+    toast.info("Scanning backend routes...");
 
     if (!targetProject.path.startsWith("mock://")) {
       const scanPromise = apiClient
@@ -1483,14 +1483,14 @@ function App() {
       requestAnimationFrame(() => {
         window.dispatchEvent(new Event("resize"));
       });
-      toast.success("AST scan complete!");
+      toast.success("Scan complete!");
     } else {
       setTimeout(() => {
         setScanningProjectId(null);
         requestAnimationFrame(() => {
           window.dispatchEvent(new Event("resize"));
         });
-        toast.success("AST scan complete!");
+        toast.success("Scan complete!");
       }, 5000);
     }
   };
