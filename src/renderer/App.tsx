@@ -1354,6 +1354,9 @@ function App() {
       toast.error("Scan failed");
     } finally {
       setScanningProjectId(null);
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
     }
   };
 
@@ -1477,10 +1480,16 @@ function App() {
         new Promise((resolve) => setTimeout(resolve, 5000)),
       ]);
       setScanningProjectId(null);
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
       toast.success("AST scan complete!");
     } else {
       setTimeout(() => {
         setScanningProjectId(null);
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new Event("resize"));
+        });
         toast.success("AST scan complete!");
       }, 5000);
     }

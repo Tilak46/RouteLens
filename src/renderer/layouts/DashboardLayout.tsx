@@ -199,10 +199,10 @@ export function DashboardLayout({
         {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
         <aside
           className={cn(
-            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-30",
+            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-30 isolate transform-gpu",
             isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
           )}
-          style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px` } : undefined}
+          style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px`, transform: "translateZ(0)" } : undefined}
         >
           {isSidebarExpanded && (
             <div className="flex flex-col h-full p-3.5 overflow-hidden">
@@ -225,8 +225,11 @@ export function DashboardLayout({
                 </button>
               </div>
 
-              {/* Sidebar Content (bounded layout with no double-scroll conflict) */}
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {/* Sidebar Content (bounded layout with hardware compositor isolation) */}
+              <div
+                className="flex-1 min-h-0 flex flex-col overflow-hidden isolate transform-gpu"
+                style={{ transform: "translateZ(0)" }}
+              >
                 {sidebarContent}
               </div>
             </div>

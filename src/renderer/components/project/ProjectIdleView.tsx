@@ -83,7 +83,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.95 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="relative px-4 py-2.5 rounded-2xl bg-card/95 border border-primary/40 backdrop-blur-md shadow-[0_8px_30px_rgba(59,130,246,0.2)] text-center flex items-center gap-3 cursor-pointer hover:border-primary/70 transition-colors"
+              className="relative px-4 py-2.5 rounded-2xl bg-[#131722]/98 border border-primary/40 shadow-[0_8px_30px_rgba(0,0,0,0.35)] text-center flex items-center gap-3 cursor-pointer hover:border-primary/70 transition-colors"
               onClick={handleVictorClick}
               title="Click Victor for co-pilot tips!"
             >
@@ -100,17 +100,23 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                 </div>
               </div>
               {/* Pointy speech arrow */}
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-card/95 border-r border-b border-primary/40 rotate-45" />
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#131722] border-r border-b border-primary/40 rotate-45" />
             </motion.div>
           </AnimatePresence>
         </div>
 
         {/* Central Visual: Animated SS2 Victor Mascot (Click to Jump / Easter Egg) */}
-        <div className="relative flex flex-col items-center my-2 select-none">
-          {/* Ambient Cosmic Lighting Aura */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-gradient-to-tr from-blue-500/15 via-cyan-500/15 to-indigo-500/10 blur-3xl rounded-full pointer-events-none -z-10 animate-pulse" style={{ animationDuration: "4s" }} />
+        <div className="relative flex flex-col items-center my-2 select-none isolate">
+          {/* Ambient Cosmic Lighting Aura (Pure CSS Radial Gradient - zero GPU blur filter overhead) */}
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full pointer-events-none -z-10 animate-pulse"
+            style={{
+              animationDuration: "4s",
+              background: "radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(6,182,212,0.10) 45%, transparent 70%)"
+            }}
+          />
 
-          {/* Interactive Mascot SVG with Framer Motion Bob */}
+          {/* Interactive Mascot SVG with GPU-accelerated CSS Keyframes */}
           <div
             onClick={handleVictorClick}
             className="relative cursor-pointer group"
@@ -119,27 +125,21 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
             <AnimatePresence mode="wait">
               {viewMode === "half" ? (
                 /* ================= MODE A: HALF SIZE (SS2 BUST) ================= */
-                <motion.svg
-                  key="mascot-half"
-                  initial={{ opacity: 0, scale: 0.92 }}
-                  animate={{ opacity: 1, scale: 1, y: isJumping ? [0, -14, 0] : [0, -6, 0] }}
-                  exit={{ opacity: 0, scale: 0.92 }}
-                  transition={{
-                    opacity: { duration: 0.25 },
-                    scale: { duration: 0.25 },
-                    y: {
-                      duration: isJumping ? 0.6 : 3.4,
-                      repeat: isJumping ? 1 : Infinity,
-                      ease: "easeInOut",
-                    },
-                  }}
-                  width="180"
-                  height="170"
-                  viewBox="0 0 160 160"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="overflow-visible"
+                <div
+                  key="mascot-half-wrap"
+                  className={cn(
+                    "transition-transform duration-200 transform-gpu",
+                    isJumping ? "animate-victor-jump" : "animate-victor-float"
+                  )}
                 >
+                  <svg
+                    width="180"
+                    height="170"
+                    viewBox="0 0 160 160"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="overflow-visible"
+                  >
                   {/* Background Twinkling Stars */}
                   <path
                     d="M32 38 L34 43 L39 45 L34 47 L32 52 L30 47 L25 45 L30 43 Z"
@@ -209,10 +209,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                     />
                     {/* Glowing Beacon on Antenna Tip */}
                     <circle cx="76" cy="14" r="4" fill="#f97316" className="animate-pulse" />
-                    <circle cx="76" cy="14" r="5" fill="#f97316" fillOpacity="0.4">
-                      <animate attributeName="r" values="4;8;4" dur="2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.6;0.05;0.6" dur="2s" repeatCount="indefinite" />
-                    </circle>
+                    <circle cx="76" cy="14" r="6" fill="#f97316" fillOpacity="0.3" className="animate-ping origin-center" />
 
                     {/* Helmet Outer Shell */}
                     <circle
@@ -331,30 +328,25 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                     />
                     <circle cx="73" cy="129" r="1.5" fill="#f97316" />
                   </g>
-                </motion.svg>
+                </svg>
+              </div>
               ) : (
                 /* ================= MODE B: FULL SIZE (SS2 FULL-BODY) ================= */
-                <motion.svg
-                  key="mascot-full"
-                  initial={{ opacity: 0, scale: 0.92 }}
-                  animate={{ opacity: 1, scale: 1, y: isJumping ? [0, -14, 0] : [0, -7, 0] }}
-                  exit={{ opacity: 0, scale: 0.92 }}
-                  transition={{
-                    opacity: { duration: 0.25 },
-                    scale: { duration: 0.25 },
-                    y: {
-                      duration: isJumping ? 0.6 : 3.4,
-                      repeat: isJumping ? 1 : Infinity,
-                      ease: "easeInOut",
-                    },
-                  }}
-                  width="180"
-                  height="210"
-                  viewBox="0 0 160 190"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="overflow-visible"
+                <div
+                  key="mascot-full-wrap"
+                  className={cn(
+                    "transition-transform duration-200 transform-gpu",
+                    isJumping ? "animate-victor-jump" : "animate-victor-float"
+                  )}
                 >
+                  <svg
+                    width="180"
+                    height="210"
+                    viewBox="0 0 160 190"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="overflow-visible"
+                  >
                   {/* Background Stars */}
                   <path
                     d="M26 34 L28 38 L32 40 L28 42 L26 46 L24 42 L20 40 L24 38 Z"
@@ -400,10 +392,7 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                     {/* Antenna */}
                     <line x1="76" y1="34" x2="76" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-zinc-400" />
                     <circle cx="76" cy="14" r="4" fill="#f97316" className="animate-pulse" />
-                    <circle cx="76" cy="14" r="5" fill="#f97316" fillOpacity="0.4">
-                      <animate attributeName="r" values="4;8;4" dur="2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.6;0.05;0.6" dur="2s" repeatCount="indefinite" />
-                    </circle>
+                    <circle cx="76" cy="14" r="6" fill="#f97316" fillOpacity="0.3" className="animate-ping origin-center" />
 
                     {/* Backpack */}
                     <rect x="52" y="78" width="48" height="42" rx="10" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-600" />
@@ -507,7 +496,8 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                       className="text-zinc-300"
                     />
                   </g>
-                </motion.svg>
+                </svg>
+              </div>
               )}
             </AnimatePresence>
           </div>

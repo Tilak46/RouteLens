@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Sparkles, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoImg from "@/assets/logo.png";
@@ -72,10 +72,20 @@ export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
   const currentStep = SCAN_STEPS[stepIndex];
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#090A0F]/90 backdrop-blur-xl select-none text-foreground p-6 overflow-hidden animate-in fade-in duration-200">
-      {/* Subtle background ambient glow */}
-      <div className="absolute w-[460px] h-[460px] rounded-full bg-primary/10 blur-[120px] pointer-events-none -top-20 -left-20" />
-      <div className="absolute w-[460px] h-[460px] rounded-full bg-amber-500/10 blur-[120px] pointer-events-none -bottom-20 -right-20" />
+    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#090A0F]/96 isolate select-none text-foreground p-6 overflow-hidden animate-in fade-in duration-200">
+      {/* Subtle background ambient glow (Radial gradients - zero blur filter overhead) */}
+      <div
+        className="absolute w-[460px] h-[460px] rounded-full pointer-events-none -top-20 -left-20 opacity-40"
+        style={{
+          background: "radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)",
+        }}
+      />
+      <div
+        className="absolute w-[460px] h-[460px] rounded-full pointer-events-none -bottom-20 -right-20 opacity-30"
+        style={{
+          background: "radial-gradient(circle, rgba(245,158,11,0.2) 0%, transparent 70%)",
+        }}
+      />
 
       {/* Top right: Clean dismiss button */}
       <button
@@ -141,7 +151,7 @@ export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
         </div>
 
         {/* Elegant "Did You Know?" Card */}
-        <div className="w-full bg-white/[0.025] border border-white/[0.08] rounded-2xl p-6 shadow-2xl backdrop-blur-md text-center space-y-3 transition-all">
+        <div className="w-full bg-[#0D0F16]/95 border border-white/[0.08] rounded-2xl p-6 shadow-2xl text-center space-y-3 transition-all">
           {/* Badge */}
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
             <Sparkles size={11} />

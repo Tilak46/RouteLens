@@ -897,4 +897,36 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* Hardware-accelerated compositor animations for Victor mascot */
+@keyframes victor-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes victor-jump {
+  0% {
+    transform: translateY(0px) scale(1);
+  }
+  40% {
+    transform: translateY(-14px) scale(1.05);
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+}
+
+.animate-victor-float {
+  animation: victor-float 3.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-victor-jump {
+  animation: victor-jump 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
 

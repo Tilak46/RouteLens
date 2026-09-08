@@ -712,6 +712,8 @@ export function TreeNode({
               onToggleFolderExpanded={onToggleFolderExpanded}
               newlyCreatedNodeId={newlyCreatedNodeId}
               onClearNewlyCreatedNodeId={onClearNewlyCreatedNodeId}
+              onDuplicateNode={onDuplicateNode}
+              onCopyNode={onCopyNode}
             />
           ))}
         </div>
