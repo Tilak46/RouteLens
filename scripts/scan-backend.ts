@@ -7,6 +7,7 @@ import {
   expressParser,
   nextAppParser,
   nextParser,
+  nestParser,
 } from "../src/main/lib/scanner/parsers";
 
 import type { ApiFolder, ApiRoute } from "../src/types";
@@ -227,6 +228,7 @@ async function main() {
     expressParser,
     nextParser,
     nextAppParser,
+    nestParser,
   ]);
   const ms = Date.now() - startedAt;
 

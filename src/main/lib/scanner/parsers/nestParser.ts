@@ -328,7 +328,7 @@ async function detectNestProject(ctx: ScannerContext): Promise<boolean> {
     );
     const pkg = JSON.parse(pkgRaw);
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    if (deps["@nestjs/core"] || deps["@nestjs/common"]) return true;
+    if (deps["@nestjs/core"] || deps["@nestjs/common"] || deps["@tsed/common"]) return true;
   } catch {
     // fall through to file-based heuristic
   }
@@ -349,14 +349,19 @@ export const nestParser: FrameworkParser = {
       const controllerClasses: any[] = [];
       traverse(ast, {
         ClassDeclaration(p) {
-          if (findDecorator(p.node.decorators, "Controller")) {
+          if (
+            findDecorator(p.node.decorators, "Controller") ||
+            findDecorator(p.node.decorators, "RestController")
+          ) {
             controllerClasses.push(p.node);
           }
         },
       });
 
       for (const classNode of controllerClasses) {
-        const controllerDecorator = findDecorator(classNode.decorators, "Controller");
+        const controllerDecorator =
+          findDecorator(classNode.decorators, "Controller") ||
+          findDecorator(classNode.decorators, "RestController");
         const controllerInfo = getDecoratorInfo(controllerDecorator);
         const controllerPrefixes = extractPathStrings(controllerInfo?.call?.arguments?.[0]);
         const classGuards = extractGuardNames(classNode.decorators);

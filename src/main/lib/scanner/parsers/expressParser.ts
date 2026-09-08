@@ -1,3 +1,4 @@
+import path from "node:path";
 import traverse from "@babel/traverse";
 import { joinPaths, normalizePath } from "../core/pathUtils";
 import {
@@ -2099,15 +2100,20 @@ function extractExpressInfo(
       // router.route('/x').get(...)
       if (isHttpMethodName(prop) && obj.type === "CallExpression") {
         const base = findRouteBaseFromCall(obj);
-        if (
-          base &&
-          (routerVars.has(base.ownerIdent) || appVars.has(base.ownerIdent))
-        ) {
+        if (base) {
+          const ownerIdent = base.ownerIdent;
+          if (!routerVars.has(ownerIdent) && !appVars.has(ownerIdent)) {
+            if (ownerIdent.toLowerCase() === "app" || ownerIdent.toLowerCase() === "server") {
+              appVars.add(ownerIdent);
+            } else {
+              routerVars.add(ownerIdent);
+            }
+          }
+
           const args = p.node.arguments;
           const handlerNode = args.length > 0 ? args[args.length - 1] : null;
           const middlewareNodes = args.slice(0, Math.max(0, args.length - 1));
 
-          const ownerIdent = base.ownerIdent;
           const inlineMiddlewares = middlewareNodes
             .map((a) => exprToString(a as any))
             .filter(Boolean);
@@ -2145,6 +2151,9 @@ function extractExpressInfo(
 
       // app.get('/x', ...) or router.post('/x', ...)
       if (isHttpMethodName(prop) && obj.type === "Identifier") {
+        // In Express, app.get(setting) has 1 argument. HTTP routes always have >= 2 arguments (path, handler)
+        if (p.node.arguments.length < 2) return;
+
         const ownerIdent = obj.name;
         const routePath = literalString(p.node.arguments[0] as any);
 
@@ -2450,11 +2459,57 @@ function computeRouterPrefixes(
     }
   }
 
-  // For routers that were never reached from an app mount, keep them visible as unmounted routes.
+function inferResourcePrefixFromFile(filePath: string): string {
+  const base = path.basename(filePath).replace(/\.(ts|js|mjs|cjs|jsx|tsx)$/, "");
+  const clean = base.replace(/(\.controller|\.router|\.routes|\.route)$/, "");
+  const generic = new Set(["index", "routes", "route", "server", "app", "main", "api"]);
+  if (!generic.has(clean.toLowerCase())) {
+    return "/" + clean;
+  }
+  const parentDir = path.basename(path.dirname(filePath));
+  if (!generic.has(parentDir.toLowerCase()) && parentDir !== "src" && parentDir !== "app" && parentDir !== "lib") {
+    return "/" + parentDir;
+  }
+  return "";
+}
+
+  // For routers that were never reached from an app mount, determine a canonical prefix from the file or parent mount.
   for (const info of fileInfos.values()) {
     for (const r of info.routerVars) {
       const ent = routerEntity(info.filePath, r);
-      if (!prefixes.has(ent)) prefixes.set(ent, [""]);
+      if (!prefixes.has(ent)) {
+        const routesInRouter = info.routes.filter((route) => route.owner === ent);
+        const inferredPfx = inferResourcePrefixFromFile(info.filePath);
+        if (inferredPfx) {
+          const alreadyPrefixed =
+            routesInRouter.length > 0 &&
+            routesInRouter.every((route) => {
+              const norm = normalizePath(route.path);
+              return norm === inferredPfx || norm.startsWith(inferredPfx + "/");
+            });
+
+          if (!alreadyPrefixed) {
+            // Check if directory index or sibling had an active mount
+            const dirIndexJs = path.join(path.dirname(info.filePath), "index.js");
+            const dirIndexTs = path.join(path.dirname(info.filePath), "index.ts");
+            let parentMountPfx = "";
+            for (const [otherEnt, pfxList] of prefixes.entries()) {
+              if (otherEnt.startsWith(dirIndexJs) || otherEnt.startsWith(dirIndexTs)) {
+                if (pfxList.length > 0 && pfxList[0] !== "") {
+                  parentMountPfx = pfxList[0];
+                  break;
+                }
+              }
+            }
+            const finalPfx = parentMountPfx ? joinPaths(parentMountPfx, inferredPfx) : inferredPfx;
+            prefixes.set(ent, [finalPfx]);
+          } else {
+            prefixes.set(ent, [""]);
+          }
+        } else {
+          prefixes.set(ent, [""]);
+        }
+      }
     }
   }
 

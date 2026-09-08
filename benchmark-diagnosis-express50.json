@@ -1,0 +1,319 @@
+[
+  {
+    "repoName": "apicache",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\apicache",
+    "filesIndexed": 9,
+    "potentialRoutes": 13,
+    "detectedRoutes": 12,
+    "detectionRate": 92,
+    "scanDurationMs": 140,
+    "methods": {
+      "GET": 12
+    },
+    "routesWithBody": 0,
+    "routesWithQuery": 0,
+    "routesWithParams": 2,
+    "routesWithMiddlewares": 0,
+    "missedFiles": [
+      {
+        "file": "src/apicache.js",
+        "estimatedRoutes": 1
+      }
+    ],
+    "sampleRoutes": [
+      {
+        "method": "GET",
+        "path": "/api/movies",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/params/:where",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/writeandend",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/writebufferandend",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/testheaderblacklist",
+        "bodyFields": []
+      }
+    ]
+  },
+  {
+    "repoName": "crystal",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\crystal",
+    "filesIndexed": 885,
+    "potentialRoutes": 8,
+    "detectedRoutes": 0,
+    "detectionRate": 0,
+    "scanDurationMs": 11196,
+    "methods": {},
+    "routesWithBody": 0,
+    "routesWithQuery": 0,
+    "routesWithParams": 0,
+    "routesWithMiddlewares": 0,
+    "missedFiles": [
+      {
+        "file": "grafast/grafserv/src/servers/hono/v4/index.ts",
+        "estimatedRoutes": 5
+      },
+      {
+        "file": "grafast/grafserv/src/servers/h3/v1/index.ts",
+        "estimatedRoutes": 3
+      }
+    ],
+    "sampleRoutes": []
+  },
+  {
+    "repoName": "express-api-es6-starter",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\express-api-es6-starter",
+    "filesIndexed": 20,
+    "potentialRoutes": 13,
+    "detectedRoutes": 9,
+    "detectionRate": 69,
+    "scanDurationMs": 64,
+    "methods": {
+      "GET": 6,
+      "POST": 1,
+      "PUT": 1,
+      "DELETE": 1
+    },
+    "routesWithBody": 0,
+    "routesWithQuery": 0,
+    "routesWithParams": 3,
+    "routesWithMiddlewares": 5,
+    "missedFiles": [],
+    "sampleRoutes": [
+      {
+        "method": "GET",
+        "path": "/api-docs/index.html",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api-docs",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/users",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/api/users/:id",
+        "bodyFields": []
+      },
+      {
+        "method": "POST",
+        "path": "/api/users",
+        "bodyFields": []
+      }
+    ]
+  },
+  {
+    "repoName": "filemanager",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\filemanager",
+    "filesIndexed": 187,
+    "potentialRoutes": 9,
+    "detectedRoutes": 9,
+    "detectionRate": 100,
+    "scanDurationMs": 719,
+    "methods": {
+      "GET": 6,
+      "DELETE": 1,
+      "PATCH": 1,
+      "POST": 1
+    },
+    "routesWithBody": 0,
+    "routesWithQuery": 0,
+    "routesWithParams": 5,
+    "routesWithMiddlewares": 9,
+    "missedFiles": [
+      {
+        "file": "demo-filesystem/files/Documents/hello-world.js",
+        "estimatedRoutes": 1
+      }
+    ],
+    "sampleRoutes": [
+      {
+        "method": "GET",
+        "path": "/",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/router/files/:id/children",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/router/files/:id/search",
+        "bodyFields": []
+      },
+      {
+        "method": "DELETE",
+        "path": "/router/files/:id",
+        "bodyFields": []
+      },
+      {
+        "method": "PATCH",
+        "path": "/router/files/:id",
+        "bodyFields": []
+      }
+    ]
+  },
+  {
+    "repoName": "node-express-mongodb-jwt-rest-api-skeleton",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\node-express-mongodb-jwt-rest-api-skeleton",
+    "filesIndexed": 134,
+    "potentialRoutes": 22,
+    "detectedRoutes": 21,
+    "detectionRate": 95,
+    "scanDurationMs": 653,
+    "methods": {
+      "POST": 8,
+      "GET": 8,
+      "PATCH": 3,
+      "DELETE": 2
+    },
+    "routesWithBody": 15,
+    "routesWithQuery": 0,
+    "routesWithParams": 6,
+    "routesWithMiddlewares": 20,
+    "missedFiles": [
+      {
+        "file": "server.js",
+        "estimatedRoutes": 1
+      }
+    ],
+    "sampleRoutes": [
+      {
+        "method": "POST",
+        "path": "/auth/register",
+        "bodyFields": [
+          "name",
+          "email",
+          "password"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/auth/verify",
+        "bodyFields": [
+          "id"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/auth/forgot",
+        "bodyFields": [
+          "email"
+        ]
+      },
+      {
+        "method": "POST",
+        "path": "/auth/reset",
+        "bodyFields": [
+          "id",
+          "password"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/auth/token",
+        "bodyFields": []
+      }
+    ]
+  },
+  {
+    "repoName": "node.js-clean-architecture",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\node.js-clean-architecture",
+    "filesIndexed": 42,
+    "potentialRoutes": 9,
+    "detectedRoutes": 9,
+    "detectionRate": 100,
+    "scanDurationMs": 129,
+    "methods": {
+      "POST": 3,
+      "GET": 4,
+      "PUT": 1,
+      "DELETE": 1
+    },
+    "routesWithBody": 0,
+    "routesWithQuery": 0,
+    "routesWithParams": 4,
+    "routesWithMiddlewares": 7,
+    "missedFiles": [
+      {
+        "file": "frameworks/webserver/server.js",
+        "estimatedRoutes": 1
+      }
+    ],
+    "sampleRoutes": [
+      {
+        "method": "POST",
+        "path": "/auth",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/post",
+        "bodyFields": []
+      },
+      {
+        "method": "GET",
+        "path": "/post/:id",
+        "bodyFields": []
+      },
+      {
+        "method": "POST",
+        "path": "/post",
+        "bodyFields": []
+      },
+      {
+        "method": "PUT",
+        "path": "/post/:id",
+        "bodyFields": []
+      }
+    ]
+  },
+  {
+    "repoName": "rest",
+    "repoPath": "c:\\Office-Work\\Testing\\easy\\rest",
+    "filesIndexed": 41,
+    "potentialRoutes": 12,
+    "detectedRoutes": 0,
+    "detectionRate": 0,
+    "scanDurationMs": 264,
+    "methods": {},
+    "routesWithBody": 0,
+    "routesWithQuery": 0,
+    "routesWithParams": 0,
+    "routesWithMiddlewares": 0,
+    "missedFiles": [
+      {
+        "file": "generators/app/templates/api/user/index.js",
+        "estimatedRoutes": 7
+      },
+      {
+        "file": "generators/app/templates/api/password-reset/index.js",
+        "estimatedRoutes": 3
+      },
+      {
+        "file": "generators/app/templates/api/auth/index.js",
+        "estimatedRoutes": 2
+      }
+    ],
+    "sampleRoutes": []
+  }
+]

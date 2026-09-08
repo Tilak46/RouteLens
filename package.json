@@ -17,6 +17,7 @@
     "release:minor": "tsx scripts/release.ts minor",
     "preview": "electron-vite preview",
     "scan:backend": "tsx scripts/scan-backend.ts",
+    "benchmark:express": "tsx scripts/benchmark-scanner.ts",
     "smoke:ai": "tsx scripts/smoke-ai.ts",
     "smoke:commitmsg": "tsx scripts/smoke-commitmsg.ts"
   },
