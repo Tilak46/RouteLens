@@ -199,7 +199,7 @@ export function DashboardLayout({
         {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
         <aside
           className={cn(
-            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-20",
+            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-30",
             isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
           )}
           style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px` } : undefined}
@@ -225,8 +225,8 @@ export function DashboardLayout({
                 </button>
               </div>
 
-              {/* Sidebar Content */}
-              <div className="flex-1 overflow-y-auto">
+              {/* Sidebar Content (bounded layout with no double-scroll conflict) */}
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {sidebarContent}
               </div>
             </div>

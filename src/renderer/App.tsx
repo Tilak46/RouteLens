@@ -2157,31 +2157,13 @@ function App() {
                   const activeProject = projects.find((p) => p.id === activeProjectId);
                   if (!activeProject) return null;
                   const isScanning = scanningProjectId === activeProject.id;
-                  const projectTree = treeCache[activeProject.path]?.tree || [];
-
-                  const extractAllRoutes = (nodes: any[]): ApiRoute[] => {
-                    const list: ApiRoute[] = [];
-                    const walk = (items: any[]) => {
-                      for (const item of items) {
-                        if (!item) continue;
-                        if ((item as any).method && (item as any).path) {
-                          list.push(item as ApiRoute);
-                        }
-                        if (Array.isArray(item.children)) {
-                          walk(item.children);
-                        }
-                      }
-                    };
-                    walk(nodes);
-                    return list;
-                  };
-
-                  const allRoutes = extractAllRoutes(projectTree);
+                  const cacheEntry = treeCache[activeProject.path];
+                  const totalEndpoints = cacheEntry?.detectedRoutesCount ?? (cacheEntry?.tree?.length || 0);
 
                   return (
                     <ProjectIdleView
                       project={activeProject}
-                      totalEndpoints={allRoutes.length}
+                      totalEndpoints={totalEndpoints}
                       isScanning={isScanning}
                       onNewTab={handleNewTab}
                       onRescan={() => handleRescanProject(activeProject)}

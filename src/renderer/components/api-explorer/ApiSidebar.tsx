@@ -81,6 +81,9 @@ export function Sidebar({
       onDragLeave={() => {
         setIsDragOverRoot(false);
       }}
+      onDragEnd={() => {
+        setIsDragOverRoot(false);
+      }}
       onDrop={(e) => {
         const draggedId = e.dataTransfer.getData("text/plain");
         if (draggedId) {
@@ -89,7 +92,7 @@ export function Sidebar({
         setIsDragOverRoot(false);
       }}
       className={cn(
-        "p-2 space-y-0.5 min-h-[300px] transition-all duration-200 border border-transparent rounded-lg relative group/sidebar",
+        "p-1 space-y-0.5 transition-all duration-200 border border-transparent rounded-lg relative group/sidebar min-h-full",
         isDragOverRoot && "border-dashed border-primary/40 bg-primary/5"
       )}
     >
@@ -246,7 +249,12 @@ export function TreeNode({
         draggable={!isRenaming}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", node.id);
+          e.dataTransfer.effectAllowed = "move";
           e.stopPropagation();
+        }}
+        onDragEnd={(e) => {
+          e.stopPropagation();
+          setDragOverPosition(null);
         }}
         onDragOver={(e) => {
           e.preventDefault();
@@ -377,7 +385,7 @@ export function TreeNode({
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <DropdownMenu onOpenChange={setIsMenuOpen}>
+            <DropdownMenu modal={false} onOpenChange={setIsMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10"
@@ -467,7 +475,12 @@ export function TreeNode({
         draggable={!isRenaming}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", node.id);
+          e.dataTransfer.effectAllowed = "move";
           e.stopPropagation();
+        }}
+        onDragEnd={(e) => {
+          e.stopPropagation();
+          setDragOverPosition(null);
         }}
         onDragOver={(e) => {
           e.preventDefault();
@@ -615,7 +628,7 @@ export function TreeNode({
             >
               <Plus size={13} />
             </button>
-            <DropdownMenu onOpenChange={setIsMenuOpen}>
+            <DropdownMenu modal={false} onOpenChange={setIsMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10"

@@ -176,6 +176,26 @@ export function WorkspaceTabs({
     y: number;
   } | null>(null);
 
+  // Auto-dismiss context menu whenever tabs change or active tab switches
+  useEffect(() => {
+    setContextMenu(null);
+  }, [activeTabId, tabs.length]);
+
+  // Dismiss context menu on Escape key or window blur
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+    const handleBlur = () => setContextMenu(null);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [contextMenu]);
+
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

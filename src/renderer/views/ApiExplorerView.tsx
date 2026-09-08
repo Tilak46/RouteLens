@@ -854,7 +854,7 @@ export function ApiExplorerSidebarPanel({
   }, [currentTree, searchQuery]);
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col h-full min-h-0 space-y-3">
       {/* 1. BACKENDS LIST */}
       <div className="flex flex-col gap-2 shrink-0">
         <div className="flex items-center justify-between mb-1 select-none">
@@ -1042,7 +1042,7 @@ export function ApiExplorerSidebarPanel({
               </div>
             </div>
 
-            <div className="flex-grow overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2">
               {isScanning && scanningProjectId === activeProject?.id ? (
                 <div className="p-4 text-xs text-cyan-400 flex items-center justify-center gap-2">
                   <RefreshCw size={12} className="animate-spin" /> Scanning AST routes...
