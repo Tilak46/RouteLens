@@ -49,7 +49,6 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
   onRescan,
   onRevealInExplorer,
 }) => {
-  const [viewMode, setViewMode] = useState<"half" | "full">("half");
   const [clickCount, setClickCount] = useState(0);
   const [isJumping, setIsJumping] = useState(false);
 
@@ -122,16 +121,12 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
             className="relative cursor-pointer group"
             title="Click me to test reactions!"
           >
-            <AnimatePresence mode="wait">
-              {viewMode === "half" ? (
-                /* ================= MODE A: HALF SIZE (SS2 BUST) ================= */
-                <div
-                  key="mascot-half-wrap"
-                  className={cn(
-                    "transition-transform duration-200 transform-gpu",
-                    isJumping ? "animate-victor-jump" : "animate-victor-float"
-                  )}
-                >
+            <div
+              className={cn(
+                "transition-transform duration-200 transform-gpu",
+                isJumping ? "animate-victor-jump" : "animate-victor-float"
+              )}
+            >
                   <svg
                     width="180"
                     height="170"
@@ -330,204 +325,8 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
                   </g>
                 </svg>
               </div>
-              ) : (
-                /* ================= MODE B: FULL SIZE (SS2 FULL-BODY) ================= */
-                <div
-                  key="mascot-full-wrap"
-                  className={cn(
-                    "transition-transform duration-200 transform-gpu",
-                    isJumping ? "animate-victor-jump" : "animate-victor-float"
-                  )}
-                >
-                  <svg
-                    width="180"
-                    height="210"
-                    viewBox="0 0 160 190"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="overflow-visible"
-                  >
-                  {/* Background Stars */}
-                  <path
-                    d="M26 34 L28 38 L32 40 L28 42 L26 46 L24 42 L20 40 L24 38 Z"
-                    fill="currentColor"
-                    className="text-zinc-500/40 animate-pulse"
-                  />
-                  <path
-                    d="M138 68 L139.5 71.5 L143 73 L139.5 74.5 L138 78 L136.5 74.5 L133 73 L136.5 71.5 Z"
-                    fill="currentColor"
-                    className="text-zinc-500/50 animate-pulse"
-                  />
-
-                  {/* Mini Rocket in Background */}
-                  <g transform="translate(122, 22) rotate(42)">
-                    <path
-                      d="M0 -18 C6 -12 7 8 7 14 L-7 14 C-7 8 -6 -12 0 -18 Z"
-                      fill="#0f172a"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinejoin="round"
-                      className="text-zinc-300"
-                    />
-                    <circle cx="0" cy="-2" r="3.2" fill="#38bdf8" fillOpacity="0.4" stroke="#38bdf8" strokeWidth="1.2" />
-                    <path d="M-7 8 L-13 15 L-7 14 Z" fill="#0f172a" stroke="currentColor" strokeWidth="1.6" className="text-zinc-300" />
-                    <path d="M7 8 L13 15 L7 14 Z" fill="#0f172a" stroke="currentColor" strokeWidth="1.6" className="text-zinc-300" />
-                    <path d="M-3 15 C-4 21 0 25 0 25 C0 25 4 21 3 15 Z" fill="#f97316" fillOpacity="0.85" className="animate-pulse" />
-                  </g>
-                  {/* Curved Smoke Trail */}
-                  <path
-                    d="M125 42 Q112 58 116 75 T110 95"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeDasharray="3 3"
-                    strokeLinecap="round"
-                    className="text-zinc-600/60"
-                  />
-
-                  {/* Soft Zero-G Floor Shadow */}
-                  <ellipse cx="76" cy="180" rx="26" ry="5.5" fill="#38bdf8" fillOpacity="0.15" />
-
-                  {/* Astronaut Full Body */}
-                  <g>
-                    {/* Antenna */}
-                    <line x1="76" y1="34" x2="76" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-zinc-400" />
-                    <circle cx="76" cy="14" r="4" fill="#f97316" className="animate-pulse" />
-                    <circle cx="76" cy="14" r="6" fill="#f97316" fillOpacity="0.3" className="animate-ping origin-center" />
-
-                    {/* Backpack */}
-                    <rect x="52" y="78" width="48" height="42" rx="10" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-600" />
-
-                    {/* Floating Zero-G Legs & Boots */}
-                    {/* Left Leg */}
-                    <rect x="58" y="118" width="14" height="22" rx="7" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-300" />
-                    <ellipse cx="64" cy="142" rx="8" ry="4.5" fill="#0f172a" stroke="currentColor" strokeWidth="1.8" className="text-zinc-400" />
-
-                    {/* Right Leg (Tilted slightly in zero-G float) */}
-                    <rect x="80" y="118" width="14" height="22" rx="7" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-300" />
-                    <ellipse cx="88" cy="142" rx="8" ry="4.5" fill="#0f172a" stroke="currentColor" strokeWidth="1.8" className="text-zinc-400" />
-
-                    {/* Torso */}
-                    <path
-                      d="M52 98 C52 122 100 122 100 98"
-                      fill="#0f172a"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      className="text-zinc-300"
-                    />
-
-                    {/* Chest Control Box */}
-                    <rect x="68" y="100" width="16" height="11" rx="2.5" fill="#1e293b" stroke="currentColor" strokeWidth="1.5" className="text-zinc-500" />
-                    <circle cx="73" cy="105" r="1.8" fill="#f97316" />
-                    <circle cx="79" cy="105" r="1.8" fill="#06b6d4" />
-
-                    {/* Left Arm Pointing to Watch */}
-                    <path
-                      d="M52 98 C42 107 46 119 62 122"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      fill="none"
-                      className="text-zinc-300"
-                    />
-
-                    {/* Right Arm Holding Watch */}
-                    <path
-                      d="M100 98 C109 107 98 123 84 123"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      fill="none"
-                      className="text-zinc-300"
-                    />
-
-                    {/* Smart Radar Scanner Watch */}
-                    <circle cx="73" cy="122" r="7" fill="#0f172a" stroke="#f97316" strokeWidth="1.8" />
-                    <path d="M73 122 L77 118" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" />
-                    <circle cx="73" cy="122" r="1.5" fill="#f97316" />
-
-                    {/* Helmet Outer Shell */}
-                    <circle
-                      cx="76"
-                      cy="65"
-                      r="32"
-                      fill="#0f172a"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      className="text-zinc-200"
-                    />
-                    {/* Earmuffs */}
-                    <rect x="41" y="56" width="6" height="18" rx="3" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
-                    <rect x="105" y="56" width="6" height="18" rx="3" fill="#1e293b" stroke="currentColor" strokeWidth="2" className="text-zinc-400" />
-
-                    {/* Visor */}
-                    <rect
-                      x="53"
-                      y="48"
-                      width="46"
-                      height="34"
-                      rx="16"
-                      fill="#090d16"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="text-cyan-400/60"
-                    />
-
-                    {/* Cute Face Inside Visor (SS2) */}
-                    <ellipse cx="68" cy="63" rx="2.5" ry="3.2" fill="#ffffff" />
-                    <circle cx="67" cy="62" r="1" fill="#09090b" />
-                    <ellipse cx="84" cy="63" rx="2.5" ry="3.2" fill="#ffffff" />
-                    <circle cx="83" cy="62" r="1" fill="#09090b" />
-                    <ellipse cx="63" cy="68" rx="2.5" ry="1.4" fill="#fb7185" fillOpacity="0.55" />
-                    <ellipse cx="89" cy="68" rx="2.5" ry="1.4" fill="#fb7185" fillOpacity="0.55" />
-                    <path
-                      d="M72 71 Q76 75 80 71"
-                      stroke="#ffffff"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-
-                    {/* Spacesuit Collar */}
-                    <path
-                      d="M58 94 Q76 102 94 94"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      className="text-zinc-300"
-                    />
-                  </g>
-                </svg>
-              </div>
-              )}
-            </AnimatePresence>
+            </div>
           </div>
-
-          {/* Interactive Comparison Switcher Pill: Half Body vs Full Body */}
-          <div className="inline-flex items-center p-0.5 rounded-full bg-muted/40 border border-border/50 text-[11px] mt-2 mb-1 shadow-inner">
-            <button
-              onClick={() => setViewMode("half")}
-              className={cn(
-                "px-3 py-1 rounded-full font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5",
-                viewMode === "half"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <span>Half Body (SS2)</span>
-            </button>
-            <button
-              onClick={() => setViewMode("full")}
-              className={cn(
-                "px-3 py-1 rounded-full font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5",
-                viewMode === "full"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <span>Full Body</span>
-            </button>
-          </div>
-        </div>
 
         {/* Clean Project Identity */}
         <div className="mt-5 mb-7 flex flex-col items-center gap-2">

@@ -2038,33 +2038,15 @@ function App() {
             treeCache={treeCache}
           />
 
-          {/* AST Scan Overlay: Temporarily showing ScanningFactsOverlay for video demo (Ghost game commented out) */}
-          {Boolean(scanningProjectId) && (
+          {/* Center Workspace Area: If scanning, cleanly display ScanningFactsOverlay as the primary center view */}
+          {Boolean(scanningProjectId) ? (
             <ErrorBoundary fallback={null}>
-              {/* 
-              <div
-                id="scan-game-container"
-                ref={scanGameContainerRef}
-                className="absolute inset-0 z-50 overflow-hidden pointer-events-auto bg-black/40 backdrop-blur-[2px]"
-              >
-                <GamingHUDCursor containerRef={scanGameContainerRef} />
-                <GhostHunter
-                  containerRef={scanGameContainerRef}
-                  isScanning={true}
-                  scanningProjectName={projects.find((p) => p.id === scanningProjectId)?.name}
-                  onDismiss={() => setScanningProjectId(null)}
-                />
-              </div>
-              */}
               <ScanningFactsOverlay
                 projectName={projects.find((p) => p.id === scanningProjectId)?.name}
                 onDismiss={() => setScanningProjectId(null)}
               />
             </ErrorBoundary>
-          )}
-
-          {/* Center Workspace Area */}
-          {activeSidebarTab === "environments" ? (
+          ) : activeSidebarTab === "environments" ? (
             <EnvironmentEditorView
               environment={currentSelectedEnv}
               project={projects.find((p) => p.id === currentSelectedEnv.projectId)}

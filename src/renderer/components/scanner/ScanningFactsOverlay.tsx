@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Sparkles, Compass } from "lucide-react";
+import { X, Sparkles, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoImg from "@/assets/logo.png";
 
@@ -9,12 +9,12 @@ interface ScanningFactsOverlayProps {
 }
 
 const DID_YOU_KNOW_FACTS = [
-  "RouteLens discovers your API endpoints instantly—without even needing your backend server to be running.",
+  "RouteLens discovers your API endpoints instantly—without needing your backend server to be running.",
   "Endpoints and controllers are automatically organized into clean, nested collection folders.",
-  "100% offline and private by design: no cloud accounts, no tracking, and zero data leaves your machine.",
+  "100% offline and private by design: no cloud accounts, no tracking, and zero telemetry leaving your machine.",
   "Your request tabs, headers, and parameter configurations are automatically preserved across app restarts.",
   "Switch effortlessly between universal global variables and dedicated backend environment profiles.",
-  "Press Ctrl+S anywhere in a request tab to quickly save and update your API endpoints.",
+  "Press Ctrl+S anywhere in a request tab to quickly save and sync your API endpoints.",
   "Pre-request and post-response scripts support familiar Postman-compatible APIs out of the box.",
   "You can drag and reorder tabs, duplicate requests with a click, and manage multiple workspaces easily.",
 ];
@@ -24,7 +24,7 @@ const SCAN_STEPS = [
   "Mapping route paths and methods...",
   "Organizing collection hierarchy...",
   "Preparing request templates...",
-  "Finalizing project workspace...",
+  "Finalizing workspace routes...",
 ];
 
 export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
@@ -35,15 +35,15 @@ export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
   const [fadeAnim, setFadeAnim] = useState(true);
   const [stepIndex, setStepIndex] = useState(0);
 
-  // Cycle facts every 3.6 seconds with smooth fade
+  // Cycle facts every 3.8 seconds with smooth fade
   useEffect(() => {
     const timer = setInterval(() => {
       setFadeAnim(false);
       setTimeout(() => {
         setFactIndex((prev) => (prev + 1) % DID_YOU_KNOW_FACTS.length);
         setFadeAnim(true);
-      }, 250);
-    }, 3600);
+      }, 200);
+    }, 3800);
 
     return () => clearInterval(timer);
   }, []);
@@ -72,103 +72,102 @@ export const ScanningFactsOverlay: React.FC<ScanningFactsOverlayProps> = ({
   const currentStep = SCAN_STEPS[stepIndex];
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#090A0F]/96 isolate select-none text-foreground p-6 overflow-hidden animate-in fade-in duration-200">
-      {/* Subtle background ambient glow (Radial gradients - zero blur filter overhead) */}
-      <div
-        className="absolute w-[460px] h-[460px] rounded-full pointer-events-none -top-20 -left-20 opacity-40"
-        style={{
-          background: "radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)",
-        }}
-      />
-      <div
-        className="absolute w-[460px] h-[460px] rounded-full pointer-events-none -bottom-20 -right-20 opacity-30"
-        style={{
-          background: "radial-gradient(circle, rgba(245,158,11,0.2) 0%, transparent 70%)",
-        }}
-      />
-
-      {/* Top right: Clean dismiss button */}
+    <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center bg-[#0C0D12] select-none text-foreground p-8 overflow-hidden relative isolate">
+      {/* Top right: Clean, understated dismiss button */}
       <button
         onClick={onDismiss}
-        className="absolute top-5 right-5 text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.08] rounded-lg px-3 py-1.5 transition-all cursor-pointer flex items-center gap-2 text-xs font-medium border border-white/[0.08]"
+        className="absolute top-6 right-6 text-zinc-400 hover:text-zinc-200 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-1.5 transition-colors cursor-pointer flex items-center gap-2 text-xs font-medium"
         title="Run in Background (Esc)"
       >
         <span>Run in background</span>
-        <kbd className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-muted-foreground border border-white/10 font-mono">
+        <kbd className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-zinc-500 border border-white/10 font-mono">
           Esc
         </kbd>
-        <X size={13} className="text-muted-foreground" />
+        <X size={12} className="text-zinc-400" />
       </button>
 
       {/* Center Content Container */}
-      <div className="relative max-w-lg w-full flex flex-col items-center text-center space-y-7 z-10">
-        
-        {/* RouteLens Logo with Breathing Halo */}
+      <div className="max-w-md w-full flex flex-col items-center text-center space-y-7 z-10">
+        {/* RouteLens Minimalist Emblem */}
         <div className="relative flex items-center justify-center">
-          {/* Ambient Glow */}
-          <div className="absolute w-24 h-24 rounded-full bg-primary/20 blur-xl animate-pulse" />
-          
-          {/* Subtle Outer Spinner Ring */}
-          <div className="absolute w-20 h-20 rounded-2xl border border-primary/30 animate-spin" style={{ animationDuration: "8s" }} />
+          {/* Very soft, elegant diffused glow */}
+          <div
+            className="absolute w-28 h-28 rounded-full pointer-events-none -z-10 opacity-30"
+            style={{
+              background: "radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)",
+            }}
+          />
 
-          {/* Logo Squircle Badge */}
-          <div className="w-16 h-16 rounded-2xl bg-[#0D0F16] border border-white/10 flex items-center justify-center p-3 shadow-2xl shadow-primary/25 relative z-10">
+          {/* Logo Badge */}
+          <div className="w-14 h-14 rounded-2xl bg-[#141721] border border-white/[0.1] flex items-center justify-center p-3 shadow-xl relative">
             <img src={logoImg} alt="RouteLens" className="w-full h-full object-contain" />
           </div>
         </div>
 
         {/* Title & Live Status */}
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
           {/* Clean Status Pill */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-semibold tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-            <span>Scanning Project</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-[11px] font-medium tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span>AST Analysis</span>
           </div>
 
           {/* Project Header */}
-          <h2 className="text-2xl font-bold tracking-tight text-white">
+          <h2 className="text-xl font-bold tracking-tight text-white mt-1">
             {projectName ? (
-              <>
-                Scanning <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-orange-400 to-amber-300">{projectName}</span>
-              </>
+              <span>
+                Scanning <span className="font-semibold text-zinc-200 underline decoration-primary/40 underline-offset-4">{projectName}</span>
+              </span>
             ) : (
               "Discovering Endpoints"
             )}
           </h2>
 
           {/* Current Step */}
-          <p className="text-xs text-muted-foreground transition-all duration-300 h-5 flex items-center justify-center gap-1.5 font-medium">
-            <Compass size={13} className="text-primary/70 animate-spin" style={{ animationDuration: "4s" }} />
-            <span className="text-zinc-300">{currentStep}</span>
+          <p className="text-xs text-zinc-400 transition-all duration-300 h-5 flex items-center justify-center gap-2 font-normal">
+            <RefreshCw size={11} className="animate-spin text-zinc-500" />
+            <span>{currentStep}</span>
           </p>
         </div>
 
-        {/* Sleek Minimalist Progress Bar */}
+        {/* Precision Progress Indicator */}
         <div className="w-full max-w-xs">
-          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/10 p-[1px]">
-            <div className="h-full bg-gradient-to-r from-primary via-amber-400 to-primary rounded-full animate-pulse shadow-sm shadow-primary/50 relative overflow-hidden" />
+          <div className="w-full h-1 bg-white/[0.06] rounded-full overflow-hidden">
+            <div className="h-full bg-primary/80 rounded-full animate-pulse shadow-sm shadow-primary/30 relative overflow-hidden" />
           </div>
         </div>
 
-        {/* Elegant "Did You Know?" Card */}
-        <div className="w-full bg-[#0D0F16]/95 border border-white/[0.08] rounded-2xl p-6 shadow-2xl text-center space-y-3 transition-all">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-            <Sparkles size={11} />
-            <span>Did you know?</span>
+        {/* High-End "Did You Know?" Card */}
+        <div className="w-full bg-[#12151E] border border-white/[0.08] rounded-xl p-5 shadow-2xl text-left space-y-2.5 transition-all">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              <Sparkles size={11} className="text-primary/90" />
+              <span>Did you know?</span>
+            </div>
+            {/* Step Dots */}
+            <div className="flex items-center gap-1">
+              {DID_YOU_KNOW_FACTS.map((_, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "h-1 rounded-full transition-all duration-300",
+                    i === factIndex ? "w-3 bg-primary" : "w-1 bg-white/10"
+                  )}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Fact Body */}
           <p
             className={cn(
-              "text-xs text-zinc-300 leading-relaxed font-normal min-h-[38px] transition-all duration-300 max-w-md mx-auto",
-              fadeAnim ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
+              "text-xs text-zinc-300 leading-relaxed font-normal min-h-[38px] transition-all duration-200",
+              fadeAnim ? "opacity-100 translate-y-0" : "opacity-0 translate-y-0.5"
             )}
           >
-            &ldquo;{currentFact}&rdquo;
+            {currentFact}
           </p>
         </div>
-
       </div>
     </div>
   );
