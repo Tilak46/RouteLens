@@ -1714,7 +1714,44 @@ function extractRubyActionsFromNode(node: Parser.SyntaxNode): Set<string> {
   return actions;
 }
 
+function isRubyRouteFile(tree: Parser.Tree, filePath: string): boolean {
+  const norm = filePath.replace(/\\/g, "/").toLowerCase();
+  if (norm.endsWith("routes.rb") || norm.includes("/routes/") || norm.includes("/config/routes")) {
+    return true;
+  }
+  let isRoute = false;
+  function check(n: Parser.SyntaxNode) {
+    if (isRoute) return;
+    if (n.type === "class") {
+      const superclass = n.children.find((c) => c.type === "superclass");
+      if (superclass && (superclass.text.includes("Sinatra") || superclass.text.includes("Grape"))) {
+        isRoute = true;
+        return;
+      }
+    }
+    if (n.type === "call" || n.type === "command_call") {
+      if (n.text.includes("routes.draw")) {
+        isRoute = true;
+        return;
+      }
+    }
+    if ((n.type === "call" || n.type === "command") && n.child(0)?.text === "require") {
+      if (n.text.includes("sinatra")) {
+        isRoute = true;
+        return;
+      }
+    }
+    for (let i = 0; i < n.childCount; i++) {
+      check(n.child(i)!);
+    }
+  }
+  check(tree.rootNode);
+  return isRoute;
+}
+
 function extractRubyRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
+  if (!isRubyRouteFile(tree, filePath)) return [];
+
   const routes: OmniRoute[] = [];
 
   interface Context {
@@ -1969,9 +2006,10 @@ function extractRubyRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
 
       // E: Direct HTTP methods: get, post, put, delete, patch, match
       if (methodName && (RUBY_HTTP_METHODS.has(methodName.toLowerCase()) || methodName === "match")) {
-        // Discard String#match calls (e.g. str.match(/regex/))
-        if (methodName === "match") {
-          if (node.child(1)?.text === "." && node.child(0)?.text !== "routes") {
+        // Discard method calls on arbitrary objects (e.g. hash.delete, headers.delete, client.post, str.match)
+        if (node.child(1)?.text === ".") {
+          const rec = node.child(0)?.text;
+          if (rec !== "routes" && rec !== "api" && rec !== "self") {
             return;
           }
         }
