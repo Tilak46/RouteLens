@@ -1,9 +1,7 @@
 import path from "node:path";
 import { ApiFolder, ApiRoute } from "../../types";
-import { scanProjectAst } from "./scanner/core/scanner";
-import { expressParser, nextAppParser, nextParser, nestParser } from "./scanner/parsers";
-import type { DetectedRoute } from "./scanner/core/types";
-
+import { scanOmniRoutes } from "./scanner/omniroute";
+import type { OmniRoute } from "./scanner/omniroute/types";
 import { buildTreeFromRoutePaths } from "../../shared/apiTree";
 import { maybeApplyAiRouteNames } from "./apiExplorer/aiRouteNaming";
 
@@ -70,23 +68,11 @@ function toDisplayName(method: string, fullPath: string): string {
   return humanize(leaf);
 }
 
-function mapDetectedToApiRoute(
+function mapOmniToApiRoute(
   projectPath: string,
-  r: DetectedRoute,
+  r: OmniRoute,
 ): ApiRoute {
   const fileRel = path.relative(projectPath, r.file).replace(/\\/g, "/");
-  const middlewares = Array.isArray(r.middlewares) ? r.middlewares : [];
-
-  let confidence = r.confidence;
-  if (!confidence) {
-    // Treat catch-alls or custom regex as medium, standard paths (static or dynamic :id) as high
-    confidence = r.path.includes("*") ? "medium" : "high";
-  }
-
-  let bodyConfidence = r.bodyConfidence;
-  if (!bodyConfidence && ["POST", "PUT", "PATCH"].includes(r.method)) {
-    bodyConfidence = r.inferredBodyFields && r.inferredBodyFields.length > 0 ? "high" : "medium";
-  }
 
   return {
     id: r.id,
@@ -94,14 +80,14 @@ function mapDetectedToApiRoute(
     method: r.method,
     path: r.path,
     file: fileRel,
-    handler: r.handler,
-    middlewares,
-    description: r.description,
-    pathParams: r.pathParams,
-    inferredBodyFields: r.inferredBodyFields,
-    inferredQueryFields: r.inferredQueryFields,
-    confidence,
-    bodyConfidence,
+    description: r.summary || `${r.framework.toUpperCase()} route`,
+    pathParams: r.params,
+    inferredBodyFields: r.body,
+    inferredQueryFields: r.query,
+    confidence: r.confidence,
+    bodyConfidence: ["POST", "PUT", "PATCH"].includes(r.method)
+      ? r.body && r.body.length > 0 ? "high" : "medium"
+      : undefined,
   };
 }
 
@@ -111,41 +97,30 @@ export async function scanProjectForRoutes(
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
 
-  log(`[Scanner] (AST) Starting scan for: ${projectPath}`);
+  log(`[OmniRoute Engine] Starting universal AST scan for: ${projectPath}`);
   try {
-    const result = await scanProjectAst(projectPath, [
-      expressParser,
-      nextParser,
-      nextAppParser,
-      nestParser,
-    ]);
+    const t0 = performance.now();
+    const result = await scanOmniRoutes(projectPath, { mode: "ast" });
+    const durationMs = Math.round(performance.now() - t0);
+
+    log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
 
     const apiRoutes = result.routes.map((r) =>
-      mapDetectedToApiRoute(projectPath, r),
+      mapOmniToApiRoute(projectPath, r),
     );
 
-    apiRoutes.forEach((r) => {
-      log(`[Scanner Debug] Pre-AI path="${r.path}" name="${r.name}" method="${r.method}"`);
-    });
-
+    // AI route naming is bypassed by default so the UI gets instantaneous speed (<1s)
     const namedRoutes = await maybeApplyAiRouteNames(apiRoutes, {
       logs,
       projectPath,
     });
 
-    namedRoutes.forEach((r) => {
-      log(`[Scanner Debug] Post-AI path="${r.path}" name="${r.name}" method="${r.method}"`);
-    });
-
     const tree = buildTreeFromRoutePaths(namedRoutes);
-
-    // Make sure we don't return fewer potential routes than actually detected
-    const potentialRoutesCount = Math.max(result.potentialRoutesCount, apiRoutes.length);
 
     return { 
       tree, 
-      logs: [...logs, ...result.logs],
-      potentialRoutesCount,
+      logs,
+      potentialRoutesCount: Math.max(result.candidateFilesCount, apiRoutes.length),
       detectedRoutesCount: apiRoutes.length
     };
   } catch (error) {

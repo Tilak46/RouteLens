@@ -4,7 +4,11 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   main: {
-    // Main process config
+    build: {
+      rollupOptions: {
+        external: ["node-llama-cpp", /^@node-llama-cpp\/.*/],
+      },
+    },
   },
   preload: {
     // Preload script config

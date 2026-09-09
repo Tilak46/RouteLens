@@ -75,15 +75,13 @@ export async function maybeApplyAiRouteNames(
   const enabledRaw = String(process.env["API_EXPLORER_AI_NAMING"] ?? "")
     .trim()
     .toLowerCase();
-  const enabled = enabledRaw
-    ? enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes"
-    : Boolean(
-        String(process.env["GEMINI_API_KEY"] ?? "").trim() ||
-        String(process.env["GOOGLE_API_KEY"] ?? "").trim() ||
-        String(process.env["OPENROUTER_API_KEY"] ?? "").trim(),
-      );
+  // Turned off by default so the UI gets instantaneous native scanning speed (<1s) without Gemini API latency
+  const enabled = enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes";
 
-  if (!enabled) return routes;
+  if (!enabled) {
+    args.logs.push("[AI Naming] Bypassed (Native heuristic naming enabled for instantaneous speed).");
+    return routes;
+  }
 
   const debugRaw = String(process.env["API_EXPLORER_AI_DEBUG"] ?? "")
     .trim()
