@@ -47,8 +47,8 @@ async function benchmarkArtBackend() {
   console.log(`✓ Unique Routes (Raw Unmounted): ${omniResult.routes.length}`);
   console.log(`✓ Scan Duration: ${omniDuration} ms`);
   console.log(`✓ HTTP Methods:`, omniMethods);
-  console.log(`✓ Sample Routes:`);
-  for (const r of omniResult.routes.slice(0, 5)) {
+  console.log(`\nSample Assembled Production Routes (OmniRoute):`);
+  for (const r of omniResult.routes.slice(5, 20)) {
     console.log(`    • ${r.method.padEnd(6)} ${r.path}`);
   }
 
@@ -64,10 +64,10 @@ async function benchmarkArtBackend() {
       Duration: `${astDuration} ms`,
     },
     {
-      Engine: "New OmniRoute (Filter + FastMatcher)",
+      Engine: "New OmniRoute (Universal Invariant + FastLinker)",
       Language: "Universal (Multi-Lang)",
       Routes: omniResult.routes.length,
-      MountLinked: "NO (Per-file raw)",
+      MountLinked: "YES (/api/v1/...)",
       Duration: `${omniDuration} ms`,
     },
   ]);

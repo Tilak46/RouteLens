@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import type { OmniRoute, OmniScanResult, FileCandidate } from "./types";
 import { isCandidateFilePath, analyzeRouteCandidate } from "./universalFilter";
 import { fastMatchRoutes } from "./fastMatcher";
+import { SymbolicMountLinker } from "./mountLinker";
 import { isLocalAiAvailable, extractRoutesWithAI } from "./localAiEngine";
 
 async function collectAllFiles(dir: string, rootPath: string, fileList: string[] = []): Promise<string[]> {
@@ -21,7 +22,8 @@ async function collectAllFiles(dir: string, rootPath: string, fileList: string[]
           seg === "build" ||
           seg === "out" ||
           seg === "coverage" ||
-          seg === "vendor"
+          seg === "vendor" ||
+          seg === "public"
         ) {
           continue;
         }
@@ -51,14 +53,17 @@ export async function scanOmniRoutes(
 
   log(`[OmniRoute] Initiating multi-language scan on: ${projectPath}`);
 
-  // Step 1: Collect all candidate code files
+  // Step 1: Collect and read all candidate code files
   const filePaths = await collectAllFiles(projectPath, projectPath);
   log(`[OmniRoute] Found ${filePaths.length} supported source files.`);
 
+  const fileCodeMap = new Map<string, string>();
   const candidateFiles: FileCandidate[] = [];
+
   for (const f of filePaths) {
     try {
       const content = await fs.promises.readFile(f, "utf-8");
+      fileCodeMap.set(f, content);
       const candidate = analyzeRouteCandidate(f, content, projectPath);
       if (candidate.hasRouteSignals) {
         candidateFiles.push(candidate);
@@ -70,25 +75,29 @@ export async function scanOmniRoutes(
 
   log(`[OmniRoute] Identified ${candidateFiles.length} candidate route files via universal invariant filter.`);
 
+  // Step 2: Build Symbolic Mount Table across the project
+  const mountLinker = new SymbolicMountLinker();
+  mountLinker.buildMountTable(fileCodeMap, projectPath);
+
   const allRoutes: OmniRoute[] = [];
   const rescueCandidates: FileCandidate[] = [];
   let fastMatchedCount = 0;
 
-  // Step 2: Run Fast Matcher on all candidate files (sub-millisecond tier)
+  // Step 3: Run Fast Matcher on all candidate files using resolved mounts
   for (const candidate of candidateFiles) {
-    const matched = fastMatchRoutes(candidate);
+    const matched = fastMatchRoutes(candidate, mountLinker);
     if (matched.length > 0) {
       fastMatchedCount += matched.length;
       allRoutes.push(...matched);
     } else if (candidate.routeScore >= 3) {
-      // Has strong route signals (paths + verbs or inside route folder), but standard patterns didn't match!
+      // Has strong route signals, but standard patterns didn't match (likely custom wrapper or loop)
       rescueCandidates.push(candidate);
     }
   }
 
   log(`[OmniRoute] Fast matcher discovered ${fastMatchedCount} routes across standard patterns.`);
 
-  // Step 3: Run On-Device AI Rescue on ambiguous / custom wrapper files
+  // Step 4: Run On-Device AI Rescue on ambiguous / custom wrapper files
   let aiRescuedCount = 0;
   if (enableAi && rescueCandidates.length > 0) {
     const aiAvailable = isLocalAiAvailable();
@@ -113,7 +122,7 @@ export async function scanOmniRoutes(
     }
   }
 
-  // Step 4: Deduplicate routes by method + path + file
+  // Step 5: Deduplicate routes by method + path + file
   const seen = new Set<string>();
   const uniqueRoutes: OmniRoute[] = [];
   for (const r of allRoutes) {

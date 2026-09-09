@@ -1,64 +1,83 @@
 import path from "node:path";
 import type { Method } from "../../../types";
 import type { FileCandidate, OmniRoute } from "./types";
+import { joinUrl, cleanPath, SymbolicMountLinker } from "./mountLinker";
 
 function stableId(file: string, method: string, routePath: string): string {
   const raw = `${file}|${method}|${routePath}`;
   return `omni_${Buffer.from(raw).toString("base64url")}`;
 }
 
-function cleanPath(p: string): string {
-  let cleaned = p.trim().replace(/^["'`]|["'`]$/g, "");
-  if (!cleaned.startsWith("/")) cleaned = "/" + cleaned;
-  return cleaned.replace(/\/+/g, "/");
-}
-
-export function fastMatchRoutes(candidate: FileCandidate): OmniRoute[] {
+export function fastMatchRoutes(
+  candidate: FileCandidate,
+  mountLinker?: SymbolicMountLinker,
+): OmniRoute[] {
   const routes: OmniRoute[] = [];
   const { content, filePath, language, relativePath } = candidate;
 
   // -------------------------------------------------------------
-  // 1. JavaScript / TypeScript: Express, Fastify, Hono, Router
+  // 1. JavaScript / TypeScript: Express, Fastify, Hono, Custom
   // -------------------------------------------------------------
   if (language === "javascript" || language === "typescript") {
-    // A. Standard Express/Fastify calls: (app|router|api|v1|server).(get|post|put|delete|patch)('/path', ...)
+    // A. Method calls on ANY router/app variable where first arg is a string starting with /
+    // e.g. adminProtectedRouter.get('/accounts', ...) or router.post('/login', ...)
     const standardCallRegex =
-      /\b(?:app|router|api|server|v\d+)\.(get|post|put|delete|patch)\s*\(\s*(['"`])([^'"`]+)\2/gi;
+      /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_$]+)\.(get|post|put|delete|patch|options|head)\s*\(\s*(['"`])(\/[^'"`]*)\3/gi;
+
     let match: RegExpExecArray | null;
     while ((match = standardCallRegex.exec(content)) !== null) {
-      const method = match[1].toUpperCase() as Method;
-      const rawPath = match[3];
-      routes.push({
-        id: stableId(filePath, method, cleanPath(rawPath)),
-        framework: "express",
-        method,
-        path: cleanPath(rawPath),
-        file: filePath,
-        confidence: "high",
-        source: "fast_matcher",
-      });
-    }
+      const routerVar = match[1];
+      const method = match[2].toUpperCase() as Method;
+      const subPath = match[4];
 
-    // B. Chained routes: router.route('/path').get(...).post(...)
-    const chainedRouteRegex =
-      /\.(?:route)\s*\(\s*(['"`])([^'"`]+)\1\s*\)((?:\s*\.(?:get|post|put|delete|patch)\s*\([^)]*\))+)/gi;
-    let chainMatch: RegExpExecArray | null;
-    while ((chainMatch = chainedRouteRegex.exec(content)) !== null) {
-      const basePath = chainMatch[2];
-      const methodCalls = chainMatch[3];
-      const methodRegex = /\.(get|post|put|delete|patch)\s*\(/gi;
-      let mMatch: RegExpExecArray | null;
-      while ((mMatch = methodRegex.exec(methodCalls)) !== null) {
-        const method = mMatch[1].toUpperCase() as Method;
+      const prefixes = mountLinker
+        ? mountLinker.getPrefixesForRouter(filePath, routerVar)
+        : new Set(["/"]);
+
+      for (const pfx of prefixes) {
+        const fullPath = joinUrl(pfx, subPath);
         routes.push({
-          id: stableId(filePath, method, cleanPath(basePath)),
+          id: stableId(filePath, method, fullPath),
           framework: "express",
           method,
-          path: cleanPath(basePath),
+          path: fullPath,
           file: filePath,
           confidence: "high",
           source: "fast_matcher",
         });
+      }
+    }
+
+    // B. Chained routes: router.route('/path').get(...).post(...)
+    const chainedRouteRegex =
+      /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_$]+)\.route\s*\(\s*(['"`])(\/[^'"`]*)\2\s*\)((?:\s*\.(?:get|post|put|delete|patch)\s*\([^)]*\))+)/gi;
+
+    let chainMatch: RegExpExecArray | null;
+    while ((chainMatch = chainedRouteRegex.exec(content)) !== null) {
+      const routerVar = chainMatch[1];
+      const basePath = chainMatch[3];
+      const methodCalls = chainMatch[4];
+
+      const prefixes = mountLinker
+        ? mountLinker.getPrefixesForRouter(filePath, routerVar)
+        : new Set(["/"]);
+
+      const methodRegex = /\.(get|post|put|delete|patch)\s*\(/gi;
+      let mMatch: RegExpExecArray | null;
+      while ((mMatch = methodRegex.exec(methodCalls)) !== null) {
+        const method = mMatch[1].toUpperCase() as Method;
+        for (const pfx of prefixes) {
+          const fullPath = joinUrl(pfx, basePath);
+          routes.push({
+            id: stableId(filePath, method, fullPath),
+            framework: "express",
+            method,
+            path: fullPath,
+            file: filePath,
+            confidence: "high",
+            source: "fast_matcher",
+          });
+        }
       }
     }
 
@@ -90,9 +109,9 @@ export function fastMatchRoutes(candidate: FileCandidate): OmniRoute[] {
   // 2. Python: FastAPI, Flask
   // -------------------------------------------------------------
   if (language === "python") {
-    // @(router|app).(get|post|put|delete|patch)("/path")
+    // @(anything).(get|post|put|delete|patch)("/path")
     const pyDecoratorRegex =
-      /@(?:router|app|api)\.(get|post|put|delete|patch)\s*\(\s*(['"])([^'"]+)\2/gi;
+      /@(?:[a-zA-Z0-9_.]+)\.(get|post|put|delete|patch)\s*\(\s*(['"])([^'"]+)\2/gi;
     let pyMatch: RegExpExecArray | null;
     while ((pyMatch = pyDecoratorRegex.exec(content)) !== null) {
       const method = pyMatch[1].toUpperCase() as Method;
@@ -113,9 +132,9 @@ export function fastMatchRoutes(candidate: FileCandidate): OmniRoute[] {
   // 3. Go: Gin, Fiber, Echo
   // -------------------------------------------------------------
   if (language === "go") {
-    // (r|v1|group|router).(GET|POST|PUT|DELETE|PATCH)("/path", ...)
+    // (anything).(GET|POST|PUT|DELETE|PATCH)("/path", ...)
     const goMethodRegex =
-      /\b(?:r|router|api|v\d+|group|auth)\.(GET|POST|PUT|DELETE|PATCH)\s*\(\s*(["'])([^"']+)\2/g;
+      /\b[a-zA-Z0-9_]+\.(GET|POST|PUT|DELETE|PATCH)\s*\(\s*(["'])([^"']+)\2/g;
     let goMatch: RegExpExecArray | null;
     while ((goMatch = goMethodRegex.exec(content)) !== null) {
       const method = goMatch[1].toUpperCase() as Method;
