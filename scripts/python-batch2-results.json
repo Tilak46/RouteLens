@@ -1,0 +1,54 @@
+[
+  {
+    "Target": "gothinkster/flask-realworld-example-app",
+    "Level": "Level 2 (Ground-Truth Accuracy & Blueprint Tuples)",
+    "Framework": "Flask",
+    "Files Scanned": 30,
+    "Candidate Files": 22,
+    "Real Routes": 19,
+    "Routes Found": "19/19",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "76ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "fastapi-users/fastapi-users",
+    "Level": "Level 2/3 (Factory Router Architecture)",
+    "Framework": "FastAPI",
+    "Files Scanned": 8,
+    "Candidate Files": 8,
+    "Real Routes": 16,
+    "Routes Found": "14/16",
+    "Recall %": "87.5%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "44ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "gothinkster/django-realworld-example-app",
+    "Level": "Level 2/3 (Django Architecture & Legacy URLconfs)",
+    "Framework": "Django",
+    "Files Scanned": 44,
+    "Candidate Files": 44,
+    "Real Routes": 19,
+    "Routes Found": "16/19",
+    "Recall %": "84.2%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "52ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "encode/django-rest-framework",
+    "Level": "Level 1 (Volume & Production Core Stress)",
+    "Framework": "DRF",
+    "Files Scanned": 163,
+    "Candidate Files": 82,
+    "Real Routes": 2,
+    "Routes Found": "3/2",
+    "Recall %": "100.0%",
+    "Precision %": "66.7%",
+    "Latency (ms)": "468ms",
+    "Status": "PASSED"
+  }
+]

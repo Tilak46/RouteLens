@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { OmniRoute, OmniScanResult, FileCandidate } from "./types";
-import { isCandidateFilePath, analyzeRouteCandidate } from "./universalFilter";
+import { isCandidateFilePath, analyzeRouteCandidate, UNIVERSAL_IGNORED_DIRECTORIES } from "./universalFilter";
 import { fastMatchRoutes } from "./fastMatcher";
 import { extractRoutesWithTreeSitter } from "./treeSitterEngine";
 import { SymbolicMountLinker } from "./mountLinker";
@@ -14,18 +14,7 @@ async function collectAllFiles(dir: string, rootPath: string, fileList: string[]
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        const seg = entry.name;
-        if (
-          seg === "node_modules" ||
-          seg === ".git" ||
-          seg === ".next" ||
-          seg === "dist" ||
-          seg === "build" ||
-          seg === "out" ||
-          seg === "coverage" ||
-          seg === "vendor" ||
-          seg === "public"
-        ) {
+        if (UNIVERSAL_IGNORED_DIRECTORIES.has(entry.name.toLowerCase())) {
           continue;
         }
         await collectAllFiles(fullPath, rootPath, fileList);

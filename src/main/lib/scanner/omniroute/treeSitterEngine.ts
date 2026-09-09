@@ -646,25 +646,64 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
             }
           }
         }
-      } else if (fnName === "path" || fnName === "re_path") {
+      } else if (fnName === "path" || fnName === "re_path" || fnName === "url") {
         const args = node.children.find((c) => c.type === "argument_list");
         if (args && args.namedChildren.length >= 2) {
           const secondArg = args.namedChildren[1];
           // Skip include(...) router mount delegations
           if (!secondArg.text.includes("include(")) {
             const firstArg = args.namedChildren[0];
-            const pathVal = getPythonStringLiteral(firstArg);
-            if (pathVal !== null) {
-              const fullPath = pathVal.startsWith("/") ? pathVal : "/" + pathVal;
+            const rawVal = getPythonStringLiteral(firstArg);
+            if (rawVal !== null) {
+              // Clean regex patterns in Django url(r'^...')
+              let clean = rawVal.replace(/^\^/, "").replace(/\/?\$$/, "").replace(/\?$/, "");
+              // Convert (?P<name>...) to {name}
+              clean = clean.replace(/\(\?P<([a-zA-Z0-9_]+)>[^)]*\)/g, "{$1}");
+              if (!clean.startsWith("/")) clean = "/" + clean;
               routes.push({
-                id: stableId(filePath, "GET", fullPath),
+                id: stableId(filePath, "GET", clean),
                 framework: "django",
                 method: "GET",
-                path: fullPath,
+                path: clean,
                 file: filePath,
                 confidence: "high",
                 source: "tree_sitter",
               });
+            }
+          }
+        }
+      }
+
+      // 4. Django REST Framework router.register(r'articles', ArticleViewSet)
+      const fnNode = node.child(0);
+      if (fnNode && fnNode.type === "attribute") {
+        const field = fnNode.child(2);
+        if (field && field.text === "register") {
+          const args = node.children.find((c) => c.type === "argument_list");
+          if (args && args.namedChildren.length >= 2) {
+            const firstArg = args.namedChildren[0];
+            const prefixStr = getPythonStringLiteral(firstArg);
+            if (prefixStr !== null) {
+              const cleanPrefix = "/" + prefixStr.replace(/^\/+|\/+$/g, "");
+              const viewSetMethods: Array<{ method: Method; sub: string }> = [
+                { method: "GET", sub: "" },
+                { method: "POST", sub: "" },
+                { method: "GET", sub: "/{id}" },
+                { method: "PUT", sub: "/{id}" },
+                { method: "DELETE", sub: "/{id}" },
+              ];
+              for (const vm of viewSetMethods) {
+                const fullP = cleanPrefix + vm.sub;
+                routes.push({
+                  id: stableId(filePath, vm.method, fullP),
+                  framework: "django",
+                  method: vm.method,
+                  path: fullP,
+                  file: filePath,
+                  confidence: "high",
+                  source: "tree_sitter",
+                });
+              }
             }
           }
         }

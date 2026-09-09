@@ -18,26 +18,53 @@ export const SUPPORTED_EXTENSIONS = new Set([
   ".cs",
 ]);
 
-export const IGNORED_DIRECTORY_SEGMENTS = new Set([
+export const UNIVERSAL_IGNORED_DIRECTORIES = new Set([
+  // Node / JavaScript / TypeScript
   "node_modules",
-  ".git",
-  ".next",
+  ".pnpm-store",
+  ".yarn",
+  // Python environments, caches & distributions
+  ".venv",
+  "venv",
+  "env",
+  ".env",
+  "virtualenv",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".tox",
+  // Java / Kotlin (Maven & Gradle)
+  ".gradle",
+  ".m2",
+  // C# / .NET
+  "bin",
+  "obj",
+  "packages",
+  ".vs",
+  // Rust / Cargo
+  "target",
+  // Go / PHP / Ruby
+  "vendor",
+  ".bundle",
+  "pkg",
+  // Build outputs & coverage
   "dist",
   "build",
   "out",
+  ".next",
+  ".nuxt",
   "coverage",
-  "vendor",
-  "target",
-  "bin",
-  "obj",
-  ".vscode",
+  "public",
+  // Version Control & IDEs
+  ".git",
+  ".svn",
+  ".hg",
   ".idea",
+  ".vscode",
 ]);
 
-const HTTP_VERB_REGEX = /\b(get|post|put|delete|patch|options|head)\b/i;
-const ROUTING_KEYWORD_REGEX = /\b(route|router|endpoint|controller|api|handler|group|mount|app|register)\b/i;
-const PATH_LITERAL_REGEX = /["'`]\/[a-zA-Z0-9_\-\/:{}.*?+@]*["'`]/;
-const DECORATOR_ROUTE_REGEX = /@(Get|Post|Put|Delete|Patch|Controller)\b|\[Http(Get|Post|Put|Delete|Patch)|\[Route|\bRoute::/i;
+export const IGNORED_DIRECTORY_SEGMENTS = UNIVERSAL_IGNORED_DIRECTORIES;
 
 export function getFileLanguage(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
@@ -200,26 +227,11 @@ export function analyzeRouteCandidate(
     lowerRel.endsWith("/route.js") ||
     lowerRel.endsWith("/route.ts");
 
-  const hasVerb = HTTP_VERB_REGEX.test(content);
-  const hasKeyword = ROUTING_KEYWORD_REGEX.test(content);
-  const hasPath = PATH_LITERAL_REGEX.test(content);
-  const hasDecorator = DECORATOR_ROUTE_REGEX.test(content);
-
-  let routeScore = 0;
-  if (hasPath) routeScore += 2;
-  if (hasVerb) routeScore += 2;
-  if (hasKeyword) routeScore += 1;
-  if (hasDecorator) routeScore += 3;
-  if (isNamedRouteLocation) routeScore += 3;
-
-  // A file is a route candidate if:
-  // 1. It has explicit route decorators / attributes / Route::, OR
-  // 2. It has a path string literal AND either an HTTP verb or routing keyword, OR
-  // 3. It is located inside an API/route directory and has route keywords
-  const hasRouteSignals =
-    hasDecorator ||
-    (hasPath && (hasVerb || hasKeyword)) ||
-    (isNamedRouteLocation && (hasVerb || hasKeyword));
+  // Invariant: Pure Tree-sitter CST execution.
+  // We do NOT use fragile regex bouncers to gatekeep files.
+  // Every backend source file (not client UI, not test) is directly parsed by Tree-sitter.
+  const hasRouteSignals = !isClient && !isTest;
+  const routeScore = isNamedRouteLocation ? 5 : 1;
 
   return {
     filePath,
