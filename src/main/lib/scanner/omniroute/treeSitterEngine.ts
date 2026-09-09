@@ -193,6 +193,65 @@ function findChainedBasePath(node: Parser.SyntaxNode | null): { basePath: string
   return null;
 }
 
+export function resolveNextJsRoutePath(filePath: string): { routePath: string; framework: "next-app" | "next-pages" } | null {
+  const normalized = filePath.replace(/\\/g, "/");
+  const parts = normalized.split("/");
+
+  // 1. App Router: app/**/route.(ts|js|tsx|jsx)
+  const appIdx = parts.lastIndexOf("app");
+  const fileName = parts[parts.length - 1];
+  const isAppRoute = appIdx !== -1 && /^route\.(t|j)sx?$/i.test(fileName);
+
+  if (isAppRoute) {
+    const subParts = parts.slice(appIdx + 1, parts.length - 1);
+    const segs = subParts
+      .map((s) => {
+        if (s.startsWith("(") && s.endsWith(")")) return null;
+        if (s.startsWith("@")) return null;
+        const mOpt = s.match(/^\[\[\.\.\.(.+)\]\]$/);
+        if (mOpt) return `:${mOpt[1]}*`;
+        const mCatch = s.match(/^\[\.\.\.(.+)\]$/);
+        if (mCatch) return `:${mCatch[1]}*`;
+        const mDyn = s.match(/^\[(.+)\]$/);
+        if (mDyn) return `:${mDyn[1]}`;
+        return s;
+      })
+      .filter(Boolean);
+
+    let routePath = "/" + segs.join("/");
+    routePath = routePath.replace(/\/+/g, "/");
+    if (!routePath.startsWith("/")) routePath = "/" + routePath;
+    return { routePath, framework: "next-app" };
+  }
+
+  // 2. Pages Router: pages/api/**.(ts|js|tsx|jsx)
+  const pagesIdx = parts.lastIndexOf("pages");
+  const apiIdx = parts.indexOf("api", pagesIdx);
+  if (pagesIdx !== -1 && apiIdx !== -1) {
+    const subParts = parts.slice(apiIdx);
+    const last = subParts[subParts.length - 1].replace(/\.(t|j)sx?$/i, "");
+    if (last === "index") {
+      subParts.pop();
+    } else {
+      subParts[subParts.length - 1] = last;
+    }
+
+    const segs = subParts.map((s) => {
+      const mCatch = s.match(/^\[\.\.\.(.+)\]$/);
+      if (mCatch) return `:${mCatch[1]}*`;
+      const mDyn = s.match(/^\[(.+)\]$/);
+      if (mDyn) return `:${mDyn[1]}`;
+      return s;
+    });
+
+    let routePath = "/" + segs.join("/");
+    routePath = routePath.replace(/\/+/g, "/");
+    return { routePath, framework: "next-pages" };
+  }
+
+  return null;
+}
+
 export function extractTsJsRoutes(
   tree: Parser.Tree,
   filePath: string,
@@ -200,6 +259,70 @@ export function extractTsJsRoutes(
 ): OmniRoute[] {
   const routes: OmniRoute[] = [];
   const validMethods = new Set(["get", "post", "put", "delete", "patch", "options", "head"]);
+
+  // 0. Next.js File-System Routing (App Router & Pages Router)
+  const nextRouteInfo = resolveNextJsRoutePath(filePath);
+  if (nextRouteInfo) {
+    const { routePath, framework } = nextRouteInfo;
+
+    if (framework === "next-app") {
+      const exportedMethods = new Set<Method>();
+      walkTree(tree.rootNode, (node) => {
+        if (node.type === "export_statement") {
+          function checkExport(n: Parser.SyntaxNode) {
+            if (n.type === "shorthand_property_identifier_pattern" || n.type === "identifier") {
+              const upper = n.text.toUpperCase();
+              if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(upper)) {
+                exportedMethods.add(upper as Method);
+              }
+            }
+            for (let i = 0; i < n.childCount; i++) {
+              checkExport(n.child(i)!);
+            }
+          }
+          for (let i = 0; i < node.childCount; i++) {
+            checkExport(node.child(i)!);
+          }
+        }
+      });
+
+      for (const m of exportedMethods) {
+        routes.push({
+          id: stableId(filePath, m, routePath),
+          framework: "next-app",
+          method: m,
+          path: routePath,
+          file: filePath,
+          confidence: "high",
+          source: "tree_sitter",
+        });
+      }
+
+      if (routes.length > 0) return routes;
+    } else if (framework === "next-pages") {
+      const pageMethods = new Set<Method>();
+      walkTree(tree.rootNode, (node) => {
+        const text = node.text;
+        const m = text.match(/req\.method\s*===?\s*['"](GET|POST|PUT|DELETE|PATCH)['"]/i);
+        if (m) pageMethods.add(m[1].toUpperCase() as Method);
+      });
+
+      const finalMethods = pageMethods.size > 0 ? Array.from(pageMethods) : (["ALL"] as Method[]);
+      for (const m of finalMethods) {
+        routes.push({
+          id: stableId(filePath, m, routePath),
+          framework: "next-pages",
+          method: m,
+          path: routePath,
+          file: filePath,
+          confidence: "high",
+          source: "tree_sitter",
+        });
+      }
+
+      if (routes.length > 0) return routes;
+    }
+  }
 
   walkTree(tree.rootNode, (node) => {
     // A. NestJS Decorator Pattern: @Controller() on class + @Get() on methods

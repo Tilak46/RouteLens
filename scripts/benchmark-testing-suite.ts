@@ -3,7 +3,7 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { scanOmniRoutes } from "../src/main/lib/scanner/omniroute";
 import { scanProjectAst } from "../src/main/lib/scanner/core/scanner";
-import { expressParser, nestParser } from "../src/main/lib/scanner/parsers";
+import { expressParser, nestParser, nextParser, nextAppParser } from "../src/main/lib/scanner/parsers";
 
 const TESTING_DIR = "c:\\Office-Work\\Testing";
 
@@ -51,7 +51,7 @@ async function runBenchmark() {
     let astError = null;
     const astStart = performance.now();
     try {
-      const res = await scanProjectAst(projPath, [expressParser, nestParser]);
+      const res = await scanProjectAst(projPath, [expressParser, nestParser, nextParser, nextAppParser]);
       astRoutes = res.routes.length;
       astDuration = Math.round(performance.now() - astStart);
     } catch (err: any) {
