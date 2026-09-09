@@ -35,6 +35,7 @@ export type FileCandidate = {
   routeScore: number;
   hasRouteSignals: boolean;
   isClientUi?: boolean;
+  isTestFile?: boolean;
 };
 
 export type OmniScanResult = {

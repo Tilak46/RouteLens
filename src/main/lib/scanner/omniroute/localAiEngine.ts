@@ -107,13 +107,13 @@ async function getOrInitLlamaSession() {
 
     llamaInstance = await getLlama();
     loadedModel = await llamaInstance.loadModel({ modelPath });
-    modelContext = await loadedModel.createContext({ threads: 6, contextSize: 2048 });
+    modelContext = await loadedModel.createContext({ threads: 6, contextSize: 4096 });
     routeGrammar = await llamaInstance.createGrammarForJsonSchema(RouteScanSchema);
 
     chatSession = new LlamaChatSession({
       contextSequence: modelContext.getSequence(),
       systemPrompt:
-        "You are an expert backend API scanner. Extract all HTTP endpoints, route paths, HTTP methods, route parameters, and request body fields from the given source code. Output strictly valid JSON complying with the schema.",
+        "You are an expert backend API scanner. Extract all HTTP routes with their exact HTTP methods and URL paths from the given code. Resolve route group prefixes (e.g. group '/api/v1' with route '/users' produces '/api/v1/users'). Output strictly valid JSON complying with the schema.",
     });
 
     return chatSession;
@@ -134,7 +134,30 @@ export async function extractRoutesWithAI(candidate: FileCandidate): Promise<Omn
   // Reset conversation history for fresh extraction
   session.resetChatHistory();
 
-  const promptText = `Extract all routes from this ${candidate.language} code:\n\`\`\`${candidate.language}\n${candidate.content.trim()}\n\`\`\``;
+  // If file is very large, take the lines containing route indicators plus surrounding context
+  let codeToSend = candidate.content.trim();
+  if (codeToSend.length > 4000) {
+    const lines = codeToSend.split("\n");
+    const selectedLines: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (
+        /\b(GET|POST|PUT|DELETE|PATCH|Group|Route|Mount|router|endpoint|api)\b/i.test(line) ||
+        /@(Get|Post|Put|Delete|Patch|RequestMapping)\b/i.test(line)
+      ) {
+        const start = Math.max(0, i - 2);
+        const end = Math.min(lines.length - 1, i + 3);
+        for (let j = start; j <= end; j++) {
+          if (!selectedLines.includes(lines[j])) selectedLines.push(lines[j]);
+        }
+      }
+    }
+    if (selectedLines.length > 0 && selectedLines.length < lines.length) {
+      codeToSend = selectedLines.join("\n");
+    }
+  }
+
+  const promptText = `Extract all HTTP routes from this ${candidate.language} code:\n\`\`\`${candidate.language}\n${codeToSend}\n\`\`\``;
 
   let rawResponse = "";
   try {

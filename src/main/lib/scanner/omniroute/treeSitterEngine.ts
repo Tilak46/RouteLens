@@ -488,33 +488,183 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
 }
 
 // -------------------------------------------------------------
-// 4. Go (Gin, Chi, Fiber, Echo)
+// 4. Go (Gin, Chi, Fiber, Echo) - Universal Invariant CST Visitor
 // -------------------------------------------------------------
+function getGoLiteralString(node: Parser.SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.type === "interpreted_string_literal" || node.type === "raw_string_literal") {
+    const raw = node.text;
+    if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
+    if (raw.startsWith('`') && raw.endsWith('`')) return raw.slice(1, -1);
+    return raw;
+  }
+  return null;
+}
+
+const GO_HTTP_METHODS = new Set([
+  "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS",
+  "Get", "Post", "Put", "Delete", "Patch", "Head", "Options",
+]);
+
+const GO_NON_ROUTER_RECEIVERS = new Set([
+  "header", "headers", "query", "url", "cookie", "cookies", "param", "params",
+  "cache", "redis", "db", "memcache", "ret", "mock", "ctx", "context", "req", "res",
+]);
+
 export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
+  const routerPrefixes = new Map<string, string>();
+  routerPrefixes.set("r", "/");
+  routerPrefixes.set("router", "/");
+  routerPrefixes.set("e", "/");
+  routerPrefixes.set("app", "/");
+  routerPrefixes.set("engine", "/");
+  routerPrefixes.set("server", "/");
+  routerPrefixes.set("api", "/");
 
-  walkTree(tree.rootNode, (node) => {
-    if (node.type === "call_expression") {
-      const text = node.text;
-      const m = text.match(/\.(GET|POST|PUT|DELETE|PATCH)\s*\(\s*(?:["']([^"']*)["'])?/i);
-      if (m) {
-        const method = m[1].toUpperCase() as Method;
-        let routePath = m[2] || "/";
-        if (!routePath.startsWith("/")) routePath = "/" + routePath;
+  function getReceiverPrefix(receiverText: string): string {
+    const clean = receiverText.trim();
+    if (routerPrefixes.has(clean)) return routerPrefixes.get(clean)!;
+    return "/";
+  }
 
-        routes.push({
-          id: stableId(filePath, method, routePath),
-          framework: "gin",
-          method,
-          path: routePath,
-          file: filePath,
-          confidence: "high",
-          source: "tree_sitter",
-        });
+  function walk(node: Parser.SyntaxNode) {
+    if (!node) return;
+
+    // 1. Lexical Scope Tracking: Group assignments
+    // Example: v1 := r.Group("/api/v1") or accounts := v1.Group("/accounts")
+    if (node.type === "short_var_declaration" || node.type === "assignment_statement") {
+      const left = node.childForFieldName("left") || node.children.find((c) => c.type === "expression_list");
+      const right = node.childForFieldName("right") || node.children.filter((c) => c.type === "expression_list")[1];
+
+      if (left && right) {
+        const callExp = right.type === "call_expression" ? right : right.children.find((c) => c.type === "call_expression");
+        if (callExp) {
+          const fn = callExp.childForFieldName("function");
+          if (fn && fn.type === "selector_expression") {
+            const operand = fn.childForFieldName("operand");
+            const field = fn.childForFieldName("field");
+            if (field && (field.text === "Group" || field.text === "Party")) {
+              const args = callExp.childForFieldName("arguments");
+              if (args && args.namedChildren.length > 0) {
+                const prefixVal = getGoLiteralString(args.namedChildren[0]);
+                if (prefixVal !== null) {
+                  const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+                  const newPrefix = joinUrl(parentPrefix, prefixVal);
+                  const varName = left.text.trim();
+                  routerPrefixes.set(varName, newPrefix);
+                }
+              }
+            }
+          }
+        }
       }
     }
-  });
 
+    // 2. Chi sub-routers: r.Route("/articles", func(r chi.Router) { ... })
+    if (node.type === "call_expression") {
+      const fn = node.childForFieldName("function");
+      if (fn && fn.type === "selector_expression") {
+        const operand = fn.childForFieldName("operand");
+        const field = fn.childForFieldName("field");
+
+        if (field && (field.text === "Route" || field.text === "Mount")) {
+          const args = node.childForFieldName("arguments");
+          if (args && args.namedChildren.length >= 2) {
+            const pathArg = getGoLiteralString(args.namedChildren[0]);
+            const secondArg = args.namedChildren[1];
+
+            if (pathArg !== null) {
+              const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+              const routePrefix = joinUrl(parentPrefix, pathArg);
+
+              // If second argument is a callback: func(r chi.Router) { ... }
+              if (secondArg && secondArg.type === "func_literal") {
+                const params = secondArg.childForFieldName("parameters");
+                let scopedVar = "r";
+                if (params && params.namedChildren.length > 0) {
+                  const firstParam = params.namedChildren[0];
+                  const paramId = firstParam.childForFieldName("name") || firstParam.children.find((c) => c.type === "identifier");
+                  if (paramId) scopedVar = paramId.text.trim();
+                }
+
+                const prevPrefix = routerPrefixes.get(scopedVar);
+                routerPrefixes.set(scopedVar, routePrefix);
+
+                // Traverse the closure body
+                const body = secondArg.childForFieldName("body");
+                if (body) {
+                  for (let i = 0; i < body.childCount; i++) {
+                    walk(body.child(i)!);
+                  }
+                }
+
+                if (prevPrefix !== undefined) {
+                  routerPrefixes.set(scopedVar, prevPrefix);
+                } else {
+                  routerPrefixes.delete(scopedVar);
+                }
+                return;
+              }
+            }
+          }
+        }
+
+        // 3. HTTP Route Registration: r.GET("/path", handler...)
+        if (field && GO_HTTP_METHODS.has(field.text)) {
+          const method = field.text.toUpperCase() as Method;
+          const operandText = operand ? operand.text.trim().toLowerCase() : "";
+
+          // Universal invariant: Filter out non-router receivers (Headers, Query, Cache, Context)
+          let isBlockedReceiver = false;
+          for (const blocked of GO_NON_ROUTER_RECEIVERS) {
+            if (
+              operandText === blocked ||
+              operandText.endsWith("." + blocked) ||
+              operandText.endsWith("()." + blocked)
+            ) {
+              isBlockedReceiver = true;
+              break;
+            }
+          }
+
+          if (!isBlockedReceiver) {
+            const args = node.childForFieldName("arguments");
+            if (args) {
+              const namedArgs = args.namedChildren;
+              // Universal invariant: Route registrations MUST have at least 2 arguments: (path, handler)
+              if (namedArgs.length >= 2) {
+                const pathVal = getGoLiteralString(namedArgs[0]);
+                // Universal invariant: First argument MUST be an interpreted or raw string literal
+                if (pathVal !== null) {
+                  const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+                  let fullPath = joinUrl(parentPrefix, pathVal);
+                  if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
+
+                  routes.push({
+                    id: stableId(filePath, method, fullPath),
+                    framework: "gin",
+                    method,
+                    path: fullPath,
+                    file: filePath,
+                    confidence: "high",
+                    source: "tree_sitter",
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Recurse children
+    for (let i = 0; i < node.childCount; i++) {
+      walk(node.child(i)!);
+    }
+  }
+
+  walk(tree.rootNode);
   return routes;
 }
 

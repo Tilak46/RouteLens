@@ -41,18 +41,27 @@ async function collectAllFiles(dir: string, rootPath: string, fileList: string[]
   return fileList;
 }
 
+export interface OmniScanOptions {
+  enableAi?: boolean;
+  maxAiRescues?: number;
+  includeTests?: boolean;
+  mode?: "hybrid" | "ast" | "ai";
+}
+
 export async function scanOmniRoutes(
   projectPath: string,
-  options: { enableAi?: boolean; maxAiRescues?: number } = {},
+  options: OmniScanOptions = {},
 ): Promise<OmniScanResult> {
   const startTime = performance.now();
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
 
-  const enableAi = options.enableAi !== false;
-  const maxAiRescues = options.maxAiRescues || 5;
+  const mode = options.mode || (options.enableAi === false ? "ast" : "hybrid");
+  const enableAi = mode === "ai" || (mode === "hybrid" && options.enableAi !== false);
+  const maxAiRescues = options.maxAiRescues || 10;
+  const includeTests = options.includeTests === true;
 
-  log(`[OmniRoute] Initiating universal hybrid scan on: ${projectPath}`);
+  log(`[OmniRoute] Initiating universal scan (mode: ${mode}) on: ${projectPath}`);
 
   // Step 1: Collect and read all candidate code files
   const filePaths = await collectAllFiles(projectPath, projectPath);
@@ -66,8 +75,8 @@ export async function scanOmniRoutes(
       const content = await fs.promises.readFile(f, "utf-8");
       fileCodeMap.set(f, content);
       const candidate = analyzeRouteCandidate(f, content, projectPath);
-      // Skip client-side UI code to prevent client Axios/fetch calls from polluting server routes
-      if (candidate.hasRouteSignals && !candidate.isClientUi) {
+      // Skip client UI code and skip unit test files unless explicitly requested
+      if (candidate.hasRouteSignals && !candidate.isClientUi && (includeTests || !candidate.isTestFile)) {
         candidateFiles.push(candidate);
       }
     } catch {
@@ -84,51 +93,64 @@ export async function scanOmniRoutes(
   const allRoutes: OmniRoute[] = [];
   const rescueCandidates: FileCandidate[] = [];
   let astMatchedCount = 0;
+  let aiRescuedCount = 0;
 
-  // Step 3: Run Tree-sitter Universal AST on all candidate files using resolved mounts
-  for (const candidate of candidateFiles) {
-    let matched = await extractRoutesWithTreeSitter(candidate, mountLinker);
-    // If Tree-sitter doesn't support the language or returns 0, try fastMatcher as auxiliary fallback
-    if (matched.length === 0) {
-      const fastMatches = fastMatchRoutes(candidate, mountLinker);
-      if (fastMatches.length > 0) {
-        matched = fastMatches;
+  if (mode === "ai") {
+    // Mode B: Pure AI-First Extraction on top candidates
+    log(`[OmniRoute AI-First] Running semantic extraction on top ${Math.min(candidateFiles.length, maxAiRescues)} candidate files...`);
+    const sorted = [...candidateFiles].sort((a, b) => b.routeScore - a.routeScore);
+    for (let i = 0; i < Math.min(sorted.length, maxAiRescues); i++) {
+      const target = sorted[i];
+      try {
+        const aiRoutes = await extractRoutesWithAI(target);
+        if (aiRoutes.length > 0) {
+          aiRescuedCount += aiRoutes.length;
+          allRoutes.push(...aiRoutes);
+          log(`[OmniRoute AI-First] Extracted ${aiRoutes.length} routes from ${target.relativePath}`);
+        }
+      } catch (err: any) {
+        log(`[OmniRoute AI-First] Error on ${target.relativePath}: ${err.message}`);
       }
     }
-
-    if (matched.length > 0) {
-      astMatchedCount += matched.length;
-      allRoutes.push(...matched);
-    } else if (candidate.routeScore >= 3) {
-      // Has strong route signals, but standard patterns didn't match (likely custom wrapper or loop)
-      rescueCandidates.push(candidate);
-    }
-  }
-
-  log(`[OmniRoute] Tree-sitter AST discovered ${astMatchedCount} routes across syntax trees.`);
-
-  // Step 4: Run On-Device AI Rescue on ambiguous / custom wrapper files
-  let aiRescuedCount = 0;
-  if (enableAi && rescueCandidates.length > 0) {
-    const aiAvailable = isLocalAiAvailable();
-    if (aiAvailable) {
-      log(`[OmniRoute] Dispatching ${Math.min(rescueCandidates.length, maxAiRescues)} ambiguous files to Local AI safety net...`);
-      for (let i = 0; i < Math.min(rescueCandidates.length, maxAiRescues); i++) {
-        const rescueTarget = rescueCandidates[i];
-        log(`[OmniRoute AI] Analyzing ${rescueTarget.relativePath} (${rescueTarget.language})...`);
-        try {
-          const aiRoutes = await extractRoutesWithAI(rescueTarget);
-          if (aiRoutes.length > 0) {
-            aiRescuedCount += aiRoutes.length;
-            allRoutes.push(...aiRoutes);
-            log(`[OmniRoute AI] Rescued ${aiRoutes.length} routes from ${rescueTarget.relativePath}!`);
-          }
-        } catch (err: any) {
-          log(`[OmniRoute AI] Error during AI rescue: ${err.message}`);
+  } else {
+    // Mode A (AST) or Hybrid: Run Tree-sitter Universal AST
+    for (const candidate of candidateFiles) {
+      let matched = await extractRoutesWithTreeSitter(candidate, mountLinker);
+      if (matched.length === 0) {
+        const fastMatches = fastMatchRoutes(candidate, mountLinker);
+        if (fastMatches.length > 0) {
+          matched = fastMatches;
         }
       }
-    } else {
-      log(`[OmniRoute] Local AI model not loaded; skipped AI rescue for ${rescueCandidates.length} custom files.`);
+
+      if (matched.length > 0) {
+        astMatchedCount += matched.length;
+        allRoutes.push(...matched);
+      } else if (candidate.routeScore >= 3) {
+        rescueCandidates.push(candidate);
+      }
+    }
+
+    log(`[OmniRoute AST] Tree-sitter AST discovered ${astMatchedCount} routes across syntax trees.`);
+
+    // If hybrid, rescue ambiguous files
+    if (mode === "hybrid" && enableAi && rescueCandidates.length > 0) {
+      const aiAvailable = isLocalAiAvailable();
+      if (aiAvailable) {
+        log(`[OmniRoute Hybrid] Dispatching ${Math.min(rescueCandidates.length, maxAiRescues)} ambiguous files to Local AI safety net...`);
+        for (let i = 0; i < Math.min(rescueCandidates.length, maxAiRescues); i++) {
+          const rescueTarget = rescueCandidates[i];
+          try {
+            const aiRoutes = await extractRoutesWithAI(rescueTarget);
+            if (aiRoutes.length > 0) {
+              aiRescuedCount += aiRoutes.length;
+              allRoutes.push(...aiRoutes);
+            }
+          } catch (err: any) {
+            log(`[OmniRoute AI] Error during AI rescue: ${err.message}`);
+          }
+        }
+      }
     }
   }
 

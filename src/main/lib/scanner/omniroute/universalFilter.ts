@@ -102,6 +102,39 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
   return false;
 }
 
+export function isTestFilePath(filePath: string, rootPath: string): boolean {
+  const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
+  const fileName = path.basename(rel);
+
+  // 1. Explicit test file name suffixes across languages
+  if (
+    fileName.endsWith("_test.go") ||
+    fileName.endsWith(".test.ts") ||
+    fileName.endsWith(".test.js") ||
+    fileName.endsWith(".spec.ts") ||
+    fileName.endsWith(".spec.js") ||
+    fileName.endsWith("test.java") ||
+    fileName.endsWith("tests.java") ||
+    fileName.endsWith("test.cs") ||
+    fileName.endsWith("tests.cs") ||
+    fileName.startsWith("test_") ||
+    fileName.endsWith("_test.py")
+  ) {
+    return true;
+  }
+
+  // 2. Relative test directory segments inside the project
+  const segments = rel.split("/");
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i];
+    if (seg === "tests" || seg === "test" || seg === "__tests__") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function isCandidateFilePath(filePath: string, rootPath: string): boolean {
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/");
   const segments = rel.split("/");
@@ -134,6 +167,7 @@ export function analyzeRouteCandidate(
   const lowerRel = rel.toLowerCase();
   const language = getFileLanguage(filePath);
   const isClient = isClientUiPath(filePath, rootPath);
+  const isTest = isTestFilePath(filePath, rootPath);
 
   // Files in route-specific folders are high-probability candidates
   const isNamedRouteLocation =
@@ -185,5 +219,6 @@ export function analyzeRouteCandidate(
     routeScore,
     hasRouteSignals,
     isClientUi: isClient,
+    isTestFile: isTest,
   };
 }
