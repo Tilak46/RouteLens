@@ -256,6 +256,34 @@ export function extractCSharpRoutes(tree: Parser.Tree, filePath: string): OmniRo
         }
       }
 
+      // Also check if class defines Map(RouteGroupBuilder ...) or AddRoutes(...)
+      for (let i = 0; i < node.childCount; i++) {
+        const c = node.child(i)!;
+        if (c.type === "declaration_list") {
+          for (let j = 0; j < c.childCount; j++) {
+            const m = c.child(j)!;
+            if (m.type === "method_declaration") {
+              const mName = m.children.find((x) => x.type === "identifier")?.text;
+              if (mName === "Map" || mName === "AddRoutes") {
+                const params = m.children.find((x) => x.type === "parameter_list");
+                if (params) {
+                  for (let k = 0; k < params.childCount; k++) {
+                    const p = params.child(k)!;
+                    if (p.type === "parameter") {
+                      const idents = p.children.filter((x) => x.type === "identifier");
+                      const pName = idents.length > 0 ? idents[idents.length - 1].text : null;
+                      if (pName) {
+                        groupPrefixMap.set(pName, classPrefix || `/api/${className}`);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       findMethods(node);
     }
 
@@ -269,25 +297,36 @@ export function extractCSharpRoutes(tree: Parser.Tree, filePath: string): OmniRo
           const verb = prop.text === "Map" ? "GET" : prop.text.slice(3).toUpperCase();
           if (["GET", "POST", "PUT", "DELETE", "PATCH"].includes(verb)) {
             const args = node.children.find((c) => c.type === "argument_list");
-            if (args && args.childCount > 1) {
-              const arg = args.child(1);
-              const str = getCSharpStringLiteral(arg?.child(0));
-              if (str !== null) {
-                const prefix = (receiver && groupPrefixMap.get(receiver)) || "";
-                let combined = [prefix, str].filter(Boolean).join("/");
-                if (!combined.startsWith("/")) combined = "/" + combined;
-                let full = combined.replace(/\/+/g, "/");
-                if (full.length > 1 && full.endsWith("/")) full = full.slice(0, -1);
-                routes.push({
-                  id: stableId(filePath, verb as Method, full),
-                  framework: "aspnet",
-                  method: verb as Method,
-                  path: full,
-                  file: filePath,
-                  confidence: "high",
-                  source: "tree_sitter",
-                });
+            let str: string | null = null;
+            if (args) {
+              for (let i = 0; i < args.childCount; i++) {
+                const arg = args.child(i)!;
+                if (arg.type === "argument") {
+                  const s = getCSharpStringLiteral(arg.child(0));
+                  if (s !== null) {
+                    str = s;
+                    break;
+                  }
+                }
               }
+            }
+
+            const hasGroup = receiver && groupPrefixMap.has(receiver);
+            if (str !== null || hasGroup) {
+              const prefix = (receiver && groupPrefixMap.get(receiver)) || "";
+              let combined = [prefix, str || ""].filter(Boolean).join("/");
+              if (!combined.startsWith("/")) combined = "/" + combined;
+              let full = combined.replace(/\/+/g, "/");
+              if (full.length > 1 && full.endsWith("/")) full = full.slice(0, -1);
+              routes.push({
+                id: stableId(filePath, verb as Method, full),
+                framework: "aspnet",
+                method: verb as Method,
+                path: full,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
             }
           }
         }
