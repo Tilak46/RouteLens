@@ -3,7 +3,12 @@ import type { Method } from "../../../types";
 export type OmniFramework =
   | "express"
   | "fastapi"
+  | "flask"
+  | "django"
+  | "starlette"
   | "gin"
+  | "fiber"
+  | "echo"
   | "next-pages"
   | "next-app"
   | "nest"

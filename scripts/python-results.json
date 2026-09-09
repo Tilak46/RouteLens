@@ -1,0 +1,62 @@
+[
+  {
+    "Target": "tiangolo/fastapi",
+    "Level": "Level 1 (Volume & Production Stress)",
+    "Framework": "FastAPI",
+    "Files Scanned": 462,
+    "Candidate Files": 332,
+    "Real Routes": 430,
+    "Routes Found": "432/430",
+    "Accuracy %": "100.5%",
+    "Latency (ms)": "432ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "tiangolo/full-stack-fastapi-template",
+    "Level": "Level 2 (Ground-Truth Accuracy)",
+    "Framework": "FastAPI",
+    "Files Scanned": 152,
+    "Candidate Files": 9,
+    "Real Routes": 23,
+    "Routes Found": "23/23",
+    "Accuracy %": "100.0%",
+    "Latency (ms)": "132ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "nsidnev/fastapi-realworld-example-app",
+    "Level": "Level 2/3 (Hierarchical Sub-Routers)",
+    "Framework": "FastAPI",
+    "Files Scanned": 95,
+    "Candidate Files": 15,
+    "Real Routes": 19,
+    "Routes Found": "19/19",
+    "Accuracy %": "100.0%",
+    "Latency (ms)": "63ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "miguelgrinberg/microblog",
+    "Level": "Level 2/3 (Production Flask Blueprints)",
+    "Framework": "Flask",
+    "Files Scanned": 34,
+    "Candidate Files": 8,
+    "Real Routes": 35,
+    "Routes Found": "35/35",
+    "Accuracy %": "100.0%",
+    "Latency (ms)": "34ms",
+    "Status": "PASSED"
+  },
+  {
+    "Target": "pallets/flask",
+    "Level": "Level 3 (Flask Core & Examples)",
+    "Framework": "Flask",
+    "Files Scanned": 17,
+    "Candidate Files": 6,
+    "Real Routes": 20,
+    "Routes Found": "20/20",
+    "Accuracy %": "100.0%",
+    "Latency (ms)": "18ms",
+    "Status": "PASSED"
+  }
+]

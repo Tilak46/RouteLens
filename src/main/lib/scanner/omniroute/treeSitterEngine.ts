@@ -452,38 +452,231 @@ export function extractTsJsRoutes(
 }
 
 // -------------------------------------------------------------
-// 3. Python (FastAPI, Flask)
+// 3. Python (FastAPI, Flask, Starlette, Django) - Universal Invariant CST Visitor
 // -------------------------------------------------------------
+function getPythonStringLiteral(node: Parser.SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.type === "string") {
+    const raw = node.text;
+    const unPrefixed = raw.replace(/^[rRfFuUbB]+/, "");
+    if (unPrefixed.startsWith('"""') && unPrefixed.endsWith('"""')) return unPrefixed.slice(3, -3);
+    if (unPrefixed.startsWith("'''") && unPrefixed.endsWith("'''")) return unPrefixed.slice(3, -3);
+    if (unPrefixed.startsWith('"') && unPrefixed.endsWith('"')) return unPrefixed.slice(1, -1);
+    if (unPrefixed.startsWith("'") && unPrefixed.endsWith("'")) return unPrefixed.slice(1, -1);
+    return unPrefixed;
+  }
+  return null;
+}
+
+const PYTHON_METHODS = new Set(["get", "post", "put", "delete", "patch", "options", "head"]);
+
 export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
+  const routerPrefixes = new Map<string, string>();
+  routerPrefixes.set("app", "/");
+  routerPrefixes.set("router", "/");
+  routerPrefixes.set("api", "/");
+  routerPrefixes.set("bp", "/");
 
-  walkTree(tree.rootNode, (node) => {
-    if (node.type === "decorated_definition") {
-      for (let i = 0; i < node.childCount; i++) {
-        const c = node.child(i)!;
-        if (c.type === "decorator") {
-          const text = c.text;
-          const m = text.match(/@(?:app|router|api)\.(get|post|put|delete|patch)\s*\(\s*(?:['"]([^'"]*)['"])?/i);
-          if (m) {
-            const method = m[1].toUpperCase() as Method;
-            let routePath = m[2] || "/";
-            if (!routePath.startsWith("/")) routePath = "/" + routePath;
+  function walk(node: Parser.SyntaxNode) {
+    if (!node) return;
 
-            routes.push({
-              id: stableId(filePath, method, routePath),
-              framework: "fastapi",
-              method,
-              path: routePath,
-              file: filePath,
-              confidence: "high",
-              source: "tree_sitter",
-            });
+    // 1. Prefix tracking: router = APIRouter(prefix="/users") or bp = Blueprint("auth", __name__, url_prefix="/auth")
+    if (node.type === "assignment") {
+      const left = node.child(0);
+      const right = node.child(2);
+      if (left && left.type === "identifier" && right && right.type === "call") {
+        const fn = right.child(0);
+        const fnName = fn?.text;
+        if (fnName === "APIRouter" || fnName === "Blueprint") {
+          const args = right.children.find((c) => c.type === "argument_list");
+          if (args) {
+            for (let i = 0; i < args.childCount; i++) {
+              const arg = args.child(i)!;
+              if (arg.type === "keyword_argument") {
+                const kName = arg.child(0)?.text;
+                if (kName === "prefix" || kName === "url_prefix") {
+                  const valNode = arg.child(2);
+                  const strVal = getPythonStringLiteral(valNode);
+                  if (strVal !== null) {
+                    routerPrefixes.set(left.text.trim(), strVal);
+                  }
+                }
+              }
+            }
           }
         }
       }
     }
-  });
 
+    // 2. Decorators: @app.get(...), @bp.route(...), @router.api_route(...)
+    if (node.type === "decorated_definition") {
+      for (let i = 0; i < node.childCount; i++) {
+        const c = node.child(i)!;
+        if (c.type === "decorator") {
+          const callNode = c.children.find((child) => child.type === "call");
+          if (callNode) {
+            const fnNode = callNode.child(0);
+            if (fnNode && fnNode.type === "attribute") {
+              const operand = fnNode.child(0);
+              const field = fnNode.child(2);
+              if (operand && field) {
+                const receiver = operand.text.trim();
+                const action = field.text.trim().toLowerCase();
+
+                let methods: Method[] = [];
+                let isRouteDecorator = false;
+                let framework: OmniFramework = "fastapi";
+
+                if (PYTHON_METHODS.has(action)) {
+                  methods = [action.toUpperCase() as Method];
+                  isRouteDecorator = true;
+                  if (receiver === "bp" || receiver.endsWith("_bp")) {
+                    framework = "flask";
+                  }
+                } else if (action === "route" || action === "api_route") {
+                  isRouteDecorator = true;
+                  framework = action === "api_route" ? "fastapi" : "flask";
+
+                  // Look for methods=[...] in arguments
+                  const args = callNode.children.find((child) => child.type === "argument_list");
+                  let foundMethods = false;
+                  if (args) {
+                    for (let j = 0; j < args.childCount; j++) {
+                      const arg = args.child(j)!;
+                      if (arg.type === "keyword_argument" && arg.child(0)?.text === "methods") {
+                        const valNode = arg.child(2);
+                        if (valNode && (valNode.type === "list" || valNode.type === "tuple")) {
+                          for (let k = 0; k < valNode.childCount; k++) {
+                            const mStr = getPythonStringLiteral(valNode.child(k)!);
+                            if (mStr) {
+                              methods.push(mStr.toUpperCase() as Method);
+                              foundMethods = true;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  if (!foundMethods) {
+                    methods = ["GET"];
+                  }
+                }
+
+                if (isRouteDecorator) {
+                  const args = callNode.children.find((child) => child.type === "argument_list");
+                  let pathVal: string | null = null;
+                  if (args) {
+                    for (let j = 0; j < args.childCount; j++) {
+                      const arg = args.child(j)!;
+                      if (arg.type === "string") {
+                        pathVal = getPythonStringLiteral(arg);
+                        break;
+                      } else if (arg.type === "keyword_argument") {
+                        const kName = arg.child(0)?.text;
+                        if (kName === "path" || kName === "rule") {
+                          pathVal = getPythonStringLiteral(arg.child(2));
+                          break;
+                        }
+                      }
+                    }
+                  }
+
+                  if (pathVal !== null) {
+                    const prefix = routerPrefixes.get(receiver) || "/";
+                    let fullPath = joinUrl(prefix, pathVal);
+                    if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
+
+                    for (const m of methods) {
+                      routes.push({
+                        id: stableId(filePath, m, fullPath),
+                        framework,
+                        method: m,
+                        path: fullPath,
+                        file: filePath,
+                        confidence: "high",
+                        source: "tree_sitter",
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Route Tables: Starlette Route(...) & Django path(...)
+    if (node.type === "call") {
+      const fn = node.child(0);
+      const fnName = fn?.text;
+      if (fnName === "Route") {
+        const args = node.children.find((c) => c.type === "argument_list");
+        if (args) {
+          let pathVal: string | null = null;
+          let methods: Method[] = [];
+          for (let j = 0; j < args.childCount; j++) {
+            const arg = args.child(j)!;
+            if (arg.type === "string" && pathVal === null) {
+              pathVal = getPythonStringLiteral(arg);
+            } else if (arg.type === "keyword_argument" && arg.child(0)?.text === "methods") {
+              const valNode = arg.child(2);
+              if (valNode && (valNode.type === "list" || valNode.type === "tuple")) {
+                for (let k = 0; k < valNode.childCount; k++) {
+                  const mStr = getPythonStringLiteral(valNode.child(k)!);
+                  if (mStr) methods.push(mStr.toUpperCase() as Method);
+                }
+              }
+            }
+          }
+          if (pathVal !== null) {
+            if (methods.length === 0) methods = ["GET"];
+            for (const m of methods) {
+              const fullPath = pathVal.startsWith("/") ? pathVal : "/" + pathVal;
+              routes.push({
+                id: stableId(filePath, m, fullPath),
+                framework: "starlette",
+                method: m,
+                path: fullPath,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
+            }
+          }
+        }
+      } else if (fnName === "path" || fnName === "re_path") {
+        const args = node.children.find((c) => c.type === "argument_list");
+        if (args && args.namedChildren.length >= 2) {
+          const secondArg = args.namedChildren[1];
+          // Skip include(...) router mount delegations
+          if (!secondArg.text.includes("include(")) {
+            const firstArg = args.namedChildren[0];
+            const pathVal = getPythonStringLiteral(firstArg);
+            if (pathVal !== null) {
+              const fullPath = pathVal.startsWith("/") ? pathVal : "/" + pathVal;
+              routes.push({
+                id: stableId(filePath, "GET", fullPath),
+                framework: "django",
+                method: "GET",
+                path: fullPath,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < node.childCount; i++) {
+      walk(node.child(i)!);
+    }
+  }
+
+  walk(tree.rootNode);
   return routes;
 }
 
