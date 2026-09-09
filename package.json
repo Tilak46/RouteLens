@@ -21,6 +21,7 @@
     "smoke:ai": "tsx scripts/smoke-ai.ts",
     "smoke:commitmsg": "tsx scripts/smoke-commitmsg.ts",
     "test:ai-prototype": "node scripts/prototype-ai-scanner.mjs",
+    "test:omniroute": "tsx scripts/test-omniroute-engine.ts",
     "download:model": "node scripts/download-model.mjs"
   },
   "dependencies": {
