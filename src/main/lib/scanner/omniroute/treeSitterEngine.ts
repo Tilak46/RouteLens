@@ -1495,7 +1495,7 @@ const RUST_HTTP_METHODS = new Set(["get", "post", "put", "delete", "patch", "hea
 function getScopeCall(node: Parser.SyntaxNode): { node: Parser.SyntaxNode; prefix: string } | null {
   if (node.type === "call_expression") {
     const fnNode = node.child(0);
-    if (fnNode && (fnNode.text === "web::scope" || fnNode.text === "scope")) {
+    if (fnNode && (fnNode.text === "web::scope" || fnNode.text === "scope" || fnNode.text === "web::resource" || fnNode.text === "resource")) {
       const args = node.children.find((c) => c.type === "arguments");
       const strNode = args?.children.find((c) => c.type === "string_literal" || c.type === "raw_string_literal");
       if (strNode) {
@@ -1505,7 +1505,7 @@ function getScopeCall(node: Parser.SyntaxNode): { node: Parser.SyntaxNode; prefi
     }
     if (fnNode && fnNode.type === "field_expression") {
       const field = fnNode.child(2);
-      if (field && field.text === "nest") {
+      if (field && (field.text === "nest" || field.text === "scope" || field.text === "resource")) {
         const args = node.children.find((c) => c.type === "arguments");
         const strNode = args?.children.find((c) => c.type === "string_literal" || c.type === "raw_string_literal");
         if (strNode) {
@@ -1518,10 +1518,33 @@ function getScopeCall(node: Parser.SyntaxNode): { node: Parser.SyntaxNode; prefi
   return null;
 }
 
-function getEnclosingRustScope(node: Parser.SyntaxNode): string {
+function getEnclosingRustScopes(node: Parser.SyntaxNode): string[] {
   const seenNodes = new Set<number>();
   const scopes: string[] = [];
-  let curr: Parser.SyntaxNode | null = node;
+
+  // 1. Walk receiver call chain of node itself, starting from immediate receiver
+  let rec: Parser.SyntaxNode | null = null;
+  const fn0 = node.child(0);
+  if (fn0 && fn0.type === "field_expression") {
+    rec = fn0.child(0);
+  }
+
+  while (rec && rec.type === "call_expression") {
+    const sc = getScopeCall(rec);
+    if (sc && !seenNodes.has(sc.node.id)) {
+      seenNodes.add(sc.node.id);
+      scopes.unshift(sc.prefix);
+    }
+    const fn = rec.child(0);
+    if (fn && fn.type === "field_expression") {
+      rec = fn.child(0);
+    } else {
+      break;
+    }
+  }
+
+  // 2. Walk enclosing parent call expressions (e.g. .service(scope(...)), .nest(...))
+  let curr: Parser.SyntaxNode | null = node.parent;
   while (curr) {
     if (curr.type === "call_expression") {
       const fn = curr.child(0);
@@ -1550,20 +1573,21 @@ function getEnclosingRustScope(node: Parser.SyntaxNode): string {
     }
     curr = curr.parent;
   }
-  return scopes.join("");
+  return scopes;
 }
 
 function extractRustRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
 
   function walk(node: Parser.SyntaxNode) {
-    // 1. Actix / Rocket attributes: #[get("/path")]
+    // 1. Actix / Rocket attributes: #[get("/path")], #[actix_web::get("/path")]
     if (node.type === "attribute_item") {
       const attr = node.children.find((c) => c.type === "attribute");
       if (attr) {
         const idNode = attr.child(0);
-        if (idNode && RUST_HTTP_METHODS.has(idNode.text.toLowerCase())) {
-          const verb = idNode.text.toUpperCase() as Method;
+        const name = idNode ? idNode.text.split("::").pop()?.toLowerCase() : null;
+        if (name && RUST_HTTP_METHODS.has(name)) {
+          const verb = name.toUpperCase() as Method;
           function findString(n: Parser.SyntaxNode): string | null {
             if (n.type === "string_literal" || n.type === "raw_string_literal") {
               return getRustStringLiteral(n);
@@ -1596,103 +1620,47 @@ function extractRustRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
     if (node.type === "call_expression") {
       const fnNode = node.child(0);
 
-      // Case A: web::resource("/login")
-      if (fnNode && (fnNode.type === "scoped_identifier" || fnNode.type === "identifier")) {
-        if (fnNode.text === "web::resource" || fnNode.text === "resource") {
-          const args = node.children.find((c) => c.type === "arguments");
-          const pathNode = args?.children.find((c) => c.type === "string_literal" || c.type === "raw_string_literal");
-          if (pathNode) {
-            const p = getRustStringLiteral(pathNode);
-            if (p !== null) {
-              const scope = getEnclosingRustScope(node);
-              let fullP = "/" + [scope, p].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
-              if (!fullP.startsWith("/")) fullP = "/" + fullP;
-              if (fullP.length > 1 && fullP.endsWith("/")) fullP = fullP.slice(0, -1);
-
-              function findVerbs(n: Parser.SyntaxNode) {
-                if ((n.type === "identifier" || n.type === "field_identifier") && RUST_HTTP_METHODS.has(n.text.toLowerCase())) {
-                  methods.push(n.text.toUpperCase() as Method);
-                }
-                for (let i = 0; i < n.childCount; i++) {
-                  findVerbs(n.child(i)!);
-                }
-              }
-
-              let ancestor: Parser.SyntaxNode | null = node.parent;
-              const methods: Method[] = [];
-              while (ancestor) {
-                if (ancestor.type === "call_expression") {
-                  const fn = ancestor.child(0);
-                  if (fn && fn.type === "field_expression" && fn.child(2)?.text === "route") {
-                    const rArgs = ancestor.children.find((c) => c.type === "arguments");
-                    if (rArgs) findVerbs(rArgs);
-                  }
-                } else if (ancestor.type !== "field_expression") {
-                  break;
-                }
-                ancestor = ancestor.parent;
-              }
-
-              const verbs = methods.length > 0 ? Array.from(new Set(methods)) : ["ANY" as Method];
-              for (const v of verbs) {
-                routes.push({
-                  id: stableId(filePath, v, fullP),
-                  framework: "actix",
-                  method: v,
-                  path: fullP,
-                  file: filePath,
-                  confidence: "high",
-                  source: "tree_sitter",
-                });
-              }
-            }
-          }
-        }
-      }
-
-      // Case B: .route("/path", ...)
+      // Case: .route("/path", ...) or .route("", ...) or .route(get(...)) inside resource/scope
       if (fnNode && fnNode.type === "field_expression") {
         const field = fnNode.child(2);
         if (field && field.text === "route") {
           const args = node.children.find((c) => c.type === "arguments");
-          if (args && args.childCount >= 2) {
-            const pathNode = args.children.find((c) => c.type === "string_literal" || c.type === "raw_string_literal");
-            if (pathNode) {
-              const p = getRustStringLiteral(pathNode);
-              if (p !== null) {
-                const scope = getEnclosingRustScope(node);
-                let fullP = "/" + [scope, p].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
-                if (!fullP.startsWith("/")) fullP = "/" + fullP;
-                if (fullP.length > 1 && fullP.endsWith("/")) fullP = fullP.slice(0, -1);
+          const pathNode = args?.children.find((c) => c.type === "string_literal" || c.type === "raw_string_literal");
+          const scopes = getEnclosingRustScopes(node);
+          const pStr = pathNode ? getRustStringLiteral(pathNode) : "";
+          if (pStr !== null && (pStr !== "" || scopes.length > 0)) {
+            let fullP = "/" + [...scopes, pStr].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
+            if (!fullP.startsWith("/")) fullP = "/" + fullP;
+            if (fullP.length > 1 && fullP.endsWith("/")) fullP = fullP.slice(0, -1);
 
-                const methods: Method[] = [];
-                function findVerbs(n: Parser.SyntaxNode) {
-                  if ((n.type === "identifier" || n.type === "field_identifier") && RUST_HTTP_METHODS.has(n.text.toLowerCase())) {
-                    methods.push(n.text.toUpperCase() as Method);
-                  }
-                  for (let i = 0; i < n.childCount; i++) {
-                    findVerbs(n.child(i)!);
-                  }
-                }
-                for (let i = 0; i < args.childCount; i++) {
-                  const a = args.child(i)!;
-                  if (a !== pathNode && a.type !== "(" && a.type !== ")" && a.type !== ",") {
-                    findVerbs(a);
-                  }
-                }
-                const verbs = methods.length > 0 ? Array.from(new Set(methods)) : ["GET" as Method];
-                for (const v of verbs) {
-                  routes.push({
-                    id: stableId(filePath, v, fullP),
-                    framework: "axum",
-                    method: v,
-                    path: fullP,
-                    file: filePath,
-                    confidence: "high",
-                    source: "tree_sitter",
-                  });
+            const methods: Method[] = [];
+            function findVerbs(n: Parser.SyntaxNode) {
+              if ((n.type === "identifier" || n.type === "field_identifier") && RUST_HTTP_METHODS.has(n.text.toLowerCase())) {
+                methods.push(n.text.toUpperCase() as Method);
+              }
+              for (let i = 0; i < n.childCount; i++) {
+                findVerbs(n.child(i)!);
+              }
+            }
+            if (args) {
+              for (let i = 0; i < args.childCount; i++) {
+                const a = args.child(i)!;
+                if (a !== pathNode && a.type !== "(" && a.type !== ")" && a.type !== ",") {
+                  findVerbs(a);
                 }
               }
+            }
+            const verbs = methods.length > 0 ? Array.from(new Set(methods)) : ["GET" as Method];
+            for (const v of verbs) {
+              routes.push({
+                id: stableId(filePath, v, fullP),
+                framework: scopes.some((s) => s.includes("api") || s.includes("v")) ? "actix" : "axum",
+                method: v,
+                path: fullP,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
             }
           }
         }

@@ -1,109 +1,24 @@
 {
-  "totalReal": 37,
-  "totalFound": 37,
+  "totalReal": 427,
+  "totalFound": 427,
   "results": [
     {
-      "Target": "yoonge/conduit-axum",
+      "Target": "actix-examples & axum-examples (Official Suites - Actix/Axum)",
       "Batch": 1,
-      "Real Routes": 19,
-      "Found Routes": 19,
+      "Real Routes": 209,
+      "Found Routes": 209,
       "Recall %": "100.0%",
       "Precision %": "100.0%",
-      "Latency (ms)": "76 ms",
-      "Routes": [
-        "GET /api/tags/:tag",
-        "GET /api/tags",
-        "GET /api/profile/:username/favorites",
-        "GET /api/profile/:username",
-        "POST /api/topic/comment",
-        "POST /api/topic/update",
-        "GET /api/topic/update/:topic_id",
-        "GET /api/topic/:topic_id",
-        "POST /api/topic/initiate",
-        "POST /api/favor",
-        "GET /api/my-favorites",
-        "GET /api/my-topics",
-        "POST /api/settings/update",
-        "GET /api/settings",
-        "GET /api/user/list",
-        "GET /api/user/:username",
-        "POST /api/login",
-        "POST /api/register",
-        "GET /api"
-      ]
+      "Latency": "925 ms"
     },
     {
-      "Target": "axum/examples/todos",
-      "Batch": 1,
-      "Real Routes": 4,
-      "Found Routes": 4,
-      "Recall %": "100.0%",
-      "Precision %": "100.0%",
-      "Latency (ms)": "27 ms",
-      "Routes": [
-        "PATCH /todos/{id}",
-        "DELETE /todos/{id}",
-        "GET /todos",
-        "POST /todos"
-      ]
-    },
-    {
-      "Target": "axum/examples/hello-world",
-      "Batch": 1,
-      "Real Routes": 1,
-      "Found Routes": 1,
-      "Recall %": "100.0%",
-      "Precision %": "100.0%",
-      "Latency (ms)": "2 ms",
-      "Routes": [
-        "GET /"
-      ]
-    },
-    {
-      "Target": "actix-examples/databases/diesel",
+      "Target": "LemmyNet/lemmy (Federated Link Aggregator - Actix-web)",
       "Batch": 2,
-      "Real Routes": 2,
-      "Found Routes": 2,
+      "Real Routes": 218,
+      "Found Routes": 218,
       "Recall %": "100.0%",
       "Precision %": "100.0%",
-      "Latency (ms)": "4 ms",
-      "Routes": [
-        "GET /user/{user_id}",
-        "POST /user"
-      ]
-    },
-    {
-      "Target": "actix-examples/auth/cookie-auth",
-      "Batch": 2,
-      "Real Routes": 3,
-      "Found Routes": 3,
-      "Recall %": "100.0%",
-      "Precision %": "100.0%",
-      "Latency (ms)": "2 ms",
-      "Routes": [
-        "POST /login",
-        "POST /logout",
-        "GET /"
-      ]
-    },
-    {
-      "Target": "actix-examples/basics/nested-routing",
-      "Batch": 2,
-      "Real Routes": 8,
-      "Found Routes": 8,
-      "Recall %": "100.0%",
-      "Precision %": "100.0%",
-      "Latency (ms)": "5 ms",
-      "Routes": [
-        "GET /products",
-        "POST /products",
-        "GET /products/{product_id}",
-        "DELETE /products/{product_id}",
-        "GET /products/{product_id}/parts",
-        "POST /products/{product_id}/parts",
-        "GET /products/{product_id}/parts/{part_id}",
-        "DELETE /products/{product_id}/parts/{part_id}"
-      ]
+      "Latency": "2657 ms"
     }
   ]
 }
