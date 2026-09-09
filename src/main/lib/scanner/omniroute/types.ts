@@ -7,6 +7,9 @@ export type OmniFramework =
   | "next-pages"
   | "next-app"
   | "nest"
+  | "aspnet"
+  | "spring"
+  | "laravel"
   | "custom"
   | "unknown";
 
@@ -21,7 +24,7 @@ export type OmniRoute = {
   body?: string[];
   query?: string[];
   confidence: "high" | "medium" | "low";
-  source: "fast_matcher" | "local_ai" | "ast";
+  source: "fast_matcher" | "local_ai" | "ast" | "tree_sitter";
 };
 
 export type FileCandidate = {
@@ -31,6 +34,7 @@ export type FileCandidate = {
   content: string;
   routeScore: number;
   hasRouteSignals: boolean;
+  isClientUi?: boolean;
 };
 
 export type OmniScanResult = {

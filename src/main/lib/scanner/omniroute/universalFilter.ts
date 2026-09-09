@@ -37,6 +37,7 @@ export const IGNORED_DIRECTORY_SEGMENTS = new Set([
 const HTTP_VERB_REGEX = /\b(get|post|put|delete|patch|options|head)\b/i;
 const ROUTING_KEYWORD_REGEX = /\b(route|router|endpoint|controller|api|handler|group|mount|app|register)\b/i;
 const PATH_LITERAL_REGEX = /["'`]\/[a-zA-Z0-9_\-\/:{}]*["'`]/;
+const DECORATOR_ROUTE_REGEX = /@(Get|Post|Put|Delete|Patch|Controller)\b|\[Http(Get|Post|Put|Delete|Patch)|\[Route/i;
 
 export function getFileLanguage(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
@@ -66,6 +67,39 @@ export function getFileLanguage(filePath: string): string {
     default:
       return "unknown";
   }
+}
+
+export function isClientUiPath(filePath: string, rootPath: string): boolean {
+  const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
+  const segments = rel.split("/");
+
+  const clientDirNames = new Set([
+    "clientapp",
+    "client",
+    "frontend",
+    "components",
+    "views",
+    "hooks",
+    "locales",
+    "assets",
+    "styles",
+  ]);
+
+  for (const seg of segments) {
+    if (clientDirNames.has(seg)) {
+      // Exception: pages/api in Next.js is backend API
+      if (seg === "pages" && rel.includes("pages/api/")) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  if (rel.includes("/pages/") && !rel.includes("/pages/api/")) {
+    return true;
+  }
+
+  return false;
 }
 
 export function isCandidateFilePath(filePath: string, rootPath: string): boolean {
@@ -99,6 +133,7 @@ export function analyzeRouteCandidate(
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/");
   const lowerRel = rel.toLowerCase();
   const language = getFileLanguage(filePath);
+  const isClient = isClientUiPath(filePath, rootPath);
 
   // Files in route-specific folders are high-probability candidates
   const isNamedRouteLocation =
@@ -110,23 +145,31 @@ export function analyzeRouteCandidate(
     lowerRel.endsWith(".route.ts") ||
     lowerRel.endsWith(".router.js") ||
     lowerRel.endsWith(".router.ts") ||
+    lowerRel.endsWith(".controller.ts") ||
+    lowerRel.endsWith(".controller.js") ||
+    lowerRel.endsWith("controller.cs") ||
+    lowerRel.endsWith(".controller.cs") ||
     lowerRel.endsWith("/route.js") ||
     lowerRel.endsWith("/route.ts");
 
   const hasVerb = HTTP_VERB_REGEX.test(content);
   const hasKeyword = ROUTING_KEYWORD_REGEX.test(content);
   const hasPath = PATH_LITERAL_REGEX.test(content);
+  const hasDecorator = DECORATOR_ROUTE_REGEX.test(content);
 
   let routeScore = 0;
   if (hasPath) routeScore += 2;
   if (hasVerb) routeScore += 2;
   if (hasKeyword) routeScore += 1;
+  if (hasDecorator) routeScore += 3;
   if (isNamedRouteLocation) routeScore += 3;
 
   // A file is a route candidate if:
-  // 1. It has a path string literal AND either an HTTP verb or routing keyword, OR
-  // 2. It is located inside an API/route directory and has route keywords
+  // 1. It has explicit route decorators / attributes, OR
+  // 2. It has a path string literal AND either an HTTP verb or routing keyword, OR
+  // 3. It is located inside an API/route directory and has route keywords
   const hasRouteSignals =
+    hasDecorator ||
     (hasPath && (hasVerb || hasKeyword)) ||
     (isNamedRouteLocation && (hasVerb || hasKeyword));
 
@@ -137,5 +180,6 @@ export function analyzeRouteCandidate(
     content,
     routeScore,
     hasRouteSignals,
+    isClientUi: isClient,
   };
 }
