@@ -100,7 +100,17 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
   const segments = rel.split("/");
   const ext = path.extname(filePath).toLowerCase();
-  const isPureBackendCode = ext === ".go" || ext === ".java" || ext === ".cs" || ext === ".rs";
+  const isPureBackendCode =
+    ext === ".go" ||
+    ext === ".java" ||
+    ext === ".cs" ||
+    ext === ".rs" ||
+    ext === ".php" ||
+    ext === ".rb";
+
+  if (isPureBackendCode) {
+    return false;
+  }
 
   const clientDirNames = new Set([
     "clientapp",
@@ -122,11 +132,6 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
       // Exception: pages/api in Next.js is backend API
       if (seg === "pages" && rel.includes("pages/api/")) {
         return false;
-      }
-      // In pure backend languages (.go, .java, .cs), subdirectories named 'client' (e.g. grpc/client)
-      // are service client packages, not browser frontend UI.
-      if (isPureBackendCode && seg === "client" && i > 0) {
-        continue;
       }
       return true;
     }

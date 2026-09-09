@@ -1,0 +1,44 @@
+[
+  {
+    "Target": "gothinkster/aspnetcore-realworld-example-app",
+    "Batch": "Batch 1",
+    "Level": "Level 2 (ASP.NET Core Conduit Spec)",
+    "Framework": "ASP.NET Core",
+    "Files Scanned": 77,
+    "Candidate Files": 64,
+    "Real Routes": 19,
+    "Routes Found": "19/19",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "161ms",
+    "Status": "PASSED (100%)"
+  },
+  {
+    "Target": "davidfowl/TodoApi (Todo.Api)",
+    "Batch": "Batch 1",
+    "Level": "Level 2/3 (Canonical Minimal API Architecture)",
+    "Framework": "ASP.NET Core",
+    "Files Scanned": 19,
+    "Candidate Files": 19,
+    "Real Routes": 7,
+    "Routes Found": "7/7",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "51ms",
+    "Status": "PASSED (100%)"
+  },
+  {
+    "Target": "dotnet-architecture/eShopOnWeb",
+    "Batch": "Batch 2",
+    "Level": "Level 1/2/3 (Microsoft Enterprise Reference App)",
+    "Framework": "ASP.NET Core",
+    "Files Scanned": 256,
+    "Candidate Files": 209,
+    "Real Routes": 32,
+    "Routes Found": "32/32",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "328ms",
+    "Status": "PASSED (100%)"
+  }
+]

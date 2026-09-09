@@ -87,44 +87,180 @@ function walkTree(node: Parser.SyntaxNode, callback: (n: Parser.SyntaxNode) => v
 // -------------------------------------------------------------
 // 1. C# (ASP.NET Core Controllers & Minimal APIs)
 // -------------------------------------------------------------
+function getCSharpStringLiteral(node: Parser.SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.type === "string_literal" || node.type === "raw_string_literal") {
+    const raw = node.text;
+    if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
+    if (raw.startsWith('@"') && raw.endsWith('"')) return raw.slice(2, -1);
+    if (raw.startsWith('$@"') && raw.endsWith('"')) return raw.slice(3, -1);
+    if (raw.startsWith('$"') && raw.endsWith('"')) return raw.slice(2, -1);
+    return raw;
+  }
+  return null;
+}
+
+function getCSharpAttrString(attrNode: Parser.SyntaxNode): string | null {
+  const args = attrNode.children.find((c) => c.type === "attribute_argument_list");
+  if (!args) return null;
+  for (let i = 0; i < args.childCount; i++) {
+    const c = args.child(i)!;
+    if (c.type === "attribute_argument") {
+      const sNode = c.children.find((x) => x.type === "string_literal" || x.type === "raw_string_literal");
+      if (sNode) return getCSharpStringLiteral(sNode);
+    }
+  }
+  return null;
+}
+
+const CSHARP_HTTP_METHODS: Record<string, Method> = {
+  HttpGet: "GET",
+  HttpPost: "POST",
+  HttpPut: "PUT",
+  HttpDelete: "DELETE",
+  HttpPatch: "PATCH",
+  HttpHead: "HEAD",
+  HttpOptions: "OPTIONS",
+};
+
 export function extractCSharpRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
 
-  walkTree(tree.rootNode, (node) => {
+  const groupPrefixMap = new Map<string, string>();
+
+  function walk(node: Parser.SyntaxNode) {
+    // 0. Track MapGroup variables: var group = routes.MapGroup("/todos");
+    if (node.type === "variable_declarator") {
+      const varName = node.child(0)?.text;
+      const init = node.children.find((c) => c.type === "equals_value_clause");
+      if (varName && init) {
+        const expr = init.child(1);
+        if (expr && expr.type === "invocation_expression") {
+          const mAccess = expr.child(0);
+          if (mAccess && mAccess.type === "member_access_expression" && mAccess.child(2)?.text === "MapGroup") {
+            const args = expr.children.find((c) => c.type === "argument_list");
+            if (args && args.childCount > 1) {
+              const arg = args.child(1);
+              const str = getCSharpStringLiteral(arg?.child(0));
+              if (str !== null) {
+                groupPrefixMap.set(varName, str);
+              }
+            }
+          }
+        }
+      }
+    }
+
     // A. Class-based Controllers
     if (node.type === "class_declaration") {
-      let classRoutePrefix = "";
+      let classPrefix = "";
+      let className = "";
 
-      // Find class attributes like [Route("api/auth")]
       for (let i = 0; i < node.childCount; i++) {
         const c = node.child(i)!;
+        if (c.type === "identifier") className = c.text;
         if (c.type === "attribute_list") {
-          const m = c.text.match(/\[Route\(\s*["']([^"']+)["']\s*\)\]/i);
-          if (m) classRoutePrefix = m[1];
+          for (let j = 0; j < c.childCount; j++) {
+            const attr = c.child(j)!;
+            if (attr.type === "attribute" && attr.child(0)?.text === "Route") {
+              const s = getCSharpAttrString(attr);
+              if (s !== null) classPrefix = s;
+            }
+          }
         }
       }
 
-      // Find method declarations with [HttpGet], [HttpPost], etc.
-      walkTree(node, (child) => {
-        if (child.type === "method_declaration") {
-          for (let j = 0; j < child.childCount; j++) {
-            const attr = child.child(j)!;
-            if (attr.type === "attribute_list") {
-              const httpMatch = attr.text.match(/\[Http(Get|Post|Put|Delete|Patch|Options|Head)\s*(?:\(\s*["']([^"']*)["']\s*\))?\s*\]/i);
-              if (httpMatch) {
-                const method = httpMatch[1].toUpperCase() as Method;
-                const subPath = httpMatch[2] || "";
-                const fullPath = "/" + [classRoutePrefix, subPath]
-                  .filter(Boolean)
-                  .join("/")
-                  .replace(/\/+/g, "/")
-                  .replace(/^\//, "");
+      if (classPrefix.includes("[controller]")) {
+        const ctrlName = className.replace(/Controller$/, "");
+        classPrefix = classPrefix.replace(/\[controller\]/gi, ctrlName.toLowerCase());
+      }
 
+      function findMethods(n: Parser.SyntaxNode) {
+        if (n.type === "method_declaration") {
+          let methodName = "";
+          for (let i = 0; i < n.childCount; i++) {
+            const c = n.child(i)!;
+            if (c.type === "identifier") {
+              methodName = c.text;
+              break;
+            }
+          }
+
+          let verb: Method | null = null;
+          let methodSubPath = "";
+
+          for (let i = 0; i < n.childCount; i++) {
+            const c = n.child(i)!;
+            if (c.type === "attribute_list") {
+              for (let j = 0; j < c.childCount; j++) {
+                const attr = c.child(j)!;
+                if (attr.type === "attribute") {
+                  const name = attr.child(0)?.text;
+                  if (name && CSHARP_HTTP_METHODS[name]) {
+                    verb = CSHARP_HTTP_METHODS[name];
+                    const sub = getCSharpAttrString(attr);
+                    if (sub) methodSubPath = sub;
+                  } else if (name === "Route") {
+                    const sub = getCSharpAttrString(attr);
+                    if (sub) methodSubPath = sub;
+                  }
+                }
+              }
+            }
+          }
+
+          if (verb) {
+            let combined = [classPrefix, methodSubPath].filter(Boolean).join("/");
+            if (!combined.startsWith("/")) combined = "/" + combined;
+            if (combined.includes("[action]")) {
+              combined = combined.replace(/\[action\]/gi, methodName.toLowerCase());
+            }
+            let full = combined.replace(/\/+/g, "/");
+            if (full.length > 1 && full.endsWith("/")) full = full.slice(0, -1);
+
+            routes.push({
+              id: stableId(filePath, verb, full),
+              framework: "aspnet",
+              method: verb,
+              path: full,
+              file: filePath,
+              confidence: "high",
+              source: "tree_sitter",
+            });
+          }
+        }
+        for (let i = 0; i < n.childCount; i++) {
+          findMethods(n.child(i)!);
+        }
+      }
+
+      findMethods(node);
+    }
+
+    // B. Minimal APIs: app.MapGet("/path", ...), app.MapPost(...), group.MapGet(...)
+    if (node.type === "invocation_expression") {
+      const expr = node.child(0);
+      if (expr && expr.type === "member_access_expression") {
+        const receiver = expr.child(0)?.text;
+        const prop = expr.child(2);
+        if (prop && prop.text.startsWith("Map")) {
+          const verb = prop.text === "Map" ? "GET" : prop.text.slice(3).toUpperCase();
+          if (["GET", "POST", "PUT", "DELETE", "PATCH"].includes(verb)) {
+            const args = node.children.find((c) => c.type === "argument_list");
+            if (args && args.childCount > 1) {
+              const arg = args.child(1);
+              const str = getCSharpStringLiteral(arg?.child(0));
+              if (str !== null) {
+                const prefix = (receiver && groupPrefixMap.get(receiver)) || "";
+                let combined = [prefix, str].filter(Boolean).join("/");
+                if (!combined.startsWith("/")) combined = "/" + combined;
+                let full = combined.replace(/\/+/g, "/");
+                if (full.length > 1 && full.endsWith("/")) full = full.slice(0, -1);
                 routes.push({
-                  id: stableId(filePath, method, fullPath),
+                  id: stableId(filePath, verb as Method, full),
                   framework: "aspnet",
-                  method,
-                  path: fullPath,
+                  method: verb as Method,
+                  path: full,
                   file: filePath,
                   confidence: "high",
                   source: "tree_sitter",
@@ -133,31 +269,15 @@ export function extractCSharpRoutes(tree: Parser.Tree, filePath: string): OmniRo
             }
           }
         }
-      });
-    }
-
-    // B. Minimal APIs: app.MapGet("/path", ...), app.MapPost(...)
-    if (node.type === "invocation_expression" || node.type === "call_expression") {
-      const text = node.text;
-      const minimalMatch = text.match(/\.Map(Get|Post|Put|Delete|Patch)\s*\(\s*["']([^"']+)["']/i);
-      if (minimalMatch) {
-        const method = minimalMatch[1].toUpperCase() as Method;
-        let routePath = minimalMatch[2];
-        if (!routePath.startsWith("/")) routePath = "/" + routePath;
-
-        routes.push({
-          id: stableId(filePath, method, routePath),
-          framework: "aspnet",
-          method,
-          path: routePath,
-          file: filePath,
-          confidence: "high",
-          source: "tree_sitter",
-        });
       }
     }
-  });
 
+    for (let i = 0; i < node.childCount; i++) {
+      walk(node.child(i)!);
+    }
+  }
+
+  walk(tree.rootNode);
   return routes;
 }
 
