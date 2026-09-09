@@ -36,7 +36,7 @@ export const IGNORED_DIRECTORY_SEGMENTS = new Set([
 
 const HTTP_VERB_REGEX = /\b(get|post|put|delete|patch|options|head)\b/i;
 const ROUTING_KEYWORD_REGEX = /\b(route|router|endpoint|controller|api|handler|group|mount|app|register)\b/i;
-const PATH_LITERAL_REGEX = /["'`]\/[a-zA-Z0-9_\-\/:{}]*["'`]/;
+const PATH_LITERAL_REGEX = /["'`]\/[a-zA-Z0-9_\-\/:{}.*?+@]*["'`]/;
 const DECORATOR_ROUTE_REGEX = /@(Get|Post|Put|Delete|Patch|Controller)\b|\[Http(Get|Post|Put|Delete|Patch)|\[Route|\bRoute::/i;
 
 export function getFileLanguage(filePath: string): string {
@@ -72,11 +72,15 @@ export function getFileLanguage(filePath: string): string {
 export function isClientUiPath(filePath: string, rootPath: string): boolean {
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
   const segments = rel.split("/");
+  const ext = path.extname(filePath).toLowerCase();
+  const isPureBackendCode = ext === ".go" || ext === ".java" || ext === ".cs" || ext === ".rs";
 
   const clientDirNames = new Set([
     "clientapp",
     "client",
     "frontend",
+    "ui",
+    "web",
     "components",
     "views",
     "hooks",
@@ -85,11 +89,17 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
     "styles",
   ]);
 
-  for (const seg of segments) {
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
     if (clientDirNames.has(seg)) {
       // Exception: pages/api in Next.js is backend API
       if (seg === "pages" && rel.includes("pages/api/")) {
         return false;
+      }
+      // In pure backend languages (.go, .java, .cs), subdirectories named 'client' (e.g. grpc/client)
+      // are service client packages, not browser frontend UI.
+      if (isPureBackendCode && seg === "client" && i > 0) {
+        continue;
       }
       return true;
     }
