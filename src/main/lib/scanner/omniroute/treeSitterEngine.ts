@@ -902,41 +902,190 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
 
 // -------------------------------------------------------------
 // 5. Java (Spring Boot)
-// -------------------------------------------------------------
+function getJavaStringLiteral(node: Parser.SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.type === "string_literal") {
+    const text = node.text;
+    if (text.startsWith('"') && text.endsWith('"')) {
+      return text.slice(1, -1);
+    }
+  }
+  return null;
+}
+
+function extractJavaPathsFromNode(valNode: Parser.SyntaxNode): string[] {
+  const paths: string[] = [];
+  if (valNode.type === "string_literal") {
+    const s = getJavaStringLiteral(valNode);
+    if (s !== null) paths.push(s);
+  } else if (valNode.type === "element_value_array_initializer") {
+    for (let i = 0; i < valNode.childCount; i++) {
+      const c = valNode.child(i)!;
+      if (c.type === "string_literal") {
+        const s = getJavaStringLiteral(c);
+        if (s !== null) paths.push(s);
+      }
+    }
+  }
+  return paths;
+}
+
+function extractJavaAnnotationData(annoNode: Parser.SyntaxNode): {
+  name: string;
+  paths: string[];
+  methods: Method[];
+} {
+  let name = "";
+  for (let i = 0; i < annoNode.childCount; i++) {
+    const c = annoNode.child(i)!;
+    if (c.type === "identifier" || c.type === "scoped_identifier") {
+      name = c.text;
+      break;
+    }
+  }
+
+  const paths: string[] = [];
+  const methods: Method[] = [];
+
+  const argList = annoNode.children.find((c) => c.type === "annotation_argument_list");
+  if (argList) {
+    for (let i = 0; i < argList.childCount; i++) {
+      const child = argList.child(i)!;
+      if (child.type === "string_literal") {
+        const p = getJavaStringLiteral(child);
+        if (p !== null) paths.push(p);
+      } else if (child.type === "element_value_array_initializer") {
+        paths.push(...extractJavaPathsFromNode(child));
+      } else if (child.type === "element_value_pair") {
+        const keyNode = child.child(0);
+        const valNode = child.child(2);
+        if (keyNode && valNode) {
+          const key = keyNode.text;
+          if (key === "value" || key === "path") {
+            paths.push(...extractJavaPathsFromNode(valNode));
+          } else if (key === "method") {
+            const mText = valNode.text;
+            const matches = mText.match(/(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)/gi);
+            if (matches) {
+              for (const m of matches) {
+                methods.push(m.toUpperCase() as Method);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { name, paths, methods };
+}
+
 export function extractJavaRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
 
-  walkTree(tree.rootNode, (node) => {
+  function walk(node: Parser.SyntaxNode) {
     if (node.type === "class_declaration") {
-      let classPrefix = "";
-      const classText = node.text;
-      const reqMapMatch = classText.match(/@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?["']([^"']+)["']/i);
-      if (reqMapMatch) classPrefix = reqMapMatch[1];
+      let classPrefixes: string[] = [""];
+      let framework: OmniFramework = "spring";
 
-      walkTree(node, (child) => {
-        if (child.type === "method_declaration") {
-          const mText = child.text;
-          const springMatch = mText.match(/@(Get|Post|Put|Delete|Patch)Mapping\s*(?:\(\s*(?:(?:value|path)\s*=\s*)?["']([^"']*)["']\s*\))?/i);
-          if (springMatch) {
-            const method = springMatch[1].toUpperCase() as Method;
-            const subPath = springMatch[2] || "";
-            const fullPath = "/" + [classPrefix, subPath].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
-
-            routes.push({
-              id: stableId(filePath, method, fullPath),
-              framework: "spring",
-              method,
-              path: fullPath,
-              file: filePath,
-              confidence: "high",
-              source: "tree_sitter",
-            });
+      const modifiers = node.children.find((c) => c.type === "modifiers");
+      if (modifiers) {
+        for (let i = 0; i < modifiers.childCount; i++) {
+          const m = modifiers.child(i)!;
+          if (m.type === "annotation" || m.type === "marker_annotation") {
+            const anno = extractJavaAnnotationData(m);
+            if (anno.name === "RequestMapping" || anno.name === "Path") {
+              if (anno.paths.length > 0) {
+                classPrefixes = anno.paths;
+              }
+            }
           }
         }
-      });
-    }
-  });
+      }
 
+      const body = node.children.find((c) => c.type === "class_body");
+      if (body) {
+        for (let i = 0; i < body.childCount; i++) {
+          const member = body.child(i)!;
+          if (member.type === "method_declaration") {
+            const mModifiers = member.children.find((c) => c.type === "modifiers");
+            if (!mModifiers) continue;
+
+            const springMappingMap: Record<string, Method> = {
+              GetMapping: "GET",
+              PostMapping: "POST",
+              PutMapping: "PUT",
+              DeleteMapping: "DELETE",
+              PatchMapping: "PATCH",
+            };
+
+            const jaxRsMethods = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]);
+
+            let detectedMethods: Method[] = [];
+            let methodSubPaths: string[] = [];
+            let isRouteMethod = false;
+
+            for (let j = 0; j < mModifiers.childCount; j++) {
+              const annoNode = mModifiers.child(j)!;
+              if (annoNode.type !== "annotation" && annoNode.type !== "marker_annotation") continue;
+
+              const anno = extractJavaAnnotationData(annoNode);
+
+              if (springMappingMap[anno.name]) {
+                isRouteMethod = true;
+                detectedMethods.push(springMappingMap[anno.name]);
+                if (anno.paths.length > 0) {
+                  methodSubPaths.push(...anno.paths);
+                }
+              } else if (anno.name === "RequestMapping") {
+                isRouteMethod = true;
+                const mList = anno.methods.length > 0 ? anno.methods : (["GET"] as Method[]);
+                detectedMethods.push(...mList);
+                if (anno.paths.length > 0) {
+                  methodSubPaths.push(...anno.paths);
+                }
+              } else if (jaxRsMethods.has(anno.name.toUpperCase())) {
+                isRouteMethod = true;
+                detectedMethods.push(anno.name.toUpperCase() as Method);
+              } else if (anno.name === "Path") {
+                if (anno.paths.length > 0) {
+                  methodSubPaths.push(...anno.paths);
+                }
+              }
+            }
+
+            if (isRouteMethod && detectedMethods.length > 0) {
+              const finalSubPaths = methodSubPaths.length > 0 ? methodSubPaths : [""];
+              for (const m of detectedMethods) {
+                for (const cp of classPrefixes) {
+                  for (const sp of finalSubPaths) {
+                    let full = "/" + [cp, sp].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
+                    if (!full.startsWith("/")) full = "/" + full;
+
+                    routes.push({
+                      id: stableId(filePath, m, full),
+                      framework,
+                      method: m,
+                      path: full,
+                      file: filePath,
+                      confidence: "high",
+                      source: "tree_sitter",
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < node.childCount; i++) {
+      walk(node.child(i)!);
+    }
+  }
+
+  walk(tree.rootNode);
   return routes;
 }
 
