@@ -58,3 +58,7 @@ release-packager/
 dist/
 out/
 *.exe
+
+# Local AI models
+models/
+*.gguf

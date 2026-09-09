@@ -19,7 +19,9 @@
     "scan:backend": "tsx scripts/scan-backend.ts",
     "benchmark:express": "tsx scripts/benchmark-scanner.ts",
     "smoke:ai": "tsx scripts/smoke-ai.ts",
-    "smoke:commitmsg": "tsx scripts/smoke-commitmsg.ts"
+    "smoke:commitmsg": "tsx scripts/smoke-commitmsg.ts",
+    "test:ai-prototype": "node scripts/prototype-ai-scanner.mjs",
+    "download:model": "node scripts/download-model.mjs"
   },
   "dependencies": {
     "@babel/parser": "^7.26.10",
