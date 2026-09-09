@@ -1,0 +1,58 @@
+{
+  "framework": "Next.js",
+  "timestamp": "2026-09-09T18:36:44.068Z",
+  "totalRoutes": 845,
+  "batches": {
+    "batch1": [
+      {
+        "repo": "Formbricks (apps/web)",
+        "routes": 174,
+        "timeMs": 2407
+      },
+      {
+        "repo": "Taxonomy",
+        "routes": 9,
+        "timeMs": 1350
+      },
+      {
+        "repo": "Quill",
+        "routes": 7,
+        "timeMs": 69
+      }
+    ],
+    "batch2": [
+      {
+        "repo": "Cal.com (apps/web)",
+        "routes": 83,
+        "timeMs": 186
+      },
+      {
+        "repo": "Dub.co (apps/web)",
+        "routes": 192,
+        "timeMs": 348
+      }
+    ],
+    "batch3": [
+      {
+        "repo": "Papermark (App + Pages)",
+        "routes": 324,
+        "timeMs": 723
+      },
+      {
+        "repo": "NextChat (app/api)",
+        "routes": 14,
+        "timeMs": 55
+      },
+      {
+        "repo": "Typebot Builder (app/api)",
+        "routes": 22,
+        "timeMs": 15
+      },
+      {
+        "repo": "LobeChat (src/app/(backend)/api)",
+        "routes": 20,
+        "timeMs": 19
+      }
+    ]
+  }
+}

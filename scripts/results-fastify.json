@@ -1,0 +1,53 @@
+{
+  "framework": "Fastify",
+  "timestamp": "2026-09-09T18:38:59.254Z",
+  "totalRoutes": 122,
+  "batches": {
+    "batch1": [
+      {
+        "repo": "FreeCodeCamp API",
+        "routes": 51,
+        "timeMs": 187
+      },
+      {
+        "repo": "Fastify RealWorld",
+        "routes": 20,
+        "timeMs": 1436
+      }
+    ],
+    "batch2": [
+      {
+        "repo": "Fastify Core Examples & Tests",
+        "routes": 20,
+        "timeMs": 3895
+      },
+      {
+        "repo": "Delvedor Example",
+        "routes": 9,
+        "timeMs": 347
+      },
+      {
+        "repo": "Mattaharish Boilerplate",
+        "routes": 2,
+        "timeMs": 601
+      }
+    ],
+    "batch3": [
+      {
+        "repo": "Matschik TS Starter",
+        "routes": 2,
+        "timeMs": 6
+      },
+      {
+        "repo": "Jellydn Starter",
+        "routes": 4,
+        "timeMs": 23
+      },
+      {
+        "repo": "Fastify Demo",
+        "routes": 14,
+        "timeMs": 72
+      }
+    ]
+  }
+}

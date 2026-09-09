@@ -1,0 +1,318 @@
+{
+  "title": "OmniRoute Multi-Framework Node.js Master Benchmark Certification",
+  "evaluatedAt": "2026-09-09T18:41:03.833Z",
+  "grandTotalRoutes": 3640,
+  "frameworks": {
+    "express": {
+      "framework": "Express",
+      "totalReal": 1112,
+      "totalFound": 1112,
+      "recall": "100.0%",
+      "precision": "100.0%",
+      "results": [
+        {
+          "Target": "sahat/hackathon-starter (Monolithic Express)",
+          "Batch": 1,
+          "Framework": "Express",
+          "Real Routes": 104,
+          "Found Routes": 104,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "869 ms"
+        },
+        {
+          "Target": "TryGhost/Ghost (Enterprise CMS API)",
+          "Batch": 1,
+          "Framework": "Express",
+          "Real Routes": 285,
+          "Found Routes": 285,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "894 ms"
+        },
+        {
+          "Target": "medusajs/medusa (Headless Commerce Platform)",
+          "Batch": 2,
+          "Framework": "Express",
+          "Real Routes": 329,
+          "Found Routes": 329,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "2260 ms"
+        },
+        {
+          "Target": "parse-community/parse-server (BaaS Backend)",
+          "Batch": 2,
+          "Framework": "Express",
+          "Real Routes": 86,
+          "Found Routes": 86,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "448 ms"
+        },
+        {
+          "Target": "HabitRPG/habitica (Gamified Task Backend)",
+          "Batch": 3,
+          "Framework": "Express",
+          "Real Routes": 259,
+          "Found Routes": 259,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "340 ms"
+        },
+        {
+          "Target": "danielfsousa/express-rest-es2017-boilerplate",
+          "Batch": 3,
+          "Framework": "Express",
+          "Real Routes": 15,
+          "Found Routes": 15,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "190 ms"
+        },
+        {
+          "Target": "gothinkster/node-express-realworld",
+          "Batch": 3,
+          "Framework": "Express",
+          "Real Routes": 20,
+          "Found Routes": 20,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "79 ms"
+        },
+        {
+          "Target": "hagopj13/node-express-boilerplate",
+          "Batch": 3,
+          "Framework": "Express",
+          "Real Routes": 14,
+          "Found Routes": 14,
+          "Recall %": "100.0%",
+          "Precision %": "100.0%",
+          "Latency": "413 ms"
+        }
+      ]
+    },
+    "nestjs": {
+      "framework": "NestJS",
+      "timestamp": "2026-09-09T18:33:48.648Z",
+      "totalRoutes": 1412,
+      "batches": {
+        "batch1": [
+          {
+            "repo": "NocoDB",
+            "routes": 484,
+            "timeMs": 398
+          },
+          {
+            "repo": "NestJS Starter + Samples",
+            "routes": 52,
+            "timeMs": 1484
+          },
+          {
+            "repo": "NestJS Enterprise Starter",
+            "routes": 13,
+            "timeMs": 531
+          }
+        ],
+        "batch2": [
+          {
+            "repo": "ToolJet (server/src)",
+            "routes": 401,
+            "timeMs": 5054
+          },
+          {
+            "repo": "Hoppscotch Backend",
+            "routes": 39,
+            "timeMs": 851
+          }
+        ],
+        "batch3": [
+          {
+            "repo": "Immich Server",
+            "routes": 305,
+            "timeMs": 2642
+          },
+          {
+            "repo": "Nest Admin",
+            "routes": 94,
+            "timeMs": 614
+          },
+          {
+            "repo": "Brocoders Boilerplate",
+            "routes": 24,
+            "timeMs": 412
+          }
+        ]
+      }
+    },
+    "nextjs": {
+      "framework": "Next.js",
+      "timestamp": "2026-09-09T18:36:44.068Z",
+      "totalRoutes": 845,
+      "batches": {
+        "batch1": [
+          {
+            "repo": "Formbricks (apps/web)",
+            "routes": 174,
+            "timeMs": 2407
+          },
+          {
+            "repo": "Taxonomy",
+            "routes": 9,
+            "timeMs": 1350
+          },
+          {
+            "repo": "Quill",
+            "routes": 7,
+            "timeMs": 69
+          }
+        ],
+        "batch2": [
+          {
+            "repo": "Cal.com (apps/web)",
+            "routes": 83,
+            "timeMs": 186
+          },
+          {
+            "repo": "Dub.co (apps/web)",
+            "routes": 192,
+            "timeMs": 348
+          }
+        ],
+        "batch3": [
+          {
+            "repo": "Papermark (App + Pages)",
+            "routes": 324,
+            "timeMs": 723
+          },
+          {
+            "repo": "NextChat (app/api)",
+            "routes": 14,
+            "timeMs": 55
+          },
+          {
+            "repo": "Typebot Builder (app/api)",
+            "routes": 22,
+            "timeMs": 15
+          },
+          {
+            "repo": "LobeChat (src/app/(backend)/api)",
+            "routes": 20,
+            "timeMs": 19
+          }
+        ]
+      }
+    },
+    "fastify": {
+      "framework": "Fastify",
+      "timestamp": "2026-09-09T18:38:59.254Z",
+      "totalRoutes": 122,
+      "batches": {
+        "batch1": [
+          {
+            "repo": "FreeCodeCamp API",
+            "routes": 51,
+            "timeMs": 187
+          },
+          {
+            "repo": "Fastify RealWorld",
+            "routes": 20,
+            "timeMs": 1436
+          }
+        ],
+        "batch2": [
+          {
+            "repo": "Fastify Core Examples & Tests",
+            "routes": 20,
+            "timeMs": 3895
+          },
+          {
+            "repo": "Delvedor Example",
+            "routes": 9,
+            "timeMs": 347
+          },
+          {
+            "repo": "Mattaharish Boilerplate",
+            "routes": 2,
+            "timeMs": 601
+          }
+        ],
+        "batch3": [
+          {
+            "repo": "Matschik TS Starter",
+            "routes": 2,
+            "timeMs": 6
+          },
+          {
+            "repo": "Jellydn Starter",
+            "routes": 4,
+            "timeMs": 23
+          },
+          {
+            "repo": "Fastify Demo",
+            "routes": 14,
+            "timeMs": 72
+          }
+        ]
+      }
+    },
+    "hono": {
+      "framework": "Hono",
+      "timestamp": "2026-09-09T18:40:38.078Z",
+      "totalRoutes": 149,
+      "batches": {
+        "batch1": [
+          {
+            "repo": "Hono Official Examples",
+            "routes": 42,
+            "timeMs": 2951
+          }
+        ],
+        "batch2": [
+          {
+            "repo": "Hono Core Engine",
+            "routes": 51,
+            "timeMs": 1160
+          },
+          {
+            "repo": "Hono Official Middleware",
+            "routes": 19,
+            "timeMs": 588
+          },
+          {
+            "repo": "Hono Node Server",
+            "routes": 3,
+            "timeMs": 108
+          }
+        ],
+        "batch3": [
+          {
+            "repo": "Rhinobase HonoHub",
+            "routes": 9,
+            "timeMs": 257
+          },
+          {
+            "repo": "Next Hono Lucia",
+            "routes": 7,
+            "timeMs": 72
+          },
+          {
+            "repo": "Goktugcy Hono Boilerplate",
+            "routes": 7,
+            "timeMs": 13
+          },
+          {
+            "repo": "Hono Starter Code",
+            "routes": 3,
+            "timeMs": 99
+          },
+          {
+            "repo": "HonoX Fullstack",
+            "routes": 8,
+            "timeMs": 181
+          }
+        ]
+      }
+    }
+  }
+}

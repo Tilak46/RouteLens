@@ -507,46 +507,103 @@ export function extractTsJsRoutes(
 
   walkTree(tree.rootNode, (node) => {
     // A. NestJS Decorator Pattern: @Controller() on class + @Get() on methods
+    // A. NestJS Decorators
     if (
       node.type === "class_declaration" ||
       (node.type === "export_statement" && node.text.includes("class "))
     ) {
-      let classPrefix = "";
-      for (let i = 0; i < node.childCount; i++) {
-        const c = node.child(i)!;
+      let classPrefixes: string[] = [""];
+      const checkDecorator = (c: Parser.SyntaxNode) => {
         if (c.type === "decorator") {
-          const m = c.text.match(/@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)/i);
-          if (m) {
-            classPrefix = m[1] || "";
+          const decText = c.text;
+          if (/@Controller\b/i.test(decText)) {
+            const prefixes: string[] = [];
+            const inner = decText.replace(/^@Controller\s*\(/i, "").replace(/\)$/, "").trim();
+            if (inner) {
+              if (inner.includes("path:")) {
+                const pathPart = inner.match(/path\s*:\s*(\[[^\]]*\]|['"`][^'"`]*['"`])/);
+                if (pathPart) {
+                  for (const sm of pathPart[1].matchAll(/['"`]([^'"`]*)['"`]/g)) {
+                    prefixes.push(sm[1]);
+                  }
+                }
+              } else {
+                for (const sm of inner.matchAll(/['"`]([^'"`]*)['"`]/g)) {
+                  prefixes.push(sm[1]);
+                }
+              }
+            }
+            if (prefixes.length > 0) {
+              classPrefixes = prefixes;
+            }
           }
         }
+      };
+
+      for (let i = 0; i < node.childCount; i++) {
+        checkDecorator(node.child(i)!);
+      }
+      let sib = node.previousNamedSibling;
+      while (sib && sib.type === "decorator") {
+        checkDecorator(sib);
+        sib = sib.previousNamedSibling;
       }
 
       walkTree(node, (child) => {
         if (child.type === "method_definition") {
+          const methodDecorators: Parser.SyntaxNode[] = [];
+
           let prev = child.previousNamedSibling;
           while (prev && prev.type === "decorator") {
-            const m = prev.text.match(/@(Get|Post|Put|Delete|Patch|Options|Head)\s*(?:\(\s*['"`]([^'"`]*)['"`]\s*\))?/i);
-            if (m) {
-              const method = m[1].toUpperCase() as Method;
-              const subPath = m[2] || "";
-              const fullPath = "/" + [classPrefix, subPath]
-                .filter(Boolean)
-                .join("/")
-                .replace(/\/+/g, "/")
-                .replace(/^\//, "");
-
-              routes.push({
-                id: stableId(filePath, method, fullPath),
-                framework: "nest",
-                method,
-                path: fullPath,
-                file: filePath,
-                confidence: "high",
-                source: "tree_sitter",
-              });
-            }
+            methodDecorators.push(prev);
             prev = prev.previousNamedSibling;
+          }
+
+          for (let i = 0; i < child.childCount; i++) {
+            const ch = child.child(i)!;
+            if (ch.type === "decorator") {
+              methodDecorators.push(ch);
+            }
+          }
+
+          for (const dec of methodDecorators) {
+            const m = dec.text.match(/@(Get|Post|Put|Delete|Patch|Options|Head|All)\s*(?:\(([\s\S]*?)\))?/i);
+            if (m) {
+              const rawVerb = m[1].toUpperCase();
+              const method: Method = rawVerb === "HEAD" || rawVerb === "OPTIONS" ? "GET" : (rawVerb as Method);
+              const argsContent = m[2] ? m[2].trim() : "";
+
+              let subPaths: string[] = [""];
+              if (argsContent) {
+                const subMatches: string[] = [];
+                for (const sm of argsContent.matchAll(/['"`]([^'"`]*)['"`]/g)) {
+                  subMatches.push(sm[1]);
+                }
+                if (subMatches.length > 0) {
+                  subPaths = subMatches;
+                }
+              }
+
+              for (const classPrefix of classPrefixes) {
+                for (const subPath of subPaths) {
+                  const fullPath = "/" + [classPrefix, subPath]
+                    .filter(Boolean)
+                    .join("/")
+                    .replace(/\/+/g, "/")
+                    .replace(/^\//, "");
+
+                  routes.push({
+                    id: stableId(filePath, method, fullPath),
+                    framework: "nest",
+                    method,
+                    path: fullPath || "/",
+                    file: filePath,
+                    confidence: "high",
+                    source: "tree_sitter",
+                  });
+                }
+              }
+            }
           }
         }
       });
@@ -636,8 +693,35 @@ export function extractTsJsRoutes(
               }
             }
           } else if (propName === "route") {
-            // Fastify server.route({ method: 'GET', path: ... })
             const argsNode = node.childForFieldName("arguments");
+            if (argsNode && argsNode.namedChildCount >= 2) {
+              // Parse-Server / OOP Express pattern: this.route('GET', '/users', ...)
+              const arg0 = argsNode.namedChild(0)!;
+              const arg1 = argsNode.namedChild(1)!;
+              if (arg0.type === "string" && (arg1.type === "string" || arg1.type === "template_string")) {
+                const mStr = arg0.text.replace(/['"`]/g, "").toUpperCase();
+                const pStr = arg1.text.replace(/^['"`]|['"`]$/g, "");
+                if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(mStr) && pStr.startsWith("/")) {
+                  const prefixes = mountLinker
+                    ? mountLinker.getPrefixesForRouter(filePath, objNode.text)
+                    : new Set(["/"]);
+                  for (const pfx of prefixes) {
+                    const fullPath = joinUrl(pfx, pStr);
+                    routes.push({
+                      id: stableId(filePath, mStr as Method, fullPath),
+                      framework: jsFramework,
+                      method: mStr as Method,
+                      path: fullPath,
+                      file: filePath,
+                      confidence: "high",
+                      source: "tree_sitter",
+                    });
+                  }
+                }
+              }
+            }
+
+            // Fastify server.route({ method: 'GET', path: ... })
             if (argsNode && argsNode.childCount > 0) {
               for (let a = 0; a < argsNode.childCount; a++) {
                 const arg = argsNode.child(a)!;
@@ -712,9 +796,9 @@ export function extractTsJsRoutes(
           } else if (propName === "on") {
             // Hono app.on('GET', '/path', handler)
             const argsNode = node.childForFieldName("arguments");
-            if (argsNode && argsNode.childCount >= 2) {
-              const mArg = argsNode.child(0);
-              const pArg = argsNode.child(1);
+            if (argsNode && argsNode.namedChildCount >= 2) {
+              const mArg = argsNode.namedChild(0);
+              const pArg = argsNode.namedChild(1);
               let methods: Method[] = [];
               if (mArg) {
                 if (mArg.type === "string") {
@@ -760,6 +844,49 @@ export function extractTsJsRoutes(
               }
             }
           }
+        }
+      }
+    }
+
+    // C. Route definition objects: api.foo = { method: 'POST', url: '/path' }
+    if (node.type === "object") {
+      let mStr: Method | null = null;
+      let pStr: string | null = null;
+      for (let i = 0; i < node.childCount; i++) {
+        const c = node.child(i)!;
+        if (c.type === "pair") {
+          const k = c.childForFieldName("key");
+          const v = c.childForFieldName("value");
+          if (k && v) {
+            const keyText = k.text.replace(/['"`]/g, "").toLowerCase();
+            if (keyText === "method" && v.type === "string") {
+              const val = v.text.replace(/['"`]/g, "").toUpperCase();
+              if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(val)) {
+                mStr = val as Method;
+              }
+            } else if ((keyText === "url" || keyText === "path") && (v.type === "string" || v.type === "template_string")) {
+              const val = v.text.replace(/^['"`]|['"`]$/g, "");
+              if (val.startsWith("/")) {
+                pStr = val;
+              }
+            }
+          }
+        }
+      }
+      if (mStr && pStr) {
+        // Prevent duplicate if parent is server.route({ ... }) which was already handled
+        const parent = node.parent;
+        const isAlreadyHandledByCall = parent && parent.type === "arguments" && parent.parent?.type === "call_expression";
+        if (!isAlreadyHandledByCall) {
+          routes.push({
+            id: stableId(filePath, mStr, pStr),
+            framework: "express",
+            method: mStr,
+            path: pStr,
+            file: filePath,
+            confidence: "high",
+            source: "tree_sitter",
+          });
         }
       }
     }

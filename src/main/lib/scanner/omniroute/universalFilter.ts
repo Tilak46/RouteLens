@@ -40,7 +40,6 @@ export const UNIVERSAL_IGNORED_DIRECTORIES = new Set([
   // C# / .NET
   "bin",
   "obj",
-  "packages",
   ".vs",
   // Rust / Cargo
   "target",
@@ -101,14 +100,23 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
   const fileName = path.basename(rel);
 
-  // Invariant: Next.js API routes (App Router route.ts/js or Pages Router pages/api) are ALWAYS backend APIs
+  // Invariant: Backend routes, APIs, controllers, and endpoints are ALWAYS backend code
   if (
     rel.includes("app/api/") ||
     rel.includes("pages/api/") ||
+    rel.includes("/api/") ||
+    rel.includes("/routes/") ||
+    rel.includes("/endpoints/") ||
+    rel.includes("/controllers/") ||
+    rel.includes("server/web/api") ||
     fileName === "route.ts" ||
     fileName === "route.js" ||
     fileName === "route.tsx" ||
-    fileName === "route.jsx"
+    fileName === "route.jsx" ||
+    fileName === "routes.ts" ||
+    fileName === "routes.js" ||
+    fileName.includes("controller.") ||
+    fileName.includes("router.")
   ) {
     return false;
   }

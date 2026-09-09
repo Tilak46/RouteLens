@@ -1,0 +1,53 @@
+{
+  "framework": "NestJS",
+  "timestamp": "2026-09-09T18:33:48.648Z",
+  "totalRoutes": 1412,
+  "batches": {
+    "batch1": [
+      {
+        "repo": "NocoDB",
+        "routes": 484,
+        "timeMs": 398
+      },
+      {
+        "repo": "NestJS Starter + Samples",
+        "routes": 52,
+        "timeMs": 1484
+      },
+      {
+        "repo": "NestJS Enterprise Starter",
+        "routes": 13,
+        "timeMs": 531
+      }
+    ],
+    "batch2": [
+      {
+        "repo": "ToolJet (server/src)",
+        "routes": 401,
+        "timeMs": 5054
+      },
+      {
+        "repo": "Hoppscotch Backend",
+        "routes": 39,
+        "timeMs": 851
+      }
+    ],
+    "batch3": [
+      {
+        "repo": "Immich Server",
+        "routes": 305,
+        "timeMs": 2642
+      },
+      {
+        "repo": "Nest Admin",
+        "routes": 94,
+        "timeMs": 614
+      },
+      {
+        "repo": "Brocoders Boilerplate",
+        "routes": 24,
+        "timeMs": 412
+      }
+    ]
+  }
+}

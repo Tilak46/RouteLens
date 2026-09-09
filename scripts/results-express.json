@@ -1,0 +1,89 @@
+{
+  "framework": "Express",
+  "totalReal": 1112,
+  "totalFound": 1112,
+  "recall": "100.0%",
+  "precision": "100.0%",
+  "results": [
+    {
+      "Target": "sahat/hackathon-starter (Monolithic Express)",
+      "Batch": 1,
+      "Framework": "Express",
+      "Real Routes": 104,
+      "Found Routes": 104,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "869 ms"
+    },
+    {
+      "Target": "TryGhost/Ghost (Enterprise CMS API)",
+      "Batch": 1,
+      "Framework": "Express",
+      "Real Routes": 285,
+      "Found Routes": 285,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "894 ms"
+    },
+    {
+      "Target": "medusajs/medusa (Headless Commerce Platform)",
+      "Batch": 2,
+      "Framework": "Express",
+      "Real Routes": 329,
+      "Found Routes": 329,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "2260 ms"
+    },
+    {
+      "Target": "parse-community/parse-server (BaaS Backend)",
+      "Batch": 2,
+      "Framework": "Express",
+      "Real Routes": 86,
+      "Found Routes": 86,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "448 ms"
+    },
+    {
+      "Target": "HabitRPG/habitica (Gamified Task Backend)",
+      "Batch": 3,
+      "Framework": "Express",
+      "Real Routes": 259,
+      "Found Routes": 259,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "340 ms"
+    },
+    {
+      "Target": "danielfsousa/express-rest-es2017-boilerplate",
+      "Batch": 3,
+      "Framework": "Express",
+      "Real Routes": 15,
+      "Found Routes": 15,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "190 ms"
+    },
+    {
+      "Target": "gothinkster/node-express-realworld",
+      "Batch": 3,
+      "Framework": "Express",
+      "Real Routes": 20,
+      "Found Routes": 20,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "79 ms"
+    },
+    {
+      "Target": "hagopj13/node-express-boilerplate",
+      "Batch": 3,
+      "Framework": "Express",
+      "Real Routes": 14,
+      "Found Routes": 14,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "413 ms"
+    }
+  ]
+}

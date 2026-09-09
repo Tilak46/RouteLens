@@ -1,0 +1,58 @@
+{
+  "framework": "Hono",
+  "timestamp": "2026-09-09T18:40:38.078Z",
+  "totalRoutes": 149,
+  "batches": {
+    "batch1": [
+      {
+        "repo": "Hono Official Examples",
+        "routes": 42,
+        "timeMs": 2951
+      }
+    ],
+    "batch2": [
+      {
+        "repo": "Hono Core Engine",
+        "routes": 51,
+        "timeMs": 1160
+      },
+      {
+        "repo": "Hono Official Middleware",
+        "routes": 19,
+        "timeMs": 588
+      },
+      {
+        "repo": "Hono Node Server",
+        "routes": 3,
+        "timeMs": 108
+      }
+    ],
+    "batch3": [
+      {
+        "repo": "Rhinobase HonoHub",
+        "routes": 9,
+        "timeMs": 257
+      },
+      {
+        "repo": "Next Hono Lucia",
+        "routes": 7,
+        "timeMs": 72
+      },
+      {
+        "repo": "Goktugcy Hono Boilerplate",
+        "routes": 7,
+        "timeMs": 13
+      },
+      {
+        "repo": "Hono Starter Code",
+        "routes": 3,
+        "timeMs": 99
+      },
+      {
+        "repo": "HonoX Fullstack",
+        "routes": 8,
+        "timeMs": 181
+      }
+    ]
+  }
+}
