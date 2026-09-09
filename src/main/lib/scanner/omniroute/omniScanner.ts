@@ -41,6 +41,7 @@ export async function scanOmniRoutes(
   projectPath: string,
   options: OmniScanOptions = {},
 ): Promise<OmniScanResult> {
+  const rootPath = path.resolve(projectPath);
   const startTime = performance.now();
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
@@ -50,10 +51,10 @@ export async function scanOmniRoutes(
   const maxAiRescues = options.maxAiRescues || 10;
   const includeTests = options.includeTests === true;
 
-  log(`[OmniRoute] Initiating universal scan (mode: ${mode}) on: ${projectPath}`);
+  log(`[OmniRoute] Initiating universal scan (mode: ${mode}) on: ${rootPath}`);
 
   // Step 1: Collect and read all candidate code files
-  const filePaths = await collectAllFiles(projectPath, projectPath);
+  const filePaths = await collectAllFiles(rootPath, rootPath);
   log(`[OmniRoute] Found ${filePaths.length} supported source files.`);
 
   const fileCodeMap = new Map<string, string>();

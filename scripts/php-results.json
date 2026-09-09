@@ -1,0 +1,72 @@
+[
+  {
+    "Target": "f1amy/laravel-realworld-example-app",
+    "Batch": "Batch 1",
+    "Level": "Level 2 (Laravel Conduit API Spec)",
+    "Framework": "Laravel",
+    "Files Scanned": 132,
+    "Candidate Files": 107,
+    "Real Routes": 19,
+    "Routes Found": "19/19",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "220ms",
+    "Status": "PASSED (100%)"
+  },
+  {
+    "Target": "symfony/demo",
+    "Batch": "Batch 1",
+    "Level": "Level 2/3 (Canonical Symfony Showcase)",
+    "Framework": "Symfony",
+    "Files Scanned": 59,
+    "Candidate Files": 37,
+    "Real Routes": 18,
+    "Routes Found": "18/18",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "532ms",
+    "Status": "PASSED (100%)"
+  },
+  {
+    "Target": "laravel/breeze (stubs/api)",
+    "Batch": "Batch 2",
+    "Level": "Level 2 (Official Laravel Auth API Starter)",
+    "Framework": "Laravel",
+    "Files Scanned": 25,
+    "Candidate Files": 15,
+    "Real Routes": 9,
+    "Routes Found": "9/9",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "27ms",
+    "Status": "PASSED (100%)"
+  },
+  {
+    "Target": "laravel/sanctum (src)",
+    "Batch": "Batch 2",
+    "Level": "Level 1 (Core SPA Auth Library)",
+    "Framework": "Laravel",
+    "Files Scanned": 20,
+    "Candidate Files": 20,
+    "Real Routes": 1,
+    "Routes Found": "1/1",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "27ms",
+    "Status": "PASSED (100%)"
+  },
+  {
+    "Target": "laravel/telescope",
+    "Batch": "Batch 2",
+    "Level": "Level 2/3 (Volume & Enterprise Monitoring)",
+    "Framework": "Laravel",
+    "Files Scanned": 133,
+    "Candidate Files": 96,
+    "Real Routes": 44,
+    "Routes Found": "44/44",
+    "Recall %": "100.0%",
+    "Precision %": "100.0%",
+    "Latency (ms)": "200ms",
+    "Status": "PASSED (100%)"
+  }
+]

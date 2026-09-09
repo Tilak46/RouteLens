@@ -1092,35 +1092,206 @@ export function extractJavaRoutes(tree: Parser.Tree, filePath: string): OmniRout
 // -------------------------------------------------------------
 // 6. PHP (Laravel / Symfony)
 // -------------------------------------------------------------
+function getPhpStringLiteral(node: Parser.SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.type === "string" || node.type === "encapsed_string") {
+    const content = node.children.find((c) => c.type === "string_content");
+    if (content) return content.text;
+    const raw = node.text;
+    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+      return raw.slice(1, -1);
+    }
+    return raw;
+  }
+  return null;
+}
+
+const LARAVEL_HTTP_METHODS = new Set(["get", "post", "put", "delete", "patch", "options", "head"]);
+
+function parseSymfonyRouteAttr(attrNode: Parser.SyntaxNode): { path: string; methods: Method[] } | null {
+  const nameNode = attrNode.child(0);
+  if (!nameNode || nameNode.text !== "Route") return null;
+
+  const argsNode = attrNode.children.find((c) => c.type === "arguments");
+  if (!argsNode) return null;
+
+  const args = argsNode.children.filter((c) => c.type === "argument");
+  if (args.length === 0) return null;
+
+  const firstArgVal = args[0].child(0);
+  const pathVal = getPhpStringLiteral(firstArgVal);
+  if (pathVal === null) return null;
+
+  let methods: Method[] = ["GET"];
+  const methodArg = args.find((a) => a.text.startsWith("methods:"));
+  if (methodArg) {
+    const matches = methodArg.text.match(/(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)/gi);
+    if (matches) methods = matches.map((m) => m.toUpperCase() as Method);
+  }
+
+  return { path: pathVal, methods };
+}
+
 export function extractPhpRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
   const isApiRoute = filePath.replace(/\\/g, "/").toLowerCase().includes("routes/api.php");
 
-  walkTree(tree.rootNode, (node) => {
-    if (node.type.includes("call_expression")) {
-      const text = node.text;
-      const m = text.match(/Route::(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/i);
-      if (m) {
-        const method = m[1].toUpperCase() as Method;
-        let routePath = m[2];
-        if (!routePath.startsWith("/")) routePath = "/" + routePath;
-        if (isApiRoute && !routePath.startsWith("/api")) {
-          routePath = "/api" + routePath;
-        }
+  function walk(node: Parser.SyntaxNode) {
+    // 1. Scoped calls: Route::get(...) or $router->get(...)
+    if (node.type === "scoped_call_expression" || node.type === "member_call_expression") {
+      let fnName: string | null = null;
+      let argsNode: Parser.SyntaxNode | null = null;
+      let isRouteCaller = false;
 
-        routes.push({
-          id: stableId(filePath, method, routePath),
-          framework: "laravel",
-          method,
-          path: routePath,
-          file: filePath,
-          confidence: "high",
-          source: "tree_sitter",
-        });
+      if (node.type === "scoped_call_expression") {
+        const scopeNode = node.child(0);
+        const nameNode = node.child(2);
+        argsNode = node.children.find((c) => c.type === "arguments") || null;
+        if (scopeNode && scopeNode.text === "Route" && nameNode) {
+          isRouteCaller = true;
+          fnName = nameNode.text.toLowerCase();
+        }
+      } else if (node.type === "member_call_expression") {
+        const obj = node.child(0);
+        const nameNode = node.child(2);
+        argsNode = node.children.find((c) => c.type === "arguments") || null;
+        if (obj && (obj.text.includes("Route") || obj.text === "$router") && nameNode) {
+          isRouteCaller = true;
+          fnName = nameNode.text.toLowerCase();
+        }
+      }
+
+      if (isRouteCaller && fnName && argsNode) {
+        const args = argsNode.children.filter((c) => c.type === "argument");
+        if (args.length >= 1) {
+          const firstArg = args[0].child(0);
+          const pathVal = getPhpStringLiteral(firstArg);
+
+          if (LARAVEL_HTTP_METHODS.has(fnName) && pathVal !== null) {
+            let fullPath = pathVal.startsWith("/") ? pathVal : "/" + pathVal;
+            if (isApiRoute && !fullPath.startsWith("/api")) {
+              fullPath = "/api" + fullPath;
+            }
+            routes.push({
+              id: stableId(filePath, fnName.toUpperCase(), fullPath),
+              framework: "laravel",
+              method: fnName.toUpperCase() as Method,
+              path: fullPath,
+              file: filePath,
+              confidence: "high",
+              source: "tree_sitter",
+            });
+          } else if ((fnName === "apiresource" || fnName === "resource") && pathVal !== null) {
+            let base = pathVal.startsWith("/") ? pathVal : "/" + pathVal;
+            if (isApiRoute && !base.startsWith("/api")) base = "/api" + base;
+            const resMethods: Array<{ method: Method; sub: string }> = [
+              { method: "GET", sub: "" },
+              { method: "POST", sub: "" },
+              { method: "GET", sub: "/{id}" },
+              { method: "PUT", sub: "/{id}" },
+              { method: "DELETE", sub: "/{id}" },
+            ];
+            for (const rm of resMethods) {
+              const fullP = base + rm.sub;
+              routes.push({
+                id: stableId(filePath, rm.method, fullP),
+                framework: "laravel",
+                method: rm.method,
+                path: fullP,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
+            }
+          } else if (fnName === "any" && pathVal !== null) {
+            let fullPath = pathVal.startsWith("/") ? pathVal : "/" + pathVal;
+            if (isApiRoute && !fullPath.startsWith("/api")) fullPath = "/api" + fullPath;
+            for (const m of ["GET", "POST", "PUT", "DELETE"] as Method[]) {
+              routes.push({
+                id: stableId(filePath, m, fullPath),
+                framework: "laravel",
+                method: m,
+                path: fullPath,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
+            }
+          }
+        }
       }
     }
-  });
 
+    // 2. Symfony / PHP 8+ Attributes: #[Route('/path', methods: ['GET'])]
+    if (node.type === "class_declaration") {
+      let classPrefix = "";
+      for (let i = 0; i < node.childCount; i++) {
+        const c = node.child(i)!;
+        if (c.type === "attribute_list") {
+          for (let j = 0; j < c.childCount; j++) {
+            const grp = c.child(j)!;
+            if (grp.type === "attribute_group") {
+              for (let k = 0; k < grp.childCount; k++) {
+                const attr = grp.child(k)!;
+                if (attr.type === "attribute") {
+                  const parsed = parseSymfonyRouteAttr(attr);
+                  if (parsed) classPrefix = parsed.path;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (let i = 0; i < node.childCount; i++) {
+        const member = node.child(i)!;
+        if (member.type === "declaration_list") {
+          for (let j = 0; j < member.childCount; j++) {
+            const mDecl = member.child(j)!;
+            if (mDecl.type === "method_declaration") {
+              for (let k = 0; k < mDecl.childCount; k++) {
+                const mChild = mDecl.child(k)!;
+                if (mChild.type === "attribute_list") {
+                  for (let l = 0; l < mChild.childCount; l++) {
+                    const grp = mChild.child(l)!;
+                    if (grp.type === "attribute_group") {
+                      for (let m = 0; m < grp.childCount; m++) {
+                        const attr = grp.child(m)!;
+                        if (attr.type === "attribute") {
+                          const parsed = parseSymfonyRouteAttr(attr);
+                          if (parsed) {
+                            let full = "/" + [classPrefix, parsed.path].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
+                            if (!full.startsWith("/")) full = "/" + full;
+                            for (const meth of parsed.methods) {
+                              routes.push({
+                                id: stableId(filePath, meth, full),
+                                framework: "symfony",
+                                method: meth,
+                                path: full,
+                                file: filePath,
+                                confidence: "high",
+                                source: "tree_sitter",
+                              });
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < node.childCount; i++) {
+      walk(node.child(i)!);
+    }
+  }
+
+  walk(tree.rootNode);
   return routes;
 }
 

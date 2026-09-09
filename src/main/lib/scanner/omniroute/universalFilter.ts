@@ -140,7 +140,9 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
 }
 
 export function isTestFilePath(filePath: string, rootPath: string): boolean {
-  const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
+  const resolvedRoot = path.resolve(rootPath);
+  const resolvedFile = path.resolve(filePath);
+  const rel = path.relative(resolvedRoot, resolvedFile).replace(/\\/g, "/").toLowerCase();
   const fileName = path.basename(rel);
 
   // 1. Explicit test file name suffixes across languages
@@ -154,6 +156,10 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
     fileName.endsWith("tests.java") ||
     fileName.endsWith("test.cs") ||
     fileName.endsWith("tests.cs") ||
+    fileName.endsWith("test.php") ||
+    fileName.endsWith("tests.php") ||
+    fileName.endsWith("_test.rb") ||
+    fileName.endsWith("_spec.rb") ||
     fileName.startsWith("test_") ||
     fileName.endsWith("_test.py")
   ) {
@@ -164,7 +170,13 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
   const segments = rel.split("/");
   for (let i = 0; i < segments.length - 1; i++) {
     const seg = segments[i];
-    if (seg === "tests" || seg === "test" || seg === "__tests__") {
+    if (
+      seg === "tests" ||
+      seg === "test" ||
+      seg === "__tests__" ||
+      seg === "spec" ||
+      seg === "specs"
+    ) {
       return true;
     }
   }
