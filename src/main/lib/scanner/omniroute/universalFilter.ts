@@ -165,6 +165,9 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
     fileName.endsWith("tests.php") ||
     fileName.endsWith("_test.rb") ||
     fileName.endsWith("_spec.rb") ||
+    fileName.endsWith("_test.rs") ||
+    fileName.endsWith("_tests.rs") ||
+    fileName === "tests.rs" ||
     fileName.startsWith("test_") ||
     fileName.endsWith("_test.py")
   ) {
