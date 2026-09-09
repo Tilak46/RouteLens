@@ -37,7 +37,7 @@ export const IGNORED_DIRECTORY_SEGMENTS = new Set([
 const HTTP_VERB_REGEX = /\b(get|post|put|delete|patch|options|head)\b/i;
 const ROUTING_KEYWORD_REGEX = /\b(route|router|endpoint|controller|api|handler|group|mount|app|register)\b/i;
 const PATH_LITERAL_REGEX = /["'`]\/[a-zA-Z0-9_\-\/:{}]*["'`]/;
-const DECORATOR_ROUTE_REGEX = /@(Get|Post|Put|Delete|Patch|Controller)\b|\[Http(Get|Post|Put|Delete|Patch)|\[Route/i;
+const DECORATOR_ROUTE_REGEX = /@(Get|Post|Put|Delete|Patch|Controller)\b|\[Http(Get|Post|Put|Delete|Patch)|\[Route|\bRoute::/i;
 
 export function getFileLanguage(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
@@ -137,9 +137,13 @@ export function analyzeRouteCandidate(
 
   // Files in route-specific folders are high-probability candidates
   const isNamedRouteLocation =
+    lowerRel.startsWith("routes/") ||
     lowerRel.includes("/routes/") ||
+    lowerRel.startsWith("controllers/") ||
     lowerRel.includes("/controllers/") ||
+    lowerRel.startsWith("endpoints/") ||
     lowerRel.includes("/endpoints/") ||
+    lowerRel.startsWith("api/") ||
     lowerRel.includes("/api/") ||
     lowerRel.endsWith(".route.js") ||
     lowerRel.endsWith(".route.ts") ||
@@ -165,7 +169,7 @@ export function analyzeRouteCandidate(
   if (isNamedRouteLocation) routeScore += 3;
 
   // A file is a route candidate if:
-  // 1. It has explicit route decorators / attributes, OR
+  // 1. It has explicit route decorators / attributes / Route::, OR
   // 2. It has a path string literal AND either an HTTP verb or routing keyword, OR
   // 3. It is located inside an API/route directory and has route keywords
   const hasRouteSignals =

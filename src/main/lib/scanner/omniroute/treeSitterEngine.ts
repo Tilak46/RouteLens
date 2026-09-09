@@ -463,10 +463,10 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
         const c = node.child(i)!;
         if (c.type === "decorator") {
           const text = c.text;
-          const m = text.match(/@(?:app|router|api)\.(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/i);
+          const m = text.match(/@(?:app|router|api)\.(get|post|put|delete|patch)\s*\(\s*(?:['"]([^'"]*)['"])?/i);
           if (m) {
             const method = m[1].toUpperCase() as Method;
-            let routePath = m[2];
+            let routePath = m[2] || "/";
             if (!routePath.startsWith("/")) routePath = "/" + routePath;
 
             routes.push({
@@ -496,10 +496,10 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
   walkTree(tree.rootNode, (node) => {
     if (node.type === "call_expression") {
       const text = node.text;
-      const m = text.match(/\.(GET|POST|PUT|DELETE|PATCH)\s*\(\s*["']([^"']+)["']/i);
+      const m = text.match(/\.(GET|POST|PUT|DELETE|PATCH)\s*\(\s*(?:["']([^"']*)["'])?/i);
       if (m) {
         const method = m[1].toUpperCase() as Method;
-        let routePath = m[2];
+        let routePath = m[2] || "/";
         if (!routePath.startsWith("/")) routePath = "/" + routePath;
 
         routes.push({
@@ -528,13 +528,13 @@ export function extractJavaRoutes(tree: Parser.Tree, filePath: string): OmniRout
     if (node.type === "class_declaration") {
       let classPrefix = "";
       const classText = node.text;
-      const reqMapMatch = classText.match(/@RequestMapping\s*\(\s*(?:value\s*=\s*)?["']([^"']+)["']/i);
+      const reqMapMatch = classText.match(/@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?["']([^"']+)["']/i);
       if (reqMapMatch) classPrefix = reqMapMatch[1];
 
       walkTree(node, (child) => {
         if (child.type === "method_declaration") {
           const mText = child.text;
-          const springMatch = mText.match(/@(Get|Post|Put|Delete|Patch)Mapping\s*(?:\(\s*(?:value\s*=\s*)?["']([^"']*)["']\s*\))?/i);
+          const springMatch = mText.match(/@(Get|Post|Put|Delete|Patch)Mapping\s*(?:\(\s*(?:(?:value|path)\s*=\s*)?["']([^"']*)["']\s*\))?/i);
           if (springMatch) {
             const method = springMatch[1].toUpperCase() as Method;
             const subPath = springMatch[2] || "";
@@ -563,15 +563,19 @@ export function extractJavaRoutes(tree: Parser.Tree, filePath: string): OmniRout
 // -------------------------------------------------------------
 export function extractPhpRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
+  const isApiRoute = filePath.replace(/\\/g, "/").toLowerCase().includes("routes/api.php");
 
   walkTree(tree.rootNode, (node) => {
-    if (node.type === "scoped_call_expression" || node.type === "function_call_expression") {
+    if (node.type.includes("call_expression")) {
       const text = node.text;
       const m = text.match(/Route::(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/i);
       if (m) {
         const method = m[1].toUpperCase() as Method;
         let routePath = m[2];
         if (!routePath.startsWith("/")) routePath = "/" + routePath;
+        if (isApiRoute && !routePath.startsWith("/api")) {
+          routePath = "/api" + routePath;
+        }
 
         routes.push({
           id: stableId(filePath, method, routePath),

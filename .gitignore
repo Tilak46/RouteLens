@@ -62,3 +62,7 @@ out/
 # Local AI models
 models/
 *.gguf
+
+# Temp benchmarks
+.temp-benchmarks/
+
