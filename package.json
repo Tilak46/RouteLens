@@ -22,7 +22,8 @@
     "smoke:commitmsg": "tsx scripts/smoke-commitmsg.ts",
     "test:ai-prototype": "node scripts/prototype-ai-scanner.mjs",
     "test:omniroute": "tsx scripts/test-omniroute-engine.ts",
-    "download:model": "node scripts/download-model.mjs"
+    "download:model": "node scripts/download-model.mjs",
+    "postinstall": "node scripts/patch-web-tree-sitter.js"
   },
   "dependencies": {
     "@babel/parser": "^7.26.10",
