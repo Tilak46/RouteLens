@@ -1,0 +1,77 @@
+{
+  "totalReal": 38,
+  "totalFound": 38,
+  "results": [
+    {
+      "Target": "gothinkster/rails-realworld-example-app",
+      "Batch": 1,
+      "Real Routes": 19,
+      "Found Routes": 19,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "83 ms",
+      "Routes": [
+        "POST /api/users/login (routes.rb)",
+        "POST /api/users (routes.rb)",
+        "GET /api/user (routes.rb)",
+        "PUT /api/user (routes.rb)",
+        "GET /api/profiles/:username (routes.rb)",
+        "POST /api/profiles/:username/follow (routes.rb)",
+        "DELETE /api/profiles/:username/follow (routes.rb)",
+        "GET /api/articles (routes.rb)",
+        "POST /api/articles (routes.rb)",
+        "GET /api/articles/:slug (routes.rb)",
+        "PUT /api/articles/:slug (routes.rb)",
+        "DELETE /api/articles/:slug (routes.rb)",
+        "POST /api/articles/:slug/favorite (routes.rb)",
+        "DELETE /api/articles/:slug/favorite (routes.rb)",
+        "GET /api/articles/:slug/comments (routes.rb)",
+        "POST /api/articles/:slug/comments (routes.rb)",
+        "DELETE /api/articles/:slug/comments/:id (routes.rb)",
+        "GET /api/articles/feed (routes.rb)",
+        "GET /api/tags (routes.rb)"
+      ]
+    },
+    {
+      "Target": "sinatra/examples (chat, simple, stream)",
+      "Batch": 1,
+      "Real Routes": 5,
+      "Found Routes": 5,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "435 ms",
+      "Routes": [
+        "GET / (chat.rb)",
+        "GET /stream (chat.rb)",
+        "POST / (chat.rb)",
+        "GET / (lifecycle_events.rb)",
+        "GET / (simple.rb)"
+      ]
+    },
+    {
+      "Target": "doorkeeper/spec/dummy (OAuth 2 Provider)",
+      "Batch": 2,
+      "Real Routes": 14,
+      "Found Routes": 14,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "33 ms",
+      "Routes": [
+        "GET /semi_protected_resources (routes.rb)",
+        "POST /semi_protected_resources (routes.rb)",
+        "GET /semi_protected_resources/:id (routes.rb)",
+        "PUT /semi_protected_resources/:id (routes.rb)",
+        "DELETE /semi_protected_resources/:id (routes.rb)",
+        "GET /full_protected_resources (routes.rb)",
+        "POST /full_protected_resources (routes.rb)",
+        "GET /full_protected_resources/:id (routes.rb)",
+        "PUT /full_protected_resources/:id (routes.rb)",
+        "DELETE /full_protected_resources/:id (routes.rb)",
+        "GET /metal.json (routes.rb)",
+        "GET /callback (routes.rb)",
+        "GET /sign_in (routes.rb)",
+        "GET / (routes.rb)"
+      ]
+    }
+  ]
+}

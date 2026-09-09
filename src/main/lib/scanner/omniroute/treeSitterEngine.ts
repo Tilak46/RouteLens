@@ -21,11 +21,29 @@ function getWasmDirectory(): string {
   return path.resolve(process.cwd(), "node_modules", "tree-sitter-wasms", "out");
 }
 
+function patchTreeSitterCtype(): void {
+  try {
+    const tsJsPath = require.resolve("web-tree-sitter/tree-sitter.js");
+    if (fs.existsSync(tsJsPath)) {
+      let code = fs.readFileSync(tsJsPath, "utf8");
+      if (!code.includes("iswspace:")) {
+        const target = "var asmLibraryArg={";
+        const replacement = "var asmLibraryArg={iswspace:(c)=>((c===32||(c>=9&&c<=13)||c===0x85||c===0xa0||c===0x1680||(c>=0x2000&&c<=0x200a)||c===0x2028||c===0x2029||c===0x202f||c===0x205f||c===0x3000)?1:0),iswdigit:(c)=>((c>=48&&c<=57)?1:0),iswalpha:(c)=>(((c>=65&&c<=90)||(c>=97&&c<=122))?1:0),iswalnum:(c)=>(((c>=48&&c<=57)||(c>=65&&c<=90)||(c>=97&&c<=122))?1:0),iswupper:(c)=>((c>=65&&c<=90)?1:0),iswlower:(c)=>((c>=97&&c<=122)?1:0),";
+        code = code.replace(target, replacement);
+        fs.writeFileSync(tsJsPath, code, "utf8");
+      }
+    }
+  } catch {
+    // Ignore if not writable
+  }
+}
+
 async function ensureParserInit(): Promise<void> {
   if (isParserInitialized) return;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
+    patchTreeSitterCtype();
     await Parser.init();
     isParserInitialized = true;
   })();
@@ -1648,6 +1666,394 @@ function extractRustRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
 }
 
 // -------------------------------------------------------------
+// 8. Ruby (Ruby on Rails, Sinatra, Grape)
+// -------------------------------------------------------------
+function getRubyStringOrSymbol(node: Parser.SyntaxNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.type === "simple_symbol") {
+    return node.text.startsWith(":") ? node.text.slice(1) : node.text;
+  }
+  if (node.type === "string") {
+    const raw = node.text;
+    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+      return raw.slice(1, -1);
+    }
+    return raw;
+  }
+  if (node.type === "string_content") return node.text;
+  for (let i = 0; i < node.childCount; i++) {
+    const res = getRubyStringOrSymbol(node.child(i)!);
+    if (res) return res;
+  }
+  return null;
+}
+
+const RUBY_HTTP_METHODS = new Set(["get", "post", "put", "delete", "patch", "head", "options"]);
+
+function extractRubyActionsFromNode(node: Parser.SyntaxNode): Set<string> {
+  const actions = new Set<string>();
+  const matches = node.text.match(/[a-zA-Z_]+/g);
+  if (matches) {
+    for (const m of matches) {
+      if (m !== "i" && m !== "w" && m !== "only" && m !== "except") {
+        actions.add(m);
+      }
+    }
+  }
+  return actions;
+}
+
+function extractRubyRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
+  const routes: OmniRoute[] = [];
+
+  interface Context {
+    prefix: string;
+    parentResource?: {
+      name: string;
+      param: string;
+    };
+  }
+
+  function cleanRubyPath(prefix: string, p: string): string {
+    let combined = "/" + [prefix, p].filter(Boolean).join("/").replace(/\/+/g, "/").replace(/^\//, "");
+    if (!combined.startsWith("/")) combined = "/" + combined;
+    if (combined.length > 1 && combined.endsWith("/")) combined = combined.slice(0, -1);
+    return combined;
+  }
+
+  function parseBlock(blockNode: Parser.SyntaxNode, ctx: Context) {
+    for (let i = 0; i < blockNode.childCount; i++) {
+      walkNode(blockNode.child(i)!, ctx);
+    }
+  }
+
+  function walkNode(node: Parser.SyntaxNode, ctx: Context) {
+    if (node.type === "call" || node.type === "command" || node.type === "command_call") {
+      let methodName = "";
+      let argsNode: Parser.SyntaxNode | undefined;
+
+      if (node.child(1)?.text === "." && node.child(2)) {
+        methodName = node.child(2)!.text;
+        argsNode = node.children.find((c) => c.type === "argument_list");
+      } else {
+        methodName = node.child(0)?.text || "";
+        argsNode = node.children.find((c) => c.type === "argument_list");
+      }
+
+      const blockNode = node.children.find((c) => c.type === "do_block" || c.type === "block");
+
+      // A: scope / namespace
+      if (methodName === "scope" || methodName === "namespace") {
+        let seg = "";
+        if (argsNode && argsNode.childCount > 0) {
+          const firstArg = argsNode.children.find((c) => c.type === "simple_symbol" || c.type === "string");
+          if (firstArg) {
+            seg = getRubyStringOrSymbol(firstArg) || "";
+          }
+        }
+        const newPrefix = cleanRubyPath(ctx.prefix, seg);
+        if (blockNode) {
+          parseBlock(blockNode, { ...ctx, prefix: newPrefix });
+        }
+        return;
+      }
+
+      // B: resources (plural)
+      if (methodName === "resources") {
+        let resName = "";
+        let param = ":id";
+        let onlyActions: Set<string> | null = null;
+        let exceptActions: Set<string> | null = null;
+        let pathOverride: string | null = null;
+
+        if (argsNode) {
+          const firstArg = argsNode.children.find((c) => c.type === "simple_symbol" || c.type === "string");
+          if (firstArg) {
+            resName = getRubyStringOrSymbol(firstArg) || "";
+          }
+
+          for (let i = 0; i < argsNode.childCount; i++) {
+            const child = argsNode.child(i)!;
+            if (child.type === "pair") {
+              const k = child.child(0)?.text.replace(/:$/, "");
+              const val = child.child(child.childCount - 1);
+              if (k === "param" && val) {
+                const s = getRubyStringOrSymbol(val);
+                if (s) param = s.startsWith(":") ? s : ":" + s;
+              } else if (k === "path" && val) {
+                const s = getRubyStringOrSymbol(val);
+                if (s) pathOverride = s;
+              } else if (k === "only" && val) {
+                onlyActions = extractRubyActionsFromNode(val);
+              } else if (k === "except" && val) {
+                exceptActions = extractRubyActionsFromNode(val);
+              }
+            }
+          }
+        }
+
+        if (pathOverride) resName = pathOverride;
+
+        if (resName) {
+          let basePath = "";
+          if (ctx.parentResource) {
+            basePath = cleanRubyPath(ctx.prefix, `${ctx.parentResource.name}/${ctx.parentResource.param}/${resName}`);
+          } else {
+            basePath = cleanRubyPath(ctx.prefix, resName);
+          }
+
+          const defaultActions: { act: string; method: Method; getP: (base: string, p: string) => string }[] = [
+            { act: "index", method: "GET", getP: (b) => b },
+            { act: "create", method: "POST", getP: (b) => b },
+            { act: "show", method: "GET", getP: (b, p) => cleanRubyPath(b, p) },
+            { act: "update", method: "PUT", getP: (b, p) => cleanRubyPath(b, p) },
+            { act: "destroy", method: "DELETE", getP: (b, p) => cleanRubyPath(b, p) },
+          ];
+
+          for (const item of defaultActions) {
+            if (onlyActions && !onlyActions.has(item.act)) continue;
+            if (exceptActions && exceptActions.has(item.act)) continue;
+
+            const rPath = item.getP(basePath, param);
+            routes.push({
+              id: stableId(filePath, item.method, rPath),
+              framework: "rails",
+              method: item.method,
+              path: rPath,
+              file: filePath,
+              confidence: "high",
+              source: "tree_sitter",
+            });
+          }
+
+          if (blockNode) {
+            parseBlock(blockNode, {
+              prefix: ctx.prefix,
+              parentResource: { name: resName, param },
+            });
+          }
+        }
+        return;
+      }
+
+      // C: resource (singular)
+      if (methodName === "resource") {
+        let resName = "";
+        let onlyActions: Set<string> | null = null;
+        let exceptActions: Set<string> | null = null;
+        let pathOverride: string | null = null;
+
+        if (argsNode) {
+          const firstArg = argsNode.children.find((c) => c.type === "simple_symbol" || c.type === "string");
+          if (firstArg) {
+            resName = getRubyStringOrSymbol(firstArg) || "";
+          }
+
+          for (let i = 0; i < argsNode.childCount; i++) {
+            const child = argsNode.child(i)!;
+            if (child.type === "pair") {
+              const k = child.child(0)?.text.replace(/:$/, "");
+              const val = child.child(child.childCount - 1);
+              if (k === "path" && val) {
+                const s = getRubyStringOrSymbol(val);
+                if (s) pathOverride = s;
+              } else if (k === "only" && val) {
+                onlyActions = extractRubyActionsFromNode(val);
+              } else if (k === "except" && val) {
+                exceptActions = extractRubyActionsFromNode(val);
+              }
+            }
+          }
+        }
+
+        if (pathOverride) resName = pathOverride;
+
+        if (resName) {
+          let basePath = "";
+          if (ctx.parentResource) {
+            basePath = cleanRubyPath(ctx.prefix, `${ctx.parentResource.name}/${ctx.parentResource.param}/${resName}`);
+          } else {
+            basePath = cleanRubyPath(ctx.prefix, resName);
+          }
+
+          const defaultSingular: { act: string; method: Method }[] = [
+            { act: "show", method: "GET" },
+            { act: "create", method: "POST" },
+            { act: "update", method: "PUT" },
+            { act: "destroy", method: "DELETE" },
+          ];
+
+          for (const item of defaultSingular) {
+            if (onlyActions && !onlyActions.has(item.act)) continue;
+            if (exceptActions && exceptActions.has(item.act)) continue;
+
+            routes.push({
+              id: stableId(filePath, item.method, basePath),
+              framework: "rails",
+              method: item.method,
+              path: basePath,
+              file: filePath,
+              confidence: "high",
+              source: "tree_sitter",
+            });
+          }
+
+          if (blockNode) {
+            parseBlock(blockNode, {
+              prefix: basePath,
+            });
+          }
+        }
+        return;
+      }
+
+      // D: devise_for :users
+      if (methodName === "devise_for") {
+        let resName = "users";
+        let signInName = "login";
+        if (argsNode) {
+          const firstArg = argsNode.children.find((c) => c.type === "simple_symbol" || c.type === "string");
+          if (firstArg) {
+            const s = getRubyStringOrSymbol(firstArg);
+            if (s) resName = s;
+          }
+          for (let i = 0; i < argsNode.childCount; i++) {
+            const child = argsNode.child(i)!;
+            if (child.type === "pair" && child.child(0)?.text.includes("path_names")) {
+              const hashNode = child.child(child.childCount - 1);
+              if (hashNode) {
+                for (let j = 0; j < hashNode.childCount; j++) {
+                  const hChild = hashNode.child(j)!;
+                  if (hChild.type === "pair" && hChild.child(0)?.text.includes("sign_in")) {
+                    const mapped = getRubyStringOrSymbol(hChild.child(hChild.childCount - 1));
+                    if (mapped) signInName = mapped;
+                  }
+                }
+              }
+            }
+          }
+        }
+        const userBase = cleanRubyPath(ctx.prefix, resName);
+        const loginPath = cleanRubyPath(userBase, signInName);
+        routes.push({
+          id: stableId(filePath, "POST", loginPath),
+          framework: "rails",
+          method: "POST",
+          path: loginPath,
+          file: filePath,
+          confidence: "high",
+          source: "tree_sitter",
+        });
+        routes.push({
+          id: stableId(filePath, "POST", userBase),
+          framework: "rails",
+          method: "POST",
+          path: userBase,
+          file: filePath,
+          confidence: "high",
+          source: "tree_sitter",
+        });
+        return;
+      }
+
+      // E: Direct HTTP methods: get, post, put, delete, patch, match
+      if (methodName && (RUBY_HTTP_METHODS.has(methodName.toLowerCase()) || methodName === "match")) {
+        // Discard String#match calls (e.g. str.match(/regex/))
+        if (methodName === "match") {
+          if (node.child(1)?.text === "." && node.child(0)?.text !== "routes") {
+            return;
+          }
+        }
+        let p = "";
+        let onType: string | null = null;
+        let matchMethods: Method[] = [];
+
+        if (argsNode) {
+          const firstArg = argsNode.children.find(
+            (c) => c.type === "simple_symbol" || c.type === "string" || c.type === "pair"
+          );
+          if (firstArg) {
+            if (!ctx.parentResource && firstArg.type === "simple_symbol") {
+              return;
+            }
+            if (firstArg.type === "pair") {
+              p = getRubyStringOrSymbol(firstArg.child(0)) || "";
+            } else {
+              p = getRubyStringOrSymbol(firstArg) || "";
+            }
+          }
+
+          for (let i = 0; i < argsNode.childCount; i++) {
+            const child = argsNode.child(i)!;
+            if (child.type === "pair") {
+              const k = child.child(0)?.text.replace(/:$/, "");
+              const val = child.child(child.childCount - 1);
+              if (k === "on" && val) {
+                const s = getRubyStringOrSymbol(val);
+                if (s) onType = s;
+              } else if (k === "via" && val) {
+                const acts = extractRubyActionsFromNode(val);
+                for (const a of acts) matchMethods.push(a.toUpperCase() as Method);
+              }
+            }
+          }
+        }
+
+        let fullPath = "";
+        if (ctx.parentResource) {
+          if (onType === "collection") {
+            fullPath = cleanRubyPath(ctx.prefix, `${ctx.parentResource.name}/${p}`);
+          } else {
+            fullPath = cleanRubyPath(ctx.prefix, `${ctx.parentResource.name}/${ctx.parentResource.param}/${p}`);
+          }
+        } else {
+          fullPath = cleanRubyPath(ctx.prefix, p);
+        }
+
+        const verbs: Method[] = methodName === "match"
+          ? (matchMethods.length > 0 ? matchMethods : ["GET"])
+          : [methodName.toUpperCase() as Method];
+
+        for (const v of verbs) {
+          routes.push({
+            id: stableId(filePath, v, fullPath),
+            framework: "rails",
+            method: v,
+            path: fullPath,
+            file: filePath,
+            confidence: "high",
+            source: "tree_sitter",
+          });
+        }
+        return;
+      }
+
+      // F: root
+      if (methodName === "root") {
+        const rootPath = cleanRubyPath(ctx.prefix, "/");
+        routes.push({
+          id: stableId(filePath, "GET", rootPath),
+          framework: "rails",
+          method: "GET",
+          path: rootPath,
+          file: filePath,
+          confidence: "high",
+          source: "tree_sitter",
+        });
+        return;
+      }
+    }
+
+    for (let i = 0; i < node.childCount; i++) {
+      walkNode(node.child(i)!, ctx);
+    }
+  }
+
+  walkNode(tree.rootNode, { prefix: "" });
+  return routes;
+}
+
+// -------------------------------------------------------------
 // Master Tree-sitter Extractor Dispatcher
 // -------------------------------------------------------------
 export async function extractRoutesWithTreeSitter(
@@ -1683,6 +2089,8 @@ export async function extractRoutesWithTreeSitter(
       return extractPhpRoutes(tree, candidate.filePath);
     case "rust":
       return extractRustRoutes(tree, candidate.filePath);
+    case "ruby":
+      return extractRubyRoutes(tree, candidate.filePath);
     default:
       return [];
   }
