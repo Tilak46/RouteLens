@@ -59,11 +59,17 @@ export function resolveExportedTarget(
   const code = fileCodeMap.get(filePath);
   if (!code) return null;
 
-  // Case 1: export default X
+  // Case 1: export default X or module.exports = X
   if (exportName === "default") {
     const defMatch = /export\s+default\s+([a-zA-Z0-9_$]+)/.exec(code);
     if (defMatch) return { filePath, localName: defMatch[1] };
+    const cjsMatch = /module\.exports\s*=\s*(?:fp\s*\(\s*)?([a-zA-Z0-9_$]+)/.exec(code);
+    if (cjsMatch) return { filePath, localName: cjsMatch[1] };
   } else {
+    // Case 1b: module.exports.foo = foo or exports.foo = foo
+    const namedCjs = new RegExp(`(?:module\\.)?exports\\.${exportName}\\s*=\\s*([a-zA-Z0-9_$]+)`).exec(code);
+    if (namedCjs) return { filePath, localName: namedCjs[1] };
+
     // export { default as adminRouter } from './admin.routes';
     const reExportRegex = /export\s*\{\s*([^}]+)\s*\}\s*from\s*['"]([^'"]+)['"]/g;
     let rMatch: RegExpExecArray | null;
@@ -95,7 +101,7 @@ export function resolveExportedTarget(
 
   // Check if exportName is actually defined or exported in this file
   const isDefinedHere = new RegExp(
-    `(?:export\\s+(?:const|let|var|function|class)\\s+${exportName}\\b|export\\s+default\\s+${exportName}\\b|export\\s*\\{[^}]*\\b${exportName}\\b|(?:const|let|var)\\s+${exportName}\\s*=|function\\s+${exportName}\\b|export\\s+default\\b)`,
+    `(?:export\\s+(?:const|let|var|function|class)\\s+${exportName}\\b|export\\s+default\\s+${exportName}\\b|export\\s*\\{[^}]*\\b${exportName}\\b|(?:const|let|var)\\s+${exportName}\\s*=|function\\s+${exportName}\\b|export\\s+default\\b|module\\.exports\\b)`,
     "i",
   ).test(code);
 
@@ -113,13 +119,15 @@ export class SymbolicMountLinker {
     const importMap = new Map<string, Map<string, TargetExport>>();
     const fileMounts = new Map<string, MountInfo[]>();
 
-    const mountRegex = /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_$]+)\.use\s*\(\s*(?:(['"`])(\/[^'"`]*)\2\s*,\s*)?([a-zA-Z0-9_$]+)\s*\)/g;
-    const importRegex = /import\s+(?:\{([^}]+)\}|([a-zA-Z0-9_$]+))\s+from\s+['"]([^'"]+)['"]/g;
+    const mountRegex = /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_$]+)\.(?:use|route)\s*\(\s*(?:(['"`])(\/[^'"`]*)\2\s*,\s*)?([a-zA-Z0-9_$]+)\s*\)/g;
+    const fastifyRegisterRegex = /([a-zA-Z0-9_$]+)\.register\s*\(\s*([a-zA-Z0-9_$]+)(?:\s*,\s*\{[^}]*prefix:\s*['"`]([^'"`]+)['"`])?/g;
+    const esImportRegex = /import\s+(?:\{([^}]+)\}|([a-zA-Z0-9_$]+))\s+from\s+['"]([^'"]+)['"]/g;
+    const cjsRequireRegex = /(?:const|let|var)\s+(?:\{([^}]+)\}|([a-zA-Z0-9_$]+))\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
     for (const [filePath, code] of fileCodeMap.entries()) {
       const localImports = new Map<string, TargetExport>();
       let imp: RegExpExecArray | null;
-      while ((imp = importRegex.exec(code)) !== null) {
+      while ((imp = esImportRegex.exec(code)) !== null) {
         const named = imp[1];
         const def = imp[2];
         const src = imp[3];
@@ -138,6 +146,27 @@ export class SymbolicMountLinker {
           }
         }
       }
+
+      let reqM: RegExpExecArray | null;
+      while ((reqM = cjsRequireRegex.exec(code)) !== null) {
+        const named = reqM[1];
+        const def = reqM[2];
+        const src = reqM[3];
+        const resolved = resolveLocalImport(filePath, src);
+        if (resolved) {
+          if (def) {
+            const deep = resolveExportedTarget(fileCodeMap, resolved, "default");
+            localImports.set(def, deep || { filePath: resolved, localName: "default" });
+          }
+          if (named) {
+            for (const part of named.split(",")) {
+              const [orig, alias] = part.trim().split(/\s*:\s*/);
+              const deep = resolveExportedTarget(fileCodeMap, resolved, orig.trim());
+              localImports.set(alias || orig.trim(), deep || { filePath: resolved, localName: orig.trim() });
+            }
+          }
+        }
+      }
       importMap.set(filePath, localImports);
 
       const mounts: MountInfo[] = [];
@@ -148,14 +177,39 @@ export class SymbolicMountLinker {
         const childRouter = mnt[4];
         mounts.push({ parentRouter, mountPath, childRouter });
       }
+
+      let regM: RegExpExecArray | null;
+      while ((regM = fastifyRegisterRegex.exec(code)) !== null) {
+        const parentRouter = regM[1];
+        const childRouter = regM[2];
+        const mountPath = regM[3] || "/";
+        mounts.push({ parentRouter, mountPath, childRouter });
+      }
+
       fileMounts.set(filePath, mounts);
     }
 
-    // Identify entrypoint (index.ts, app.ts, server.js, main.go, etc.)
-    for (const filePath of fileCodeMap.keys()) {
+    // Identify entrypoint (index.ts, app.ts, server.js, main.go, express.js, etc.)
+    for (const [filePath, code] of fileCodeMap.entries()) {
       const base = path.basename(filePath).toLowerCase();
-      if (base.startsWith("index.") || base.startsWith("app.") || base.startsWith("server.") || base.startsWith("main.")) {
+      if (
+        base.startsWith("index.") ||
+        base.startsWith("app.") ||
+        base.startsWith("server.") ||
+        base.startsWith("main.") ||
+        base.startsWith("express.")
+      ) {
         this.setPrefix(filePath, "app", "/");
+        this.setPrefix(filePath, "server", "/");
+      }
+
+      // Invariant: any file creating an app has a root router
+      const rootMatch = /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:express|fastify)\s*\(|(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*new\s+Hono\s*\(/i.exec(code);
+      if (rootMatch) {
+        const rVar = rootMatch[1] || rootMatch[2];
+        if (rVar) {
+          this.setPrefix(filePath, rVar, "/");
+        }
       }
     }
 
@@ -203,9 +257,9 @@ export class SymbolicMountLinker {
                 }
               }
 
-              // Check default export
+              // Check default export / module.exports
               const targetCode = fileCodeMap.get(targetFile) || "";
-              const defMatch = /export\s+default\s+([a-zA-Z0-9_$]+)/.exec(targetCode);
+              const defMatch = /(?:export\s+default|module\.exports\s*=)\s*(?:fp\s*\(\s*)?([a-zA-Z0-9_$]+)/.exec(targetCode);
               if (defMatch) {
                 const exportedVar = defMatch[1];
                 const targetKey = `${targetFile}:${exportedVar}`;

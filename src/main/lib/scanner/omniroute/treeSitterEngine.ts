@@ -562,6 +562,18 @@ export function extractTsJsRoutes(
         if (propNode && objNode) {
           const propName = propNode.text.toLowerCase();
 
+          // Detect JS/TS framework flavor for this file
+          const fileText = tree.rootNode.text;
+          let jsFramework: OmniFramework = "express";
+          if (fileText.includes("hono") || fileText.includes("new Hono")) {
+            jsFramework = "hono";
+          } else if (
+            fileText.includes("fastify") ||
+            fileText.includes("fastify-plugin")
+          ) {
+            jsFramework = "fastify";
+          }
+
           if (validMethods.has(propName)) {
             const argsNode = node.childForFieldName("arguments");
             let foundDirectPath: string | null = null;
@@ -592,7 +604,7 @@ export function extractTsJsRoutes(
                 const fullPath = joinUrl(pfx, foundDirectPath);
                 routes.push({
                   id: stableId(filePath, method, fullPath),
-                  framework: "express",
+                  framework: jsFramework,
                   method,
                   path: fullPath,
                   file: filePath,
@@ -613,13 +625,137 @@ export function extractTsJsRoutes(
                   const fullPath = joinUrl(pfx, chain.basePath);
                   routes.push({
                     id: stableId(filePath, method, fullPath),
-                    framework: "express",
+                    framework: jsFramework,
                     method,
                     path: fullPath,
                     file: filePath,
                     confidence: "high",
                     source: "tree_sitter",
                   });
+                }
+              }
+            }
+          } else if (propName === "route") {
+            // Fastify server.route({ method: 'GET', path: ... })
+            const argsNode = node.childForFieldName("arguments");
+            if (argsNode && argsNode.childCount > 0) {
+              for (let a = 0; a < argsNode.childCount; a++) {
+                const arg = argsNode.child(a)!;
+                if (arg.type === "object") {
+                  let extractedMethods: Method[] = [];
+                  let extractedPath: string | null = null;
+
+                  for (let p = 0; p < arg.childCount; p++) {
+                    const propChild = arg.child(p)!;
+                    if (propChild.type === "pair") {
+                      const kNode = propChild.childForFieldName("key");
+                      const vNode = propChild.childForFieldName("value");
+                      if (kNode && vNode) {
+                        const keyName = kNode.text.replace(/['"`]/g, "").toLowerCase();
+                        if (keyName === "method") {
+                          if (vNode.type === "string") {
+                            const mStr = vNode.text.replace(/['"`]/g, "").toUpperCase();
+                            if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(mStr)) {
+                              extractedMethods.push(mStr as Method);
+                            }
+                          } else if (vNode.type === "array") {
+                            for (let el = 0; el < vNode.childCount; el++) {
+                              const elem = vNode.child(el)!;
+                              if (elem.type === "string") {
+                                const mStr = elem.text.replace(/['"`]/g, "").toUpperCase();
+                                if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(mStr)) {
+                                  extractedMethods.push(mStr as Method);
+                                }
+                              }
+                            }
+                          }
+                        } else if (keyName === "path" || keyName === "url") {
+                          if (vNode.type === "string" || vNode.type === "template_string") {
+                            extractedPath = vNode.text.replace(/^['"`]|['"`]$/g, "");
+                          } else if (vNode.type === "binary_expression") {
+                            walkTree(vNode, (binChild) => {
+                              if ((binChild.type === "string" || binChild.type === "template_string") && !extractedPath) {
+                                extractedPath = binChild.text.replace(/^['"`]|['"`]$/g, "");
+                              }
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  if (extractedMethods.length > 0 && extractedPath) {
+                    if (!extractedPath.startsWith("/")) extractedPath = "/" + extractedPath;
+                    const routerVar = objNode.text;
+                    const prefixes = mountLinker
+                      ? mountLinker.getPrefixesForRouter(filePath, routerVar)
+                      : new Set(["/"]);
+
+                    for (const m of extractedMethods) {
+                      for (const pfx of prefixes) {
+                        const fullPath = joinUrl(pfx, extractedPath);
+                        routes.push({
+                          id: stableId(filePath, m, fullPath),
+                          framework: "fastify",
+                          method: m,
+                          path: fullPath,
+                          file: filePath,
+                          confidence: "high",
+                          source: "tree_sitter",
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } else if (propName === "on") {
+            // Hono app.on('GET', '/path', handler)
+            const argsNode = node.childForFieldName("arguments");
+            if (argsNode && argsNode.childCount >= 2) {
+              const mArg = argsNode.child(0);
+              const pArg = argsNode.child(1);
+              let methods: Method[] = [];
+              if (mArg) {
+                if (mArg.type === "string") {
+                  const mStr = mArg.text.replace(/['"`]/g, "").toUpperCase();
+                  if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(mStr)) {
+                    methods.push(mStr as Method);
+                  }
+                } else if (mArg.type === "array") {
+                  for (let i = 0; i < mArg.childCount; i++) {
+                    const el = mArg.child(i)!;
+                    if (el.type === "string") {
+                      const mStr = el.text.replace(/['"`]/g, "").toUpperCase();
+                      if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(mStr)) {
+                        methods.push(mStr as Method);
+                      }
+                    }
+                  }
+                }
+              }
+              let pathVal: string | null = null;
+              if (pArg && (pArg.type === "string" || pArg.type === "template_string")) {
+                pathVal = pArg.text.replace(/^['"`]|['"`]$/g, "");
+              }
+              if (methods.length > 0 && pathVal) {
+                if (!pathVal.startsWith("/")) pathVal = "/" + pathVal;
+                const prefixes = mountLinker
+                  ? mountLinker.getPrefixesForRouter(filePath, objNode.text)
+                  : new Set(["/"]);
+                for (const m of methods) {
+                  for (const pfx of prefixes) {
+                    const fullPath = joinUrl(pfx, pathVal);
+                    routes.push({
+                      id: stableId(filePath, m, fullPath),
+                      framework: jsFramework,
+                      method: m,
+                      path: fullPath,
+                      file: filePath,
+                      confidence: "high",
+                      source: "tree_sitter",
+                    });
+                  }
                 }
               }
             }
@@ -2125,6 +2261,7 @@ export async function extractRoutesWithTreeSitter(
   switch (candidate.language) {
     case "csharp":
       return extractCSharpRoutes(tree, candidate.filePath);
+    case "tsx":
     case "typescript":
     case "javascript":
       return extractTsJsRoutes(tree, candidate.filePath, mountLinker);

@@ -75,8 +75,9 @@ export function getFileLanguage(filePath: string): string {
     case ".cjs":
       return "javascript";
     case ".ts":
-    case ".tsx":
       return "typescript";
+    case ".tsx":
+      return "tsx";
     case ".py":
       return "python";
     case ".go":
@@ -98,6 +99,20 @@ export function getFileLanguage(filePath: string): string {
 
 export function isClientUiPath(filePath: string, rootPath: string): boolean {
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
+  const fileName = path.basename(rel);
+
+  // Invariant: Next.js API routes (App Router route.ts/js or Pages Router pages/api) are ALWAYS backend APIs
+  if (
+    rel.includes("app/api/") ||
+    rel.includes("pages/api/") ||
+    fileName === "route.ts" ||
+    fileName === "route.js" ||
+    fileName === "route.tsx" ||
+    fileName === "route.jsx"
+  ) {
+    return false;
+  }
+
   const segments = rel.split("/");
   const ext = path.extname(filePath).toLowerCase();
   const isPureBackendCode =
@@ -157,6 +172,12 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
     fileName.endsWith(".test.js") ||
     fileName.endsWith(".spec.ts") ||
     fileName.endsWith(".spec.js") ||
+    fileName.endsWith(".e2e-spec.ts") ||
+    fileName.endsWith(".e2e-spec.js") ||
+    fileName.endsWith(".test.tsx") ||
+    fileName.endsWith(".spec.tsx") ||
+    fileName.endsWith(".test.jsx") ||
+    fileName.endsWith(".spec.jsx") ||
     fileName.endsWith("test.java") ||
     fileName.endsWith("tests.java") ||
     fileName.endsWith("test.cs") ||
@@ -183,7 +204,9 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
       seg === "test" ||
       seg === "__tests__" ||
       seg === "spec" ||
-      seg === "specs"
+      seg === "specs" ||
+      seg === "e2e" ||
+      seg === "cypress"
     ) {
       return true;
     }

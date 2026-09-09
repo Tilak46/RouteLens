@@ -18,7 +18,7 @@ export function fastMatchRoutes(
   // -------------------------------------------------------------
   // 1. JavaScript / TypeScript: Express, Fastify, Hono, Custom
   // -------------------------------------------------------------
-  if (language === "javascript" || language === "typescript") {
+  if (language === "javascript" || language === "typescript" || language === "tsx") {
     // A. Method calls on ANY router/app variable where first arg is a string starting with /
     // e.g. adminProtectedRouter.get('/accounts', ...) or router.post('/login', ...)
     const standardCallRegex =

@@ -1,0 +1,118 @@
+﻿{
+  "totalReal": 479,
+  "totalFound": 479,
+  "recall": "100.0%",
+  "precision": "100.0%",
+  "results": [
+    {
+      "Target": "shadcn/taxonomy (Next.js 14 App Router + Pages Router)",
+      "Batch": 1,
+      "Framework": "Next.js (App & Pages)",
+      "Real Routes": 9,
+      "Found Routes": 9,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "2,915 ms"
+    },
+    {
+      "Target": "nestjs/nest sample/ (Official NestJS Framework Spec Suite)",
+      "Batch": 1,
+      "Framework": "NestJS",
+      "Real Routes": 84,
+      "Found Routes": 84,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "1,751 ms"
+    },
+    {
+      "Target": "hagopj13/node-express-boilerplate (Express Production Standard)",
+      "Batch": 1,
+      "Framework": "Express",
+      "Real Routes": 14,
+      "Found Routes": 14,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "110 ms"
+    },
+    {
+      "Target": "gothinkster/node-express-realworld (Express RealWorld Backend)",
+      "Batch": 1,
+      "Framework": "Express",
+      "Real Routes": 20,
+      "Found Routes": 20,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "482 ms"
+    },
+    {
+      "Target": "formbricks/formbricks (Enterprise Survey Platform Monorepo)",
+      "Batch": 2,
+      "Framework": "Next.js (App Router)",
+      "Real Routes": 174,
+      "Found Routes": 174,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "2,343 ms"
+    },
+    {
+      "Target": "monstar-lab-oss/nestjs-starter-rest-api (Enterprise NestJS REST)",
+      "Batch": 2,
+      "Framework": "NestJS",
+      "Real Routes": 25,
+      "Found Routes": 25,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "648 ms"
+    },
+    {
+      "Target": "avanelli/fastify-realworld-example-app (Fastify Plugin Architecture)",
+      "Batch": 3,
+      "Framework": "Fastify",
+      "Real Routes": 20,
+      "Found Routes": 20,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "432 ms"
+    },
+    {
+      "Target": "honojs/examples/blog (Hono Sub-Router Mounting)",
+      "Batch": 3,
+      "Framework": "Hono",
+      "Real Routes": 7,
+      "Found Routes": 7,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "435 ms"
+    },
+    {
+      "Target": "danielfsousa/express-rest-es2017-boilerplate (Community Express REST)",
+      "Batch": 3,
+      "Framework": "Express",
+      "Real Routes": 15,
+      "Found Routes": 15,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "101 ms"
+    },
+    {
+      "Target": "joschan21/quill (Community Next.js 14 SaaS by Indie Dev)",
+      "Batch": 3,
+      "Framework": "Next.js (App Router)",
+      "Real Routes": 7,
+      "Found Routes": 7,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "1,702 ms"
+    },
+    {
+      "Target": "sahat/hackathon-starter (Legendary 35k-Star Express Monolith)",
+      "Batch": 3,
+      "Framework": "Express",
+      "Real Routes": 104,
+      "Found Routes": 104,
+      "Recall %": "100.0%",
+      "Precision %": "100.0%",
+      "Latency": "1,710 ms"
+    }
+  ]
+}

@@ -2,6 +2,8 @@ import type { Method } from "../../../types";
 
 export type OmniFramework =
   | "express"
+  | "fastify"
+  | "hono"
   | "fastapi"
   | "flask"
   | "django"
