@@ -26,10 +26,14 @@ function patchTreeSitterCtype(): void {
     const tsJsPath = require.resolve("web-tree-sitter/tree-sitter.js");
     if (fs.existsSync(tsJsPath)) {
       let code = fs.readFileSync(tsJsPath, "utf8");
-      if (!code.includes("iswspace:")) {
+      if (!code.includes("iswxdigit:")) {
         const target = "var asmLibraryArg={";
-        const replacement = "var asmLibraryArg={iswspace:(c)=>((c===32||(c>=9&&c<=13)||c===0x85||c===0xa0||c===0x1680||(c>=0x2000&&c<=0x200a)||c===0x2028||c===0x2029||c===0x202f||c===0x205f||c===0x3000)?1:0),iswdigit:(c)=>((c>=48&&c<=57)?1:0),iswalpha:(c)=>(((c>=65&&c<=90)||(c>=97&&c<=122))?1:0),iswalnum:(c)=>(((c>=48&&c<=57)||(c>=65&&c<=90)||(c>=97&&c<=122))?1:0),iswupper:(c)=>((c>=65&&c<=90)?1:0),iswlower:(c)=>((c>=97&&c<=122)?1:0),";
-        code = code.replace(target, replacement);
+        const replacement = "var asmLibraryArg={iswspace:(c)=>((c===32||(c>=9&&c<=13)||c===0x85||c===0xa0||c===0x1680||(c>=0x2000&&c<=0x200a)||c===0x2028||c===0x2029||c===0x202f||c===0x205f||c===0x3000)?1:0),iswdigit:(c)=>((c>=48&&c<=57)?1:0),iswxdigit:(c)=>(((c>=48&&c<=57)||(c>=65&&c<=70)||(c>=97&&c<=102))?1:0),iswalpha:(c)=>(((c>=65&&c<=90)||(c>=97&&c<=122))?1:0),iswalnum:(c)=>(((c>=48&&c<=57)||(c>=65&&c<=90)||(c>=97&&c<=122))?1:0),iswupper:(c)=>((c>=65&&c<=90)?1:0),iswlower:(c)=>((c>=97&&c<=122)?1:0),";
+        if (code.includes("iswspace:")) {
+          code = code.replace("iswdigit:(c)=>((c>=48&&c<=57)?1:0),", "iswdigit:(c)=>((c>=48&&c<=57)?1:0),iswxdigit:(c)=>(((c>=48&&c<=57)||(c>=65&&c<=70)||(c>=97&&c<=102))?1:0),");
+        } else {
+          code = code.replace(target, replacement);
+        }
         fs.writeFileSync(tsJsPath, code, "utf8");
       }
     }
