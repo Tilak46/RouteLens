@@ -9,15 +9,51 @@ let isParserInitialized = false;
 let initPromise: Promise<void> | null = null;
 const languageCache = new Map<string, Parser.Language>();
 
+function getTreeSitterWasmPath(): string {
+  const possiblePaths = [
+    // 1. Next to bundled out/main/index.js
+    path.resolve(__dirname, "tree-sitter.wasm"),
+    // 2. In project node_modules from process.cwd()
+    path.resolve(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+    // 3. In relative paths from out/main or src/main
+    path.resolve(__dirname, "..", "..", "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+    path.resolve(__dirname, "..", "..", "..", "..", "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) return p;
+  }
+
+  try {
+    const pkg = require.resolve("web-tree-sitter/package.json");
+    const p = path.join(path.dirname(pkg), "tree-sitter.wasm");
+    if (fs.existsSync(p)) return p;
+  } catch {}
+
+  return "tree-sitter.wasm";
+}
+
 function getWasmDirectory(): string {
   const possiblePaths = [
+    // 1. Next to bundled out/main/index.js
+    path.resolve(__dirname, "tree-sitter-wasms"),
+    // 2. In project node_modules from process.cwd()
     path.resolve(process.cwd(), "node_modules", "tree-sitter-wasms", "out"),
+    // 3. In relative paths from out/main or src/main
+    path.resolve(__dirname, "..", "..", "node_modules", "tree-sitter-wasms", "out"),
     path.resolve(__dirname, "..", "..", "..", "..", "node_modules", "tree-sitter-wasms", "out"),
   ];
 
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) return p;
   }
+
+  try {
+    const pkg = require.resolve("tree-sitter-wasms/package.json");
+    const p = path.join(path.dirname(pkg), "out");
+    if (fs.existsSync(p)) return p;
+  } catch {}
+
   return path.resolve(process.cwd(), "node_modules", "tree-sitter-wasms", "out");
 }
 
@@ -48,9 +84,28 @@ async function ensureParserInit(): Promise<void> {
 
   initPromise = (async () => {
     patchTreeSitterCtype();
-    await Parser.init();
+    const wasmPath = getTreeSitterWasmPath();
+    const initCallPromise = Parser.init({
+      locateFile: (file: string) => {
+        if (file === "tree-sitter.wasm") {
+          return wasmPath;
+        }
+        return file;
+      },
+    });
+
+    // 8-second safety timeout so Parser.init never deadlocks the process
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("web-tree-sitter initialization timed out")), 8000),
+    );
+
+    await Promise.race([initCallPromise, timeoutPromise]);
     isParserInitialized = true;
-  })();
+  })().catch((err) => {
+    // Reset so future attempts don't hang on a permanently poisoned promise
+    initPromise = null;
+    throw err;
+  });
 
   return initPromise;
 }

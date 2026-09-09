@@ -100,7 +100,13 @@ export async function scanProjectForRoutes(
   log(`[OmniRoute Engine] Starting universal AST scan for: ${projectPath}`);
   try {
     const t0 = performance.now();
-    const result = await scanOmniRoutes(projectPath, { mode: "ast" });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Scanner timed out after 15 seconds")), 15000),
+    );
+    const result = await Promise.race([
+      scanOmniRoutes(projectPath, { mode: "ast" }),
+      timeoutPromise,
+    ]);
     const durationMs = Math.round(performance.now() - t0);
 
     log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);

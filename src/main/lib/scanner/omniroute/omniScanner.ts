@@ -8,16 +8,23 @@ import { extractRoutesWithTreeSitter } from "./treeSitterEngine";
 import { SymbolicMountLinker } from "./mountLinker";
 import { isLocalAiAvailable, extractRoutesWithAI } from "./localAiEngine";
 
-async function collectAllFiles(dir: string, rootPath: string, fileList: string[] = []): Promise<string[]> {
+async function collectAllFiles(
+  dir: string,
+  rootPath: string,
+  fileList: string[] = [],
+  depth: number = 0,
+): Promise<string[]> {
+  if (depth > 12 || fileList.length >= 20000) return fileList;
   try {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
+      if (fileList.length >= 20000) break;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (UNIVERSAL_IGNORED_DIRECTORIES.has(entry.name.toLowerCase())) {
           continue;
         }
-        await collectAllFiles(fullPath, rootPath, fileList);
+        await collectAllFiles(fullPath, rootPath, fileList, depth + 1);
       } else if (entry.isFile()) {
         if (isCandidateFilePath(fullPath, rootPath)) {
           fileList.push(fullPath);

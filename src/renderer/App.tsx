@@ -1324,7 +1324,11 @@ function App() {
     }
 
     try {
-      const result = await apiClient.scanProject(project.path);
+      const scanPromise = apiClient.scanProject(project.path);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Scan timed out")), 20000)
+      );
+      const result = await Promise.race([scanPromise, timeoutPromise]);
       const existing = treeCache[project.path];
       const currentTree = existing?.tree || [];
       const merged = currentTree.length > 0
@@ -1351,7 +1355,9 @@ function App() {
         description: `Discovered ${result?.detectedRoutesCount || merged.length} routes in ${project.name}`,
       });
     } catch (err) {
-      toast.error("Scan failed");
+      toast.error("Scan failed or timed out", {
+        description: "Please verify backend directory access or rescan.",
+      });
     } finally {
       setScanningProjectId(null);
       requestAnimationFrame(() => {
