@@ -55,7 +55,7 @@ import { getAiModel, getAiProvider } from "./lib/ai/openrouter";
         const raw = String(process.env["API_EXPLORER_AI_NAMING"] ?? "")
           .trim()
           .toLowerCase();
-        if (!raw) return hasKey;
+        if (!raw) return false;
         return raw === "1" || raw === "true" || raw === "yes";
       })();
 

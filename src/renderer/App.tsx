@@ -1326,7 +1326,7 @@ function App() {
     try {
       const scanPromise = apiClient.scanProject(project.path);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Scan timed out")), 20000)
+        setTimeout(() => reject(new Error("Scan timed out")), 30000)
       );
       const result = await Promise.race([scanPromise, timeoutPromise]);
       const existing = treeCache[project.path];

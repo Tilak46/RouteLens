@@ -100,35 +100,37 @@ export async function scanProjectForRoutes(
   log(`[OmniRoute Engine] Starting universal AST scan for: ${projectPath}`);
   try {
     const t0 = performance.now();
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Scanner timed out after 15 seconds")), 15000),
-    );
-    const result = await Promise.race([
-      scanOmniRoutes(projectPath, { mode: "ast" }),
-      timeoutPromise,
-    ]);
-    const durationMs = Math.round(performance.now() - t0);
+    const fullScanPipeline = async () => {
+      const result = await scanOmniRoutes(projectPath, { mode: "ast" });
+      const durationMs = Math.round(performance.now() - t0);
 
-    log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
+      log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
 
-    const apiRoutes = result.routes.map((r) =>
-      mapOmniToApiRoute(projectPath, r),
-    );
+      const apiRoutes = result.routes.map((r) =>
+        mapOmniToApiRoute(projectPath, r),
+      );
 
-    // AI route naming is bypassed by default so the UI gets instantaneous speed (<1s)
-    const namedRoutes = await maybeApplyAiRouteNames(apiRoutes, {
-      logs,
-      projectPath,
-    });
+      // AI route naming is bypassed by default so the UI gets instantaneous speed (<1s)
+      const namedRoutes = await maybeApplyAiRouteNames(apiRoutes, {
+        logs,
+        projectPath,
+      });
 
-    const tree = buildTreeFromRoutePaths(namedRoutes);
+      const tree = buildTreeFromRoutePaths(namedRoutes);
 
-    return { 
-      tree, 
-      logs,
-      potentialRoutesCount: Math.max(result.candidateFilesCount, apiRoutes.length),
-      detectedRoutesCount: apiRoutes.length
+      return { 
+        tree, 
+        logs,
+        potentialRoutesCount: Math.max(result.candidateFilesCount, apiRoutes.length),
+        detectedRoutesCount: apiRoutes.length
+      };
     };
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Scanner timed out after 25 seconds")), 25000),
+    );
+
+    return await Promise.race([fullScanPipeline(), timeoutPromise]);
   } catch (error) {
     const errorMsg = `Failed to scan project: ${error}`;
     console.error(errorMsg);
