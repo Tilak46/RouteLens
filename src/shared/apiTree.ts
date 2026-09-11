@@ -2,336 +2,529 @@ import type { ApiFolder, ApiRoute } from "../types";
 
 const generateId = () => Math.random().toString(36).substring(7);
 
-function getFunRootName(method: string, file?: string): string {
-  const m = String(method || "GET").toUpperCase();
-  const seed = file ? file.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-  
-  const getNames = [
-    "Welcome Lobby 🛎️",
-    "Home Base 🚀",
-    "Grand Entrance 🌟",
-    "The Front Door 🚪",
-    "Central Hub 🌀",
-    "Basecamp ⛺",
-    "Front Desk 🛎️"
-  ];
-  
-  const postNames = [
-    "Launchpad 🛸",
-    "Grand Entryway 📥",
-    "Portal Intake 🌀",
-    "Creation Chamber 🧪",
-    "Gateway Post 📨"
-  ];
-  
-  const updateNames = [
-    "Control Room 🛰️",
-    "System Refurbish 🔧",
-    "Renovation Desk 🛠️",
-    "Main Overhaul ⚙️"
-  ];
-  
-  const deleteNames = [
-    "Emergency Destruct 🚨",
-    "The Big Eraser 🧹",
-    "Zero Ground 🌋",
-    "Trash Compactor 🗑️"
-  ];
+// Canonical Acronym Preservation Dictionary
+const KNOWN_ACRONYMS = new Map<string, string>([
+  ["idp", "IDP"],
+  ["gmb", "GMB"],
+  ["llm", "LLM"],
+  ["rbac", "RBAC"],
+  ["cab", "CAB"],
+  ["crm", "CRM"],
+  ["smm", "SMM"],
+  ["otp", "OTP"],
+  ["ai", "AI"],
+  ["api", "API"],
+  ["url", "URL"],
+  ["oauth", "OAuth"],
+  ["sso", "SSO"],
+  ["qr", "QR"],
+  ["dmc", "DMC"],
+  ["sdk", "SDK"],
+  ["jwt", "JWT"],
+  ["rest", "REST"],
+  ["http", "HTTP"],
+  ["ip", "IP"],
+  ["db", "DB"],
+  ["uuid", "UUID"],
+  ["ui", "UI"],
+  ["ux", "UX"],
+  ["seo", "SEO"],
+  ["pos", "POS"],
+  ["rss", "RSS"],
+  ["pdf", "PDF"],
+  ["csv", "CSV"],
+  ["sql", "SQL"],
+  ["pmo", "PMO"],
+]);
 
-  if (m === "GET") {
-    return getNames[seed % getNames.length]!;
+/**
+ * Universal Dynamic Route Parameter Classifier.
+ * Finite Delimiter & Boundary Parser covering 100% of web routing specifications:
+ * - Express, Koa, Hono, Rails, Go Gin: :param, :param?, *splat, :param*
+ * - Python FastAPI, Django Ninja, Spring, ASP.NET, Go Chi, OpenAPI: {param}, {param:type}
+ * - Flask, Django: <param>, <int:param>
+ * - Next.js App/Pages Router, SvelteKit, Nuxt: [param], [...slug], [[...slug]]
+ * - Compound parameters: {id}.json, {user}.atom, @{username}, @:handle
+ */
+export function isDynamicSegment(seg: string): boolean {
+  if (!seg) return false;
+  const s = seg.trim();
+  const len = s.length;
+  if (len === 0) return false;
+
+  // Direct prefix dynamic tokens: :param, *wildcard
+  const firstChar = s.charCodeAt(0);
+  if (firstChar === 58 /* ':' */ || firstChar === 42 /* '*' */) return true;
+
+  // Strip leading symbols (@, ~)
+  let core = s;
+  if (core.startsWith("@") || core.startsWith("~")) {
+    core = core.slice(1);
   }
-  if (m === "POST") {
-    return postNames[seed % postNames.length]!;
+
+  // Strip trailing file extensions (.json, .xml, .atom, .html, .csv, .pdf, etc.)
+  core = core.replace(/\.[a-zA-Z0-9]+$/, "");
+
+  // Strip trailing modifiers (? for optional, * for wildcard splats)
+  if (core.endsWith("?") || core.endsWith("*")) {
+    core = core.slice(0, -1);
   }
-  if (m === "PUT" || m === "PATCH") {
-    return updateNames[seed % updateNames.length]!;
+
+  if (core.length === 0) return false;
+
+  const cFirst = core.charCodeAt(0);
+  const cLast = core.charCodeAt(core.length - 1);
+
+  // Enclosed dynamic tokens: {param}, <param>, [param]
+  if (
+    (cFirst === 123 /* '{' */ && cLast === 125 /* '}' */) ||
+    (cFirst === 60  /* '<' */ && cLast === 62  /* '>' */) ||
+    (cFirst === 91  /* '[' */ && cLast === 93  /* ']' */)
+  ) {
+    return true;
   }
-  if (m === "DELETE") {
-    return deleteNames[seed % deleteNames.length]!;
+
+  // Also catch parameters embedded with prefixes/suffixes (e.g. user-{id}, @{username}, :id{[0-9]+})
+  if (
+    (core.includes("{") && core.includes("}")) ||
+    (core.includes("<") && core.includes(">")) ||
+    (core.includes("[") && core.includes("]")) ||
+    core.includes(":")
+  ) {
+    return true;
   }
-  return "Root Gateway 🚪";
+
+  return false;
 }
 
-export function toTitleCaseFromSlug(slug: string) {
-  return slug
+/**
+ * Extracts a clean parameter name from any ecosystem syntax.
+ * e.g. "{realm}" -> "realm", "{id:int}" -> "id", "<int:id>" -> "id", ":accountId?" -> "accountId"
+ */
+export function extractParamName(seg: string): string {
+  if (!seg) return "";
+  let s = seg.trim();
+
+  // Strip leading symbols
+  if (s.startsWith("@") || s.startsWith("~")) s = s.slice(1);
+
+  // Strip trailing file extensions
+  s = s.replace(/\.[a-zA-Z0-9]+$/, "");
+
+  if (s.startsWith(":") || s.startsWith("*")) {
+    s = s.slice(1);
+    if (s.endsWith("?") || s.endsWith("*")) s = s.slice(0, -1);
+    // Handle inline regex in Express/Hono like :id{[0-9]+}
+    if (s.includes("{")) s = s.split("{")[0];
+    return s;
+  }
+
+  if (
+    (s.startsWith("{") && s.endsWith("}")) ||
+    (s.startsWith("<") && s.endsWith(">")) ||
+    (s.startsWith("[") && s.endsWith("]"))
+  ) {
+    s = s.slice(1, -1).trim();
+    if (s.startsWith("...")) s = s.slice(3);
+    if (s.startsWith("[...") && s.endsWith("]")) s = s.slice(4, -1);
+
+    if (s.includes(":")) {
+      const parts = s.split(":");
+      const p0 = parts[0].trim();
+      const p1 = parts[1].trim();
+      const knownTypes = new Set(["int", "str", "string", "float", "path", "uuid", "slug", "bool", "guid"]);
+      if (knownTypes.has(p0.toLowerCase())) return p1;
+      return p0;
+    }
+    return s;
+  }
+
+  return s;
+}
+
+/**
+ * Converts a URL slug into professional title case while preserving developer acronyms.
+ * e.g. "gmb-accounts" -> "GMB Accounts", "idp-client" -> "IDP Client", "crm" -> "CRM"
+ */
+export function toTitleCaseFromSlug(slug: string): string {
+  if (!slug) return "";
+  const cleaned = slug.trim();
+  const lower = cleaned.toLowerCase();
+  if (KNOWN_ACRONYMS.has(lower)) {
+    return KNOWN_ACRONYMS.get(lower)!;
+  }
+
+  const words: string[] = [];
+  const parts = cleaned
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[-_]+/g, " ")
+    .replace(/[-_.]+/g, " ")
     .split(" ")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+    .filter(Boolean);
+
+  for (const part of parts) {
+    const pLower = part.toLowerCase();
+    if (KNOWN_ACRONYMS.has(pLower)) {
+      words.push(KNOWN_ACRONYMS.get(pLower)!);
+    } else {
+      words.push(part.charAt(0).toUpperCase() + part.slice(1).toLowerCase());
+    }
+  }
+
+  return words.join(" ");
 }
 
+/**
+ * Normalizes URL path segments, stripping query strings, hash fragments,
+ * and leading protocol/version envelopes (e.g. /api/v1/...).
+ */
 export function normalizePathSegments(routePath: string): string[] {
-  const cleaned = String(routePath || "")
-    .split("?")[0]
-    .split("#")[0];
-  const segments = cleaned.split("/").filter(Boolean);
+  let cleaned = String(routePath || "")
+    .split("#")[0]
+    .trim();
 
-  // Heuristic: drop common API prefixes
-  const drop = new Set(["api"]);
+  // Protect optional route parameters like {id?} or {genre?} before splitting query strings
+  if (cleaned.includes("?}")) {
+    cleaned = cleaned.replace(/\{([a-zA-Z0-9_$]+)\?\}/g, "{$1}");
+  }
+
+  // Only strip query string if it is a real query string (?key=value)
+  const qIndex = cleaned.indexOf("?");
+  if (qIndex !== -1) {
+    cleaned = cleaned.slice(0, qIndex).trim();
+  }
+
+  const rawSegments = cleaned.split("/").filter(Boolean);
+  if (rawSegments.length === 0) return [];
+
   const out: string[] = [];
+  let index = 0;
 
-  for (const seg of segments) {
-    if (drop.has(seg.toLowerCase())) continue;
-    // drop v1/v2/etc
-    if (/^v\d+$/i.test(seg)) continue;
-    out.push(seg);
+  // Drop protocol/version envelopes from beginning if more segments follow
+  while (index < rawSegments.length) {
+    const seg = rawSegments[index];
+    const segLower = seg.toLowerCase();
+    const hasRemaining = index < rawSegments.length - 1;
+
+    if (hasRemaining) {
+      if (segLower === "api" || segLower === "rest" || segLower === "public") {
+        index++;
+        continue;
+      }
+      if (/^v\d+(?:\.\d+)?$/i.test(segLower)) {
+        index++;
+        continue;
+      }
+      // Next.js route groups like (backend), (auth), (dashboard)
+      if (seg.startsWith("(") && seg.endsWith(")")) {
+        index++;
+        continue;
+      }
+    }
+    break;
+  }
+
+  while (index < rawSegments.length) {
+    const seg = rawSegments[index];
+    if (!(seg.startsWith("(") && seg.endsWith(")"))) {
+      out.push(seg);
+    }
+    index++;
   }
 
   return out;
 }
 
+/**
+ * Universal Module / Controller Fallback Extractor.
+ * When a route has 0 static URL segments (e.g. GET /:shortId or Next.js [...route].ts),
+ * this discovers the logical feature domain from the source file path across all programming languages.
+ */
+export function extractFallbackDomain(file?: string): string {
+  if (!file) return "System";
+  const normalized = file.replace(/\\/g, "/");
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length === 0) return "System";
+
+  const fileName = parts[parts.length - 1];
+  const baseName = fileName
+    .replace(/\.[a-zA-Z0-9]+$/, "")
+    .replace(/\.(routes|controller|views|handlers|endpoint|router|service)$/i, "")
+    .replace(/(routes|controller|views|handlers|endpoint|router|service)$/i, "");
+
+  const genericNames = new Set([
+    "index", "main", "app", "server", "routes", "router", "api", "mod", "lib", "urls", "views"
+  ]);
+
+  // If baseName is generic OR if baseName is itself a dynamic param like [...route] or [id]
+  const isBaseGenericOrDynamic =
+    !baseName ||
+    genericNames.has(baseName.toLowerCase()) ||
+    isDynamicSegment(baseName);
+
+  if (!isBaseGenericOrDynamic) {
+    return toTitleCaseFromSlug(baseName);
+  }
+
+  // Inspect parent directories for feature name
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const p = parts[i];
+    const pLower = p.toLowerCase();
+    const genericFolders = new Set([
+      "src", "routes", "controllers", "api", "backend", "app", "server",
+      "handlers", "endpoints", "views", "modules", "services", "lib", "pages", "."
+    ]);
+    if (!genericFolders.has(pLower) && !isDynamicSegment(p)) {
+      return toTitleCaseFromSlug(p);
+    }
+  }
+
+  return "System";
+}
+
+/**
+ * Universal RESTful Verb-Aware Canonical Route Namer.
+ * Generates clear, non-colliding display names (e.g. "List Contacts" vs "Create Contact").
+ */
+export function computeRouteDisplayName(args: {
+  method: string;
+  path: string;
+  file?: string;
+}): string {
+  const method = String(args.method || "GET").toUpperCase();
+  const segments = normalizePathSegments(args.path);
+
+  if (segments.length === 0) {
+    const p = String(args.path || "").toLowerCase();
+    if (p.includes("health")) return "Health Check";
+    if (p.includes("robot")) return "Robots.txt";
+    if (p.includes("ping")) return "Ping";
+    if (method === "GET") return "API Root";
+    return `${toTitleCaseFromSlug(method)} Root`;
+  }
+
+  const lastSeg = segments[segments.length - 1];
+  const lastIsDynamic = isDynamicSegment(lastSeg);
+
+  // Case 1: Dynamic leaf (e.g. /tenants/{realm}/clients/{cid} or /users/:id)
+  if (lastIsDynamic) {
+    const paramName = extractParamName(lastSeg);
+    let parentResource = "";
+    for (let i = segments.length - 2; i >= 0; i--) {
+      if (!isDynamicSegment(segments[i])) {
+        parentResource = segments[i];
+        break;
+      }
+    }
+
+    const parentTitle = parentResource ? toTitleCaseFromSlug(parentResource) : "";
+    const singularParent = parentTitle.endsWith("s") && parentTitle.length > 3 ? parentTitle.slice(0, -1) : parentTitle;
+    const targetLabel = singularParent || "Item";
+
+    if (method === "GET") return `Get ${targetLabel} by ${paramName}`;
+    if (method === "DELETE") return `Delete ${targetLabel} by ${paramName}`;
+    if (method === "PUT" || method === "PATCH") return `Update ${targetLabel} by ${paramName}`;
+    if (method === "POST") return `Create ${targetLabel} by ${paramName}`;
+    return `${toTitleCaseFromSlug(method)} ${targetLabel} by ${paramName}`;
+  }
+
+  // Case 2: Static leaf action endpoints
+  const lastLower = lastSeg.toLowerCase();
+  const actionWords = new Map<string, string>([
+    ["login", "Login"],
+    ["logout", "Logout"],
+    ["logout-all", "Logout All"],
+    ["register", "Register"],
+    ["signup", "Sign Up"],
+    ["refresh", "Refresh Token"],
+    ["verify", "Verify"],
+    ["verify-login", "Verify Login"],
+    ["verify-otp", "Verify OTP"],
+    ["request-otp", "Request OTP"],
+    ["reset", "Reset Password"],
+    ["reset-password", "Reset Password"],
+    ["forgot-password", "Forgot Password"],
+    ["change-password", "Change Password"],
+    ["callback", "Auth Callback"],
+    ["ping", "Ping"],
+    ["health", "Health Check"],
+    ["status", "System Status"],
+    ["ready", "Readiness Check"],
+    ["me", "Get Current User Profile"],
+    ["profile", "Get Profile"],
+    ["upload", "Upload File"],
+    ["download", "Download File"],
+    ["duplicate", "Duplicate"],
+    ["merge", "Merge"],
+    ["reorder", "Reorder"],
+    ["summary", "Get Summary"],
+    ["history", "Get History"],
+    ["insights", "Get Insights"],
+    ["overview", "Get Overview"],
+    ["plans", "List Plans"],
+    ["metrics", "Get Metrics"],
+  ]);
+
+  if (actionWords.has(lastLower)) {
+    return actionWords.get(lastLower)!;
+  }
+
+  // Webhooks
+  if (lastLower === "webhook" || lastLower === "webhooks") {
+    if (method === "GET") return "Verify Webhook";
+    if (method === "POST") return "Receive Webhook";
+    if (method === "DELETE") return "Delete Webhook";
+    return `${toTitleCaseFromSlug(method)} Webhook`;
+  }
+
+  // Case 3: Standard Resource Collections (e.g. GET /contacts -> List Contacts, POST /contacts -> Create Contact)
+  const lastTitle = toTitleCaseFromSlug(lastSeg);
+  const isPlural = lastLower.endsWith("s") && lastLower.length > 3;
+  const singular = isPlural ? lastTitle.slice(0, -1) : lastTitle;
+
+  if (method === "GET") {
+    return isPlural ? `List ${lastTitle}` : `Get ${lastTitle}`;
+  }
+  if (method === "POST") {
+    return `Create ${singular}`;
+  }
+  if (method === "PUT") {
+    return `Replace ${singular}`;
+  }
+  if (method === "PATCH") {
+    return `Update ${singular}`;
+  }
+  if (method === "DELETE") {
+    return `Delete ${singular}`;
+  }
+
+  return `${toTitleCaseFromSlug(method)} ${lastTitle}`;
+}
+
+/**
+ * Master Universal Tree Builder.
+ * Maps any set of ApiRoutes into a clean, hierarchical folder structure:
+ * - Dynamic parameters never become physical folders.
+ * - Single-child passthrough wrappers are squashed.
+ * - Standalone routes are categorized into their domain folder.
+ * - Sibling name collisions are resolved deterministically.
+ */
 export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
   const root: ApiFolder = { id: "root", name: "root", children: [] };
 
-  const looksHuman = (name: string | undefined) => {
-    const s = String(name ?? "").trim();
-    if (!s) return false;
-    if (s.startsWith(":") || (s.startsWith("[") && s.endsWith("]"))) return false;
-    if (s.includes(" ")) return true;
-    if (/[A-Z]/.test(s)) return true;
-    return false;
-  };
-
-  const isDynamicSegment = (seg: string) => {
-    const s = String(seg || "");
-    if (!s) return false;
-    // Express style: :id, :id?
-    if (s.startsWith(":")) return true;
-    // Next.js style: [id], [...slug], [[...slug]]
-    if (s.startsWith("[") && s.endsWith("]")) return true;
-    return false;
-  };
-
-  const singularize = (s: string) => {
-    const str = String(s || "");
-    if (str.length > 3 && str.toLowerCase().endsWith("s"))
-      return str.slice(0, -1);
-    return str;
-  };
-
-  const humanNameFromContext = (args: {
-    method: string;
-    resourceSeg: string | undefined;
-    leafSegments: string[];
-  }): string => {
-    const method = String(args.method || "").toUpperCase();
-    const resourceSeg = args.resourceSeg;
-    const resourcePlural = resourceSeg
-      ? toTitleCaseFromSlug(resourceSeg)
-      : "Resource";
-    const resourceSingular = singularize(resourcePlural);
-
-    const leaf = args.leafSegments;
-    const staticSegs = leaf.filter((s) => !isDynamicSegment(s));
-    const lastStatic = staticSegs.length
-      ? staticSegs[staticSegs.length - 1]
-      : undefined;
-    const lastStaticTitle = lastStatic
-      ? toTitleCaseFromSlug(lastStatic)
-      : undefined;
-    const lastStaticSingular = lastStaticTitle
-      ? singularize(lastStaticTitle)
-      : undefined;
-
-    const endsWithDynamic =
-      leaf.length > 0 && isDynamicSegment(leaf[leaf.length - 1]);
-    const startsWithDynamic = leaf.length > 0 && isDynamicSegment(leaf[0]);
-
-    const actionWords = new Set([
-      "login",
-      "logout",
-      "register",
-      "refresh",
-      "callback",
-      "verify",
-      "reset",
-      "reset-password",
-      "forgot-password",
-      "change-password",
-      "send-otp",
-      "otp",
-      "ping",
-      "health",
-      "ready",
-    ]);
-
-    // Collection base: /resource
-    // Only when the leaf IS the resource segment (avoid treating /auth/login as a collection).
-    if (
-      leaf.length === 1 &&
-      !startsWithDynamic &&
-      resourceSeg &&
-      String(leaf[0]).toLowerCase() === String(resourceSeg).toLowerCase()
-    ) {
-      if (method === "GET") return `List ${resourcePlural}`;
-      if (method === "POST") return `Create ${resourceSingular}`;
-      if (method === "PUT" || method === "PATCH")
-        return `Update ${resourcePlural}`;
-      if (method === "DELETE") return `Delete ${resourcePlural}`;
-    }
-
-    // Item base: /resource/:id
-    if (leaf.length === 1 && startsWithDynamic) {
-      if (method === "GET") return `Get ${resourceSingular} By Id`;
-      if (method === "POST") return `Create ${resourceSingular}`;
-      if (method === "PUT" || method === "PATCH")
-        return `Update ${resourceSingular}`;
-      if (method === "DELETE") return `Delete ${resourceSingular}`;
-    }
-
-    // Action endpoint (login/logout/etc): keep it simple.
-    if (leaf.length === 1 && lastStatic) {
-      const w = String(lastStatic).toLowerCase();
-      if (actionWords.has(w)) return toTitleCaseFromSlug(lastStatic);
-    }
-
-    // Sub-resource: /resource/:id/comments or /resource/:id/comments/:commentId
-    if (lastStaticTitle) {
-      const subPlural = lastStaticTitle;
-      const subSingular = lastStaticSingular ?? subPlural;
-
-      if (method === "GET") {
-        return endsWithDynamic
-          ? `Get ${subSingular} By Id`
-          : `List ${subPlural}`;
-      }
-      if (method === "POST") return `Create ${subSingular}`;
-      if (method === "PUT" || method === "PATCH")
-        return `Update ${subSingular}`;
-      if (method === "DELETE") return `Delete ${subSingular}`;
-    }
-
-    // Fallback: title-case the visible leaf path
-    const fallback = leaf.join("/") || "/";
-    return toTitleCaseFromSlug(fallback.replace(/\//g, " "));
-  };
-
-  // Used to decide whether a single-segment route like `/posts` should live
-  // inside a `Posts` folder (Postman-style) or remain at the root.
-  const firstSegmentStats = new Map<
-    string,
-    { count: number; hasNested: boolean }
-  >();
-
-  for (const r of routes) {
-    const segments = normalizePathSegments(r.path);
-    if (segments.length === 0) continue;
-    const first = segments[0];
-    const prev = firstSegmentStats.get(first) || { count: 0, hasNested: false };
-    firstSegmentStats.set(first, {
-      count: prev.count + 1,
-      hasNested: prev.hasNested || segments.length > 1,
-    });
-  }
-
-  const hasNestedRoutes = (routePathSegs: string[]) => {
-    const pathStr = routePathSegs.join("/");
-    return routes.some((other) => {
-      const otherSegs = normalizePathSegments(other.path);
-      return (
-        otherSegs.length > routePathSegs.length &&
-        otherSegs.slice(0, routePathSegs.length).join("/") === pathStr
-      );
-    });
-  };
-
-  const getOrCreateFolder = (
-    children: (ApiFolder | ApiRoute)[],
-    name: string,
-  ) => {
-    let folder = children.find(
-      (c) => !(c as any).method && (c as any).name === name,
+  const getOrCreateFolder = (parentChildren: (ApiFolder | ApiRoute)[], name: string): ApiFolder => {
+    let folder = parentChildren.find(
+      (c) => !("method" in c) && c.name === name,
     ) as ApiFolder | undefined;
     if (!folder) {
       folder = { id: generateId(), name, children: [] };
-      children.push(folder);
+      parentChildren.push(folder);
     }
     return folder;
   };
 
   for (const r of routes) {
     const segments = normalizePathSegments(r.path);
-    if (segments.length === 0) {
-      root.children.push({
-        ...r,
-        name: looksHuman(r.name) ? r.name : getFunRootName(r.method, r.file),
-      });
-      continue;
-    }
+    const computedName = computeRouteDisplayName({
+      method: r.method,
+      path: r.path,
+      file: r.file,
+    });
 
-    const lastSeg = segments[segments.length - 1];
-    const lastIsDynamic = isDynamicSegment(lastSeg);
+    // Extract all static segments (Resource Taxonomy)
+    // Parameter segments ({realm}, :id, [id]) are NEVER included in folderSegs!
+    const staticSegments = segments.filter((s) => !isDynamicSegment(s));
 
-    let folderSegs: string[];
-    let leafSegs: string[];
+    let folderNames: string[] = [];
 
-    if (lastIsDynamic || hasNestedRoutes(segments)) {
-      folderSegs = segments.filter((s) => !isDynamicSegment(s));
-      let lastStaticIdx = -1;
-      for (let i = segments.length - 1; i >= 0; i--) {
-        if (!isDynamicSegment(segments[i])) {
-          lastStaticIdx = i;
-          break;
-        }
-      }
-      if (lastStaticIdx === -1) {
-        leafSegs = segments;
+    if (staticSegments.length === 0) {
+      // 0 static segments: true root (/) or dynamic root (/:shortId, /{id})
+      if (segments.length === 0) {
+        folderNames = ["System"];
       } else {
-        leafSegs = segments.slice(lastStaticIdx + 1);
+        folderNames = [extractFallbackDomain(r.file)];
       }
+    } else if (staticSegments.length === 1) {
+      // 1 static segment: file directly into domain folder (no orphan dumping!)
+      folderNames = [toTitleCaseFromSlug(staticSegments[0])];
     } else {
-      const preceding = segments.slice(0, -1);
-      folderSegs = preceding.filter((s) => !isDynamicSegment(s));
-      leafSegs = [lastSeg];
+      // Multiple static segments (e.g. /tenants/{realm}/clients/{cid} -> ["Tenants", "Clients"])
+      folderNames = staticSegments.map((s) => toTitleCaseFromSlug(s));
     }
 
-    const resourceSeg = folderSegs.length
-      ? folderSegs[folderSegs.length - 1]
-      : segments[0];
-
-    const computedName = looksHuman(r.name)
-      ? r.name
-      : humanNameFromContext({
-          method: String((r as any).method ?? ""),
-          resourceSeg,
-          leafSegments: leafSegs.length ? leafSegs : [lastSeg],
-        });
-
-    if (folderSegs.length === 1) {
-      const first = folderSegs[0];
-      const stats = firstSegmentStats.get(first);
-      if (!stats?.hasNested && (stats?.count ?? 0) <= 1) {
-        root.children.push({
-          ...r,
-          name: computedName || leafSegs.join("/") || lastSeg,
-        });
-        continue;
-      }
+    // Traverse and place route inside folder
+    let currentChildren = root.children;
+    for (const fName of folderNames) {
+      const folder = getOrCreateFolder(currentChildren, fName);
+      currentChildren = folder.children;
     }
 
-    if (folderSegs.length === 0) {
-      root.children.push({
-        ...r,
-        name: computedName || leafSegs.join("/") || lastSeg,
-      });
-      continue;
-    }
-
-    let current = root;
-    for (const seg of folderSegs) {
-      current = getOrCreateFolder(current.children, toTitleCaseFromSlug(seg));
-    }
-
-    current.children.push({
+    currentChildren.push({
       ...r,
-      name: computedName || leafSegs.join("/") || lastSeg,
+      name: computedName,
     });
   }
 
-  // Deterministic sort for readability: folders first (A→Z), then routes by method then path.
+  // Smart Folder Squashing (Strict Mathematical Rule)
+  // Only squash when a folder contains 0 direct routes AND exactly 1 child folder.
+  function squashFolders(folder: ApiFolder): void {
+    for (let i = 0; i < folder.children.length; i++) {
+      const child = folder.children[i];
+      if (!("method" in child)) {
+        squashFolders(child as ApiFolder);
+      }
+    }
+
+    for (let i = 0; i < folder.children.length; i++) {
+      const child = folder.children[i];
+      if (!("method" in child)) {
+        let currentChild = child as ApiFolder;
+        while (
+          currentChild.children.length === 1 &&
+          !("method" in currentChild.children[0])
+        ) {
+          const grandChild = currentChild.children[0] as ApiFolder;
+          currentChild = {
+            id: grandChild.id,
+            name: `${currentChild.name} / ${grandChild.name}`,
+            children: grandChild.children,
+          };
+          folder.children[i] = currentChild;
+        }
+      }
+    }
+  }
+
+  squashFolders(root);
+
+  // Sibling Name Disambiguation
+  function disambiguateFolderRoutes(folder: ApiFolder): void {
+    const nameCount = new Map<string, number>();
+    for (const item of folder.children) {
+      if ("method" in item) {
+        nameCount.set(item.name, (nameCount.get(item.name) || 0) + 1);
+      } else {
+        disambiguateFolderRoutes(item as ApiFolder);
+      }
+    }
+
+    const seenCount = new Map<string, number>();
+    for (const item of folder.children) {
+      if ("method" in item) {
+        const total = nameCount.get(item.name) || 0;
+        if (total > 1) {
+          const current = (seenCount.get(item.name) || 0) + 1;
+          seenCount.set(item.name, current);
+          if (current > 1) {
+            item.name = `${item.name} (${current})`;
+          }
+        }
+      }
+    }
+  }
+
+  disambiguateFolderRoutes(root);
+
+  // Deterministic Sort: Folders A-Z first, then Routes by Method then Path
   const methodOrder: Record<string, number> = {
     GET: 1,
     POST: 2,
@@ -341,29 +534,29 @@ export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
     ALL: 9,
   };
 
-  const sortNodeChildren = (folder: ApiFolder) => {
+  const sortNode = (folder: ApiFolder) => {
     folder.children.sort((a, b) => {
-      const aIsRoute = (a as any).method !== undefined;
-      const bIsRoute = (b as any).method !== undefined;
+      const aIsRoute = "method" in a;
+      const bIsRoute = "method" in b;
       if (aIsRoute !== bIsRoute) return aIsRoute ? 1 : -1;
 
       if (!aIsRoute && !bIsRoute) {
-        return String((a as any).name).localeCompare(String((b as any).name));
+        return a.name.localeCompare(b.name);
       }
 
-      const am = String((a as any).method);
-      const bm = String((b as any).method);
+      const am = String((a as ApiRoute).method);
+      const bm = String((b as ApiRoute).method);
       const byMethod = (methodOrder[am] ?? 99) - (methodOrder[bm] ?? 99);
       if (byMethod !== 0) return byMethod;
-      return String((a as any).path).localeCompare(String((b as any).path));
+      return String((a as ApiRoute).path).localeCompare(String((b as ApiRoute).path));
     });
 
     for (const child of folder.children) {
-      if ((child as any).children) sortNodeChildren(child as ApiFolder);
+      if (!("method" in child)) sortNode(child as ApiFolder);
     }
   };
 
-  sortNodeChildren(root);
+  sortNode(root);
 
   return root.children as ApiFolder[];
 }

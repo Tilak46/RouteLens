@@ -119,29 +119,41 @@ export class SymbolicMountLinker {
     const importMap = new Map<string, Map<string, TargetExport>>();
     const fileMounts = new Map<string, MountInfo[]>();
 
-    const mountRegex = /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_$]+)\.(?:use|route)\s*\(\s*(?:(['"`])(\/[^'"`]*)\2\s*,\s*)?([a-zA-Z0-9_$]+)\s*\)/g;
-    const fastifyRegisterRegex = /([a-zA-Z0-9_$]+)\.register\s*\(\s*([a-zA-Z0-9_$]+)(?:\s*,\s*\{[^}]*prefix:\s*['"`]([^'"`]+)['"`])?/g;
-    const esImportRegex = /import\s+(?:\{([^}]+)\}|([a-zA-Z0-9_$]+))\s+from\s+['"]([^'"]+)['"]/g;
+    // Supports:
+    // 1. import defaultVal, { named1, named2 as alias } from '...'
+    // 2. import defaultVal from '...'
+    // 3. import { named1, named2 } from '...'
+    // 4. import * as ns from '...'
+    const esImportRegex = /import\s+(?:([a-zA-Z0-9_$]+)\s*,\s*\{([^}]+)\}|([a-zA-Z0-9_$]+)|\{([^}]+)\}|\*\s+as\s+([a-zA-Z0-9_$]+))\s+from\s+['"]([^'"]+)['"]/g;
     const cjsRequireRegex = /(?:const|let|var)\s+(?:\{([^}]+)\}|([a-zA-Z0-9_$]+))\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    const mountRegex = /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_$]+)\.(?:use|route)\s*\(\s*(?:(['"`])(\/[^'"`]*)\2\s*,\s*)?(?:[a-zA-Z0-9_$.()]+\s*,\s*)*([a-zA-Z0-9_$]+)\s*\)/g;
+    const fastifyRegisterRegex = /([a-zA-Z0-9_$]+)\.register\s*\(\s*([a-zA-Z0-9_$]+)(?:\s*,\s*\{[^}]*prefix:\s*['"`]([^'"`]+)['"`])?/g;
 
     for (const [filePath, code] of fileCodeMap.entries()) {
       const localImports = new Map<string, TargetExport>();
       let imp: RegExpExecArray | null;
       while ((imp = esImportRegex.exec(code)) !== null) {
-        const named = imp[1];
-        const def = imp[2];
-        const src = imp[3];
+        const def = imp[1] || imp[3];
+        const named = imp[2] || imp[4];
+        const ns = imp[5];
+        const src = imp[6];
         const resolved = resolveLocalImport(filePath, src);
         if (resolved) {
           if (def) {
             const deep = resolveExportedTarget(fileCodeMap, resolved, "default");
             localImports.set(def, deep || { filePath: resolved, localName: "default" });
           }
+          if (ns) {
+            const deep = resolveExportedTarget(fileCodeMap, resolved, "default");
+            localImports.set(ns, deep || { filePath: resolved, localName: "default" });
+          }
           if (named) {
             for (const part of named.split(",")) {
               const [orig, alias] = part.trim().split(/\s+as\s+/);
-              const deep = resolveExportedTarget(fileCodeMap, resolved, orig.trim());
-              localImports.set(alias || orig.trim(), deep || { filePath: resolved, localName: orig.trim() });
+              if (orig) {
+                const deep = resolveExportedTarget(fileCodeMap, resolved, orig.trim());
+                localImports.set(alias || orig.trim(), deep || { filePath: resolved, localName: orig.trim() });
+              }
             }
           }
         }
@@ -161,8 +173,10 @@ export class SymbolicMountLinker {
           if (named) {
             for (const part of named.split(",")) {
               const [orig, alias] = part.trim().split(/\s*:\s*/);
-              const deep = resolveExportedTarget(fileCodeMap, resolved, orig.trim());
-              localImports.set(alias || orig.trim(), deep || { filePath: resolved, localName: orig.trim() });
+              if (orig) {
+                const deep = resolveExportedTarget(fileCodeMap, resolved, orig.trim());
+                localImports.set(alias || orig.trim(), deep || { filePath: resolved, localName: orig.trim() });
+              }
             }
           }
         }
