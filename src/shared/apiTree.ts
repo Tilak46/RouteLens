@@ -495,6 +495,13 @@ export function computeRouteDisplayName(args: {
 export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
   const root: ApiFolder = { id: "root", name: "root", children: [] };
 
+  // Count true root routes (e.g. /, /api where segments.length === 0)
+  const rootRoutesCount = routes.filter(
+    (r) => normalizePathSegments(r.path).length === 0,
+  ).length;
+  // If 1 to 3 root routes exist, keep them directly at root level (Option B: sorted at bottom)
+  const keepRootRoutesAtRoot = rootRoutesCount >= 1 && rootRoutesCount <= 3;
+
   const getOrCreateFolder = (parentChildren: (ApiFolder | ApiRoute)[], name: string): ApiFolder => {
     let folder = parentChildren.find(
       (c) => !("method" in c) && c.name === name,
@@ -523,7 +530,11 @@ export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
     if (staticSegments.length === 0) {
       // 0 static segments: true root (/) or dynamic root (/:shortId, /{id})
       if (segments.length === 0) {
-        folderNames = ["System"];
+        if (keepRootRoutesAtRoot) {
+          folderNames = [];
+        } else {
+          folderNames = ["System"];
+        }
       } else {
         folderNames = [extractFallbackDomain(r.file)];
       }
