@@ -8,6 +8,7 @@ import { joinUrl, SymbolicMountLinker } from "./mountLinker";
 let isParserInitialized = false;
 let initPromise: Promise<void> | null = null;
 const languageCache = new Map<string, Parser.Language>();
+const parserCache = new Map<string, Parser>();
 
 function getTreeSitterWasmPath(): string {
   const possiblePaths = [
@@ -126,25 +127,30 @@ const WASM_FILE_MAP: Record<string, string> = {
 export async function getLanguageParser(language: string): Promise<{ parser: Parser; language: Parser.Language } | null> {
   await ensureParserInit();
 
-  const wasmFileName = WASM_FILE_MAP[language.toLowerCase()];
+  const langKey = language.toLowerCase();
+  const wasmFileName = WASM_FILE_MAP[langKey];
   if (!wasmFileName) return null;
 
-  let lang = languageCache.get(language);
+  let lang = languageCache.get(langKey);
   if (!lang) {
     const wasmPath = path.join(getWasmDirectory(), wasmFileName);
     if (!fs.existsSync(wasmPath)) return null;
 
     try {
       lang = await Parser.Language.load(wasmPath);
-      languageCache.set(language, lang);
+      languageCache.set(langKey, lang);
     } catch (err) {
       console.error(`[TreeSitter] Failed to load WASM for ${language}:`, err);
       return null;
     }
   }
 
-  const parser = new Parser();
-  parser.setLanguage(lang);
+  let parser = parserCache.get(langKey);
+  if (!parser) {
+    parser = new Parser();
+    parser.setLanguage(lang);
+    parserCache.set(langKey, parser);
+  }
   return { parser, language: lang };
 }
 
@@ -967,6 +973,25 @@ function getPythonStringLiteral(node: Parser.SyntaxNode | null | undefined): str
   return null;
 }
 
+function extractPythonPathValues(argNode: Parser.SyntaxNode): string[] {
+  if (argNode.type === "string") {
+    const s = getPythonStringLiteral(argNode);
+    return s ? [s] : [];
+  }
+  if (argNode.type === "list" || argNode.type === "tuple") {
+    const res: string[] = [];
+    for (let k = 0; k < argNode.childCount; k++) {
+      const c = argNode.child(k)!;
+      if (c.type === "string") {
+        const s = getPythonStringLiteral(c);
+        if (s) res.push(s);
+      }
+    }
+    return res;
+  }
+  return [];
+}
+
 const PYTHON_METHODS = new Set(["get", "post", "put", "delete", "patch", "options", "head"]);
 
 export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
@@ -976,6 +1001,7 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
   routerPrefixes.set("router", "/");
   routerPrefixes.set("api", "/");
   routerPrefixes.set("bp", "/");
+  routerPrefixes.set("http", "/");
 
   function walk(node: Parser.SyntaxNode) {
     if (!node) return;
@@ -1008,7 +1034,7 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
       }
     }
 
-    // 2. Decorators: @app.get(...), @bp.route(...), @router.api_route(...)
+    // 2. Decorators: @app.get(...), @bp.route(...), @router.api_route(...), @http.route(...), @route(...)
     if (node.type === "decorated_definition") {
       for (let i = 0; i < node.childCount; i++) {
         const c = node.child(i)!;
@@ -1016,73 +1042,83 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
           const callNode = c.children.find((child) => child.type === "call");
           if (callNode) {
             const fnNode = callNode.child(0);
+            let receiver = "";
+            let action = "";
+
             if (fnNode && fnNode.type === "attribute") {
               const operand = fnNode.child(0);
               const field = fnNode.child(2);
               if (operand && field) {
-                const receiver = operand.text.trim();
-                const action = field.text.trim().toLowerCase();
+                receiver = operand.text.trim();
+                action = field.text.trim().toLowerCase();
+              }
+            } else if (fnNode && fnNode.type === "identifier") {
+              action = fnNode.text.trim().toLowerCase();
+              receiver = "";
+            }
 
-                let methods: Method[] = [];
-                let isRouteDecorator = false;
-                let framework: OmniFramework = "fastapi";
+            if (action) {
+              let methods: Method[] = [];
+              let isRouteDecorator = false;
+              let framework: OmniFramework = "fastapi";
 
-                if (PYTHON_METHODS.has(action)) {
-                  methods = [action.toUpperCase() as Method];
-                  isRouteDecorator = true;
-                  if (receiver === "bp" || receiver.endsWith("_bp")) {
-                    framework = "flask";
-                  }
-                } else if (action === "route" || action === "api_route") {
-                  isRouteDecorator = true;
-                  framework = action === "api_route" ? "fastapi" : "flask";
+              if (PYTHON_METHODS.has(action)) {
+                methods = [action.toUpperCase() as Method];
+                isRouteDecorator = true;
+                if (receiver === "bp" || receiver.endsWith("_bp")) {
+                  framework = "flask";
+                }
+              } else if (action === "route" || action === "api_route") {
+                isRouteDecorator = true;
+                framework = action === "api_route" ? "fastapi" : "flask";
 
-                  // Look for methods=[...] in arguments
-                  const args = callNode.children.find((child) => child.type === "argument_list");
-                  let foundMethods = false;
-                  if (args) {
-                    for (let j = 0; j < args.childCount; j++) {
-                      const arg = args.child(j)!;
-                      if (arg.type === "keyword_argument" && arg.child(0)?.text === "methods") {
-                        const valNode = arg.child(2);
-                        if (valNode && (valNode.type === "list" || valNode.type === "tuple")) {
-                          for (let k = 0; k < valNode.childCount; k++) {
-                            const mStr = getPythonStringLiteral(valNode.child(k)!);
-                            if (mStr) {
-                              methods.push(mStr.toUpperCase() as Method);
-                              foundMethods = true;
-                            }
+                // Look for methods=[...] in arguments
+                const args = callNode.children.find((child) => child.type === "argument_list");
+                let foundMethods = false;
+                if (args) {
+                  for (let j = 0; j < args.childCount; j++) {
+                    const arg = args.child(j)!;
+                    if (arg.type === "keyword_argument" && arg.child(0)?.text === "methods") {
+                      const valNode = arg.child(2);
+                      if (valNode && (valNode.type === "list" || valNode.type === "tuple")) {
+                        for (let k = 0; k < valNode.childCount; k++) {
+                          const mStr = getPythonStringLiteral(valNode.child(k)!);
+                          if (mStr) {
+                            methods.push(mStr.toUpperCase() as Method);
+                            foundMethods = true;
                           }
                         }
                       }
                     }
                   }
-                  if (!foundMethods) {
-                    methods = ["GET"];
-                  }
                 }
+                if (!foundMethods) {
+                  methods = ["GET"];
+                }
+              }
 
-                if (isRouteDecorator) {
-                  const args = callNode.children.find((child) => child.type === "argument_list");
-                  let pathVal: string | null = null;
-                  if (args) {
-                    for (let j = 0; j < args.childCount; j++) {
-                      const arg = args.child(j)!;
-                      if (arg.type === "string") {
-                        pathVal = getPythonStringLiteral(arg);
+              if (isRouteDecorator) {
+                const args = callNode.children.find((child) => child.type === "argument_list");
+                const pathVals: string[] = [];
+                if (args) {
+                  for (let j = 0; j < args.childCount; j++) {
+                    const arg = args.child(j)!;
+                    if (arg.type === "string" || arg.type === "list" || arg.type === "tuple") {
+                      pathVals.push(...extractPythonPathValues(arg));
+                      break;
+                    } else if (arg.type === "keyword_argument") {
+                      const kName = arg.child(0)?.text;
+                      if (kName === "path" || kName === "rule") {
+                        pathVals.push(...extractPythonPathValues(arg.child(2)!));
                         break;
-                      } else if (arg.type === "keyword_argument") {
-                        const kName = arg.child(0)?.text;
-                        if (kName === "path" || kName === "rule") {
-                          pathVal = getPythonStringLiteral(arg.child(2));
-                          break;
-                        }
                       }
                     }
                   }
+                }
 
-                  if (pathVal !== null) {
-                    const prefix = routerPrefixes.get(receiver) || "/";
+                if (pathVals.length > 0) {
+                  const prefix = routerPrefixes.get(receiver) || "/";
+                  for (const pathVal of pathVals) {
                     let fullPath = joinUrl(prefix, pathVal);
                     if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
 
@@ -2440,26 +2476,34 @@ export async function extractRoutesWithTreeSitter(
     return [];
   }
 
-  switch (candidate.language) {
-    case "csharp":
-      return extractCSharpRoutes(tree, candidate.filePath);
-    case "tsx":
-    case "typescript":
-    case "javascript":
-      return extractTsJsRoutes(tree, candidate.filePath, mountLinker);
-    case "python":
-      return extractPythonRoutes(tree, candidate.filePath);
-    case "go":
-      return extractGoRoutes(tree, candidate.filePath);
-    case "java":
-      return extractJavaRoutes(tree, candidate.filePath);
-    case "php":
-      return extractPhpRoutes(tree, candidate.filePath);
-    case "rust":
-      return extractRustRoutes(tree, candidate.filePath);
-    case "ruby":
-      return extractRubyRoutes(tree, candidate.filePath);
-    default:
-      return [];
+  try {
+    switch (candidate.language) {
+      case "csharp":
+        return extractCSharpRoutes(tree, candidate.filePath);
+      case "tsx":
+      case "typescript":
+      case "javascript":
+        return extractTsJsRoutes(tree, candidate.filePath, mountLinker);
+      case "python":
+        return extractPythonRoutes(tree, candidate.filePath);
+      case "go":
+        return extractGoRoutes(tree, candidate.filePath);
+      case "java":
+        return extractJavaRoutes(tree, candidate.filePath);
+      case "php":
+        return extractPhpRoutes(tree, candidate.filePath);
+      case "rust":
+        return extractRustRoutes(tree, candidate.filePath);
+      case "ruby":
+        return extractRubyRoutes(tree, candidate.filePath);
+      default:
+        return [];
+    }
+  } finally {
+    try {
+      tree.delete();
+    } catch {
+      // Ignore cleanup error if already freed
+    }
   }
 }
