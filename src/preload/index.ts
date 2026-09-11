@@ -180,11 +180,14 @@ export const api = {
     return ipcRenderer.invoke("browsers:scan");
   },
 
-  // API Explorer
   scanProject: (
     path: string,
-  ): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number }> => {
+  ): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number; cancelled?: boolean }> => {
     return ipcRenderer.invoke("api-explorer:scan-project", path);
+  },
+
+  cancelScanProject: (path: string): Promise<boolean> => {
+    return ipcRenderer.invoke("api-explorer:cancel-scan", path);
   },
 
   runApiRequest: (request: ApiHttpRequest): Promise<ApiHttpResponse> => {

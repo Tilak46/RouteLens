@@ -12,6 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { CookieJarService } from "../services/cookieJar";
 
+const activeScanControllers = new Map<string, AbortController>();
+
 export function registerApiExplorerHandlers() {
   ipcMain.handle(
     "api-explorer:scan-project",
@@ -21,13 +23,41 @@ export function registerApiExplorerHandlers() {
         return { tree: [], logs: ["No project path provided"] };
       }
 
+      // If an existing scan is running for this project, abort it cleanly first
+      const prev = activeScanControllers.get(projectPath);
+      if (prev) {
+        prev.abort();
+      }
+
+      const controller = new AbortController();
+      activeScanControllers.set(projectPath, controller);
+
       try {
-        const result = await scanProjectForRoutes(projectPath);
+        const result = await scanProjectForRoutes(projectPath, controller.signal);
         return result;
       } catch (err) {
         console.error("Scan failed", err);
         return { tree: [], logs: [`Scan failed: ${err}`] };
+      } finally {
+        if (activeScanControllers.get(projectPath) === controller) {
+          activeScanControllers.delete(projectPath);
+        }
       }
+    },
+  );
+
+  ipcMain.handle(
+    "api-explorer:cancel-scan",
+    async (_, projectPath: string): Promise<boolean> => {
+      if (!projectPath) return false;
+      const controller = activeScanControllers.get(projectPath);
+      if (controller) {
+        console.log(`[IPC] Cancelling active scan for: ${projectPath}`);
+        controller.abort();
+        activeScanControllers.delete(projectPath);
+        return true;
+      }
+      return false;
     },
   );
 

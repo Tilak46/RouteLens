@@ -1324,11 +1324,14 @@ function App() {
     }
 
     try {
-      const scanPromise = apiClient.scanProject(project.path);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Scan timed out")), 30000)
-      );
-      const result = await Promise.race([scanPromise, timeoutPromise]);
+      const result = await apiClient.scanProject(project.path);
+      if (result?.cancelled) {
+        toast.info("Scan cancelled", {
+          description: `Route scan was stopped for ${project.name}`,
+        });
+        return;
+      }
+
       const existing = treeCache[project.path];
       const currentTree = existing?.tree || [];
       const merged = currentTree.length > 0
@@ -1354,15 +1357,33 @@ function App() {
       toast.success("Scan complete", {
         description: `Discovered ${result?.detectedRoutesCount || merged.length} routes in ${project.name}`,
       });
-    } catch (err) {
-      toast.error("Scan failed or timed out", {
-        description: "Please verify backend directory access or rescan.",
-      });
+    } catch (err: any) {
+      if (err?.message?.includes("cancelled") || err?.message?.includes("aborted")) {
+        toast.info("Scan cancelled", {
+          description: `Route scan was stopped for ${project.name}`,
+        });
+      } else {
+        toast.error("Scan failed", {
+          description: err?.message || "Please verify backend directory access or rescan.",
+        });
+      }
     } finally {
       setScanningProjectId(null);
       requestAnimationFrame(() => {
         window.dispatchEvent(new Event("resize"));
       });
+    }
+  };
+
+  const handleCancelScan = async (project: Project) => {
+    try {
+      await apiClient.cancelScanProject(project.path);
+      setScanningProjectId(null);
+      toast.info("Scan cancelled", {
+        description: `Route scan was stopped for ${project.name}`,
+      });
+    } catch {
+      // Ignore
     }
   };
 
@@ -1853,6 +1874,7 @@ function App() {
             onAddProjectClick={handleAddBackendFolder}
             onRemoveProject={handleRemoveProject}
             onRescanProject={handleRescanProject}
+            onCancelScanProject={handleCancelScan}
             onRenameNode={handleSidebarRenameNode}
             onDeleteNode={handleSidebarDeleteNode}
             isScanning={Boolean(scanningProjectId)}
@@ -2164,6 +2186,7 @@ function App() {
                       isScanning={isScanning}
                       onNewTab={handleNewTab}
                       onRescan={() => handleRescanProject(activeProject)}
+                      onCancelScan={() => handleCancelScan(activeProject)}
                       onRevealInExplorer={() => apiClient.showItemInFolder(activeProject.path)}
                     />
                   );

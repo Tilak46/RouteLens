@@ -13,24 +13,27 @@ async function collectAllFiles(
   rootPath: string,
   fileList: string[] = [],
   depth: number = 0,
+  abortSignal?: AbortSignal,
+  onHeartbeat?: () => void,
 ): Promise<string[]> {
-  if (depth > 12 || fileList.length >= 20000) return fileList;
+  if (depth > 12 || fileList.length >= 20000 || abortSignal?.aborted) return fileList;
   try {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (fileList.length >= 20000) break;
+      if (fileList.length >= 20000 || abortSignal?.aborted) break;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (UNIVERSAL_IGNORED_DIRECTORIES.has(entry.name.toLowerCase())) {
           continue;
         }
-        await collectAllFiles(fullPath, rootPath, fileList, depth + 1);
+        await collectAllFiles(fullPath, rootPath, fileList, depth + 1, abortSignal, onHeartbeat);
       } else if (entry.isFile()) {
         if (isCandidateFilePath(fullPath, rootPath)) {
           fileList.push(fullPath);
         }
       }
     }
+    onHeartbeat?.();
   } catch {
     // Ignore read errors
   }
@@ -42,6 +45,9 @@ export interface OmniScanOptions {
   maxAiRescues?: number;
   includeTests?: boolean;
   mode?: "hybrid" | "ast" | "ai";
+  abortSignal?: AbortSignal;
+  onHeartbeat?: () => void;
+  perFileTimeoutMs?: number;
 }
 
 export async function scanOmniRoutes(
@@ -61,13 +67,17 @@ export async function scanOmniRoutes(
   log(`[OmniRoute] Initiating universal scan (mode: ${mode}) on: ${rootPath}`);
 
   // Step 1: Collect and read all candidate code files
-  const filePaths = await collectAllFiles(rootPath, rootPath);
+  const filePaths = await collectAllFiles(rootPath, rootPath, [], 0, options.abortSignal, options.onHeartbeat);
   log(`[OmniRoute] Found ${filePaths.length} supported source files.`);
 
   const fileCodeMap = new Map<string, string>();
   const candidateFiles: FileCandidate[] = [];
 
   for (const f of filePaths) {
+    if (options.abortSignal?.aborted) {
+      log(`[OmniRoute] Scan cancelled by user during file collection.`);
+      break;
+    }
     try {
       const content = await fs.promises.readFile(f, "utf-8");
       fileCodeMap.set(f, content);
@@ -79,6 +89,7 @@ export async function scanOmniRoutes(
     } catch {
       // Ignore read errors
     }
+    options.onHeartbeat?.();
   }
 
   log(`[OmniRoute] Identified ${candidateFiles.length} backend candidate route files via universal invariant filter.`);
@@ -92,11 +103,43 @@ export async function scanOmniRoutes(
   let astMatchedCount = 0;
   let aiRescuedCount = 0;
 
+  const perFileTimeoutMs = options.perFileTimeoutMs ?? 15_000;
+
+  async function safeExtractCandidate(candidate: FileCandidate): Promise<OmniRoute[]> {
+    let timeoutId: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`Extraction timed out after ${perFileTimeoutMs}ms`));
+      }, perFileTimeoutMs);
+    });
+
+    try {
+      const extractPromise = (async () => {
+        let matched = await extractRoutesWithTreeSitter(candidate, mountLinker);
+        if (matched.length === 0) {
+          const fastMatches = fastMatchRoutes(candidate, mountLinker);
+          if (fastMatches.length > 0) {
+            matched = fastMatches;
+          }
+        }
+        return matched;
+      })();
+
+      return await Promise.race([extractPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   if (mode === "ai") {
     // Mode B: Pure AI-First Extraction on top candidates
     log(`[OmniRoute AI-First] Running semantic extraction on top ${Math.min(candidateFiles.length, maxAiRescues)} candidate files...`);
     const sorted = [...candidateFiles].sort((a, b) => b.routeScore - a.routeScore);
     for (let i = 0; i < Math.min(sorted.length, maxAiRescues); i++) {
+      if (options.abortSignal?.aborted) {
+        log(`[OmniRoute AI-First] Scan cancelled by user.`);
+        break;
+      }
       const target = sorted[i];
       try {
         const aiRoutes = await extractRoutesWithAI(target);
@@ -107,24 +150,30 @@ export async function scanOmniRoutes(
         }
       } catch (err: any) {
         log(`[OmniRoute AI-First] Error on ${target.relativePath}: ${err.message}`);
+      } finally {
+        options.onHeartbeat?.();
       }
     }
   } else {
-    // Mode A (AST) or Hybrid: Run Tree-sitter Universal AST
+    // Mode A (AST) or Hybrid: Run Tree-sitter Universal AST with Per-File Isolation
     for (const candidate of candidateFiles) {
-      let matched = await extractRoutesWithTreeSitter(candidate, mountLinker);
-      if (matched.length === 0) {
-        const fastMatches = fastMatchRoutes(candidate, mountLinker);
-        if (fastMatches.length > 0) {
-          matched = fastMatches;
-        }
+      if (options.abortSignal?.aborted) {
+        log(`[OmniRoute] Scan cancelled by user.`);
+        break;
       }
 
-      if (matched.length > 0) {
-        astMatchedCount += matched.length;
-        allRoutes.push(...matched);
-      } else if (candidate.routeScore >= 3) {
-        rescueCandidates.push(candidate);
+      try {
+        const matched = await safeExtractCandidate(candidate);
+        if (matched.length > 0) {
+          astMatchedCount += matched.length;
+          allRoutes.push(...matched);
+        } else if (candidate.routeScore >= 3) {
+          rescueCandidates.push(candidate);
+        }
+      } catch (err: any) {
+        log(`[OmniRoute] Skipped candidate file ${candidate.relativePath}: ${err?.message || err}`);
+      } finally {
+        options.onHeartbeat?.();
       }
     }
 
@@ -136,6 +185,10 @@ export async function scanOmniRoutes(
       if (aiAvailable) {
         log(`[OmniRoute Hybrid] Dispatching ${Math.min(rescueCandidates.length, maxAiRescues)} ambiguous files to Local AI safety net...`);
         for (let i = 0; i < Math.min(rescueCandidates.length, maxAiRescues); i++) {
+          if (options.abortSignal?.aborted) {
+            log(`[OmniRoute Hybrid] Scan cancelled by user.`);
+            break;
+          }
           const rescueTarget = rescueCandidates[i];
           try {
             const aiRoutes = await extractRoutesWithAI(rescueTarget);
@@ -145,6 +198,8 @@ export async function scanOmniRoutes(
             }
           } catch (err: any) {
             log(`[OmniRoute AI] Error during AI rescue: ${err.message}`);
+          } finally {
+            options.onHeartbeat?.();
           }
         }
       }

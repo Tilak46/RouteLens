@@ -30,16 +30,65 @@ function mapOmniToApiRoute(
 
 export async function scanProjectForRoutes(
   projectPath: string,
-): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number }> {
+  abortSignal?: AbortSignal,
+): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number; cancelled?: boolean }> {
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
 
   log(`[OmniRoute Engine] Starting universal AST scan for: ${projectPath}`);
+
+  if (abortSignal?.aborted) {
+    return { tree: [], logs: ["Scan cancelled by user before start"], potentialRoutesCount: 0, detectedRoutesCount: 0, cancelled: true };
+  }
+
+  let lastActivityTimestamp = Date.now();
+  let watchdogInterval: NodeJS.Timeout | null = null;
+  let watchdogReject: ((err: Error) => void) | null = null;
+
+  const INACTIVITY_LIMIT_MS = 60_000; // 60 seconds of total silence = deadlock
+  const watchdogPromise = new Promise<never>((_, reject) => {
+    watchdogReject = reject;
+  });
+
+  watchdogInterval = setInterval(() => {
+    if (abortSignal?.aborted) {
+      if (watchdogReject) {
+        watchdogReject(new Error("Scan cancelled by user"));
+      }
+      return;
+    }
+    const idleTime = Date.now() - lastActivityTimestamp;
+    if (idleTime > INACTIVITY_LIMIT_MS) {
+      if (watchdogReject) {
+        watchdogReject(new Error(`Inactivity Watchdog: Scanner stalled with no progress for ${Math.round(idleTime / 1000)}s`));
+      }
+    }
+  }, 2000);
+
+  const heartbeat = () => {
+    lastActivityTimestamp = Date.now();
+  };
+
   try {
     const t0 = performance.now();
-    const fullScanPipeline = async () => {
-      const result = await scanOmniRoutes(projectPath, { mode: "ast" });
+    const scanPromise = (async () => {
+      const result = await scanOmniRoutes(projectPath, {
+        mode: "ast",
+        abortSignal,
+        onHeartbeat: heartbeat,
+      });
       const durationMs = Math.round(performance.now() - t0);
+
+      if (abortSignal?.aborted) {
+        log(`[OmniRoute Engine] Scan was cancelled by user after ${durationMs}ms.`);
+        return {
+          tree: [],
+          logs,
+          potentialRoutesCount: 0,
+          detectedRoutesCount: 0,
+          cancelled: true,
+        };
+      }
 
       log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
 
@@ -59,19 +108,22 @@ export async function scanProjectForRoutes(
         tree, 
         logs,
         potentialRoutesCount: apiRoutes.length,
-        detectedRoutesCount: apiRoutes.length
+        detectedRoutesCount: apiRoutes.length,
+        cancelled: false,
       };
-    };
+    })();
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Scanner timed out after 25 seconds")), 25000),
-    );
-
-    return await Promise.race([fullScanPipeline(), timeoutPromise]);
-  } catch (error) {
-    const errorMsg = `Failed to scan project: ${error}`;
+    return await Promise.race([scanPromise, watchdogPromise]);
+  } catch (error: any) {
+    if (abortSignal?.aborted || error?.message?.includes("cancelled by user")) {
+      log(`[OmniRoute Engine] Scan cancelled by user.`);
+      return { tree: [], logs, potentialRoutesCount: 0, detectedRoutesCount: 0, cancelled: true };
+    }
+    const errorMsg = `Failed to scan project: ${error?.message || error}`;
     console.error(errorMsg);
     logs.push(errorMsg);
     return { tree: [], logs, potentialRoutesCount: 0, detectedRoutesCount: 0 };
+  } finally {
+    if (watchdogInterval) clearInterval(watchdogInterval);
   }
 }

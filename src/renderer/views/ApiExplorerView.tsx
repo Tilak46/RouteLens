@@ -40,6 +40,7 @@ export type ApiExplorerSidebarPanelProps = {
   onAddProjectClick?: () => void;
   onRemoveProject?: (id: string) => void;
   onRescanProject?: (project: Project) => void;
+  onCancelScanProject?: (project: Project) => void;
   onRenameNode?: (nodeId: string, newName: string) => void;
   onDeleteNode?: (nodeIds: string | string[]) => void;
   isScanning?: boolean;
@@ -402,6 +403,7 @@ export function ApiExplorerSidebarPanel({
   onAddProjectClick,
   onRemoveProject,
   onRescanProject,
+  onCancelScanProject,
   onRenameNode,
   onDeleteNode,
   isScanning,
@@ -930,20 +932,31 @@ export function ApiExplorerSidebarPanel({
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {isScanningThis && (
-                        <RefreshCw size={11} className="animate-spin text-cyan-400 mr-1" />
-                      )}
-                      {onRescanProject && (
+                      {isScanningThis ? (
                         <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/10 cursor-pointer"
-                          title="Rescan backend routes"
+                          className="text-cyan-400 hover:text-rose-400 p-0.5 rounded hover:bg-rose-500/10 cursor-pointer flex items-center gap-1 text-[10px]"
+                          title="Cancel active scan"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onRescanProject(p);
+                            onCancelScanProject?.(p);
                           }}
                         >
-                          <RefreshCw size={11} />
+                          <RefreshCw size={11} className="animate-spin" />
+                          <span className="text-[9px] text-muted-foreground hover:text-rose-400">Stop</span>
                         </button>
+                      ) : (
+                        onRescanProject && (
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/10 cursor-pointer"
+                            title="Rescan backend routes"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRescanProject(p);
+                            }}
+                          >
+                            <RefreshCw size={11} />
+                          </button>
+                        )
                       )}
                       {onRemoveProject && (
                         <button
@@ -980,14 +993,24 @@ export function ApiExplorerSidebarPanel({
                 </span>
               </span>
               <div className="flex items-center gap-1.5">
-                <button
-                  className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5 cursor-pointer"
-                  onClick={() => onRescanProject?.(activeProject)}
-                  disabled={isScanning}
-                  title="Rescan project routes"
-                >
-                  <RefreshCw size={11} className={isScanning ? "animate-spin text-cyan-400" : ""} />
-                </button>
+                {isScanning ? (
+                  <button
+                    className="text-cyan-400 hover:text-rose-400 p-0.5 px-1.5 rounded hover:bg-rose-500/10 cursor-pointer flex items-center gap-1 text-[10px]"
+                    onClick={() => onCancelScanProject?.(activeProject)}
+                    title="Stop active scan"
+                  >
+                    <RefreshCw size={11} className="animate-spin text-cyan-400" />
+                    <span className="text-[9px] text-muted-foreground hover:text-rose-400 font-medium">Cancel</span>
+                  </button>
+                ) : (
+                  <button
+                    className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5 cursor-pointer"
+                    onClick={() => onRescanProject?.(activeProject)}
+                    title="Rescan project routes"
+                  >
+                    <RefreshCw size={11} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1099,18 +1122,27 @@ export function ApiExplorerSidebarPanel({
                     No API routes were found in this directory. Rescan or create a manual request.
                   </p>
                   <div className="flex items-center gap-2">
-                    {onRescanProject && activeProject && (
+                    {isScanning && activeProject ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onCancelScanProject?.(activeProject)}
+                        className="h-6 text-[11px] px-2.5 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 cursor-pointer"
+                      >
+                        <RefreshCw size={10} className="mr-1 animate-spin text-rose-400" />
+                        Cancel Scan
+                      </Button>
+                    ) : onRescanProject && activeProject ? (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => onRescanProject(activeProject)}
-                        disabled={isScanning}
                         className="h-6 text-[11px] px-2.5 bg-primary/10 hover:bg-primary/20 border-primary/20 text-primary cursor-pointer"
                       >
-                        <RefreshCw size={10} className={cn("mr-1", isScanning && "animate-spin")} />
+                        <RefreshCw size={10} className="mr-1" />
                         Rescan Routes
                       </Button>
-                    )}
+                    ) : null}
                     <Button
                       size="sm"
                       variant="outline"

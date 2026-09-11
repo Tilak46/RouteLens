@@ -10,6 +10,7 @@ interface ProjectIdleViewProps {
   isScanning: boolean;
   onNewTab: () => void;
   onRescan: () => void;
+  onCancelScan?: () => void;
   onRevealInExplorer: () => void;
 }
 
@@ -367,15 +368,25 @@ export const ProjectIdleView: React.FC<ProjectIdleViewProps> = ({
             </kbd>
           </button>
 
-          {/* Secondary: Rescan Codebase */}
-          <button
-            onClick={onRescan}
-            disabled={isScanning}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-all duration-200 shadow-sm hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw size={13} className={cn(isScanning && "animate-spin text-primary")} />
-            <span>{isScanning ? "Scanning..." : "Rescan"}</span>
-          </button>
+          {/* Secondary: Rescan Codebase or Cancel */}
+          {isScanning ? (
+            <button
+              onClick={onCancelScan}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-semibold transition-all duration-200 shadow-sm hover:-translate-y-0.5 cursor-pointer"
+              title="Cancel active scan"
+            >
+              <RefreshCw size={13} className="animate-spin text-rose-400" />
+              <span>Cancel Scan</span>
+            </button>
+          ) : (
+            <button
+              onClick={onRescan}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-card/60 hover:bg-card/90 border border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-all duration-200 shadow-sm hover:-translate-y-0.5 cursor-pointer"
+            >
+              <RefreshCw size={13} />
+              <span>Rescan</span>
+            </button>
+          )}
         </div>
 
         {/* Subtle Friendly Sidebar Cue */}
