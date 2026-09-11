@@ -80,263 +80,190 @@ export const toRouteKey = (route: Pick<ApiRoute, "method" | "path">) => {
   return `${method}:${p}`;
 };
 
-type UserRouteItem = ApiRoute & { parentId: string | null };
-type UserFolderItem = ApiFolder & { parentId: string | null };
-
-function indexTree(
-  nodes: (ApiFolder | ApiRoute)[],
-  parentId: string | null,
-  state: {
-    manualRequests: Map<string, UserRouteItem>;
-    customFolders: Map<string, UserFolderItem>;
-    scannedRoutesById: Map<string, UserRouteItem>;
-    scannedRoutesByKey: Map<string, UserRouteItem>;
-    folderNames: Map<string, string>;
-    sortOrder: Map<string | null, string[]>;
+export function hasUserCustomization(route: ApiRoute): boolean {
+  if (route.isManual) return true;
+  if (route.id && route.id.startsWith("request_")) return true;
+  if (Array.isArray(route.headers) && route.headers.length > 0) return true;
+  if (route.auth && route.auth.type && route.auth.type !== "none") return true;
+  if (route.preRequestScript && route.preRequestScript.trim() !== "") return true;
+  if (route.postResponseScript && route.postResponseScript.trim() !== "") return true;
+  if (route.bodyMode && route.bodyMode !== "none" && route.bodyMode !== "json") return true;
+  if (
+    route.bodyText &&
+    route.bodyText.trim() !== "" &&
+    route.bodyText.trim() !== "{\n  \n}" &&
+    route.bodyText.trim() !== "{}"
+  ) {
+    return true;
   }
-) {
-  const childKeys: string[] = [];
-
-  for (const n of nodes) {
-    if (isRoute(n)) {
-      const isManual = Boolean(n.id?.startsWith("request_") || n.isManual);
-      const key = isManual ? n.id : (n.id || toRouteKey(n));
-      childKeys.push(key);
-
-      if (isManual) {
-        state.manualRequests.set(n.id, { ...n, parentId, isManual: true });
-      } else {
-        if (n.id) state.scannedRoutesById.set(n.id, { ...n, parentId });
-        state.scannedRoutesByKey.set(toRouteKey(n), { ...n, parentId });
-      }
-    } else {
-      childKeys.push(n.id);
-      state.folderNames.set(n.id, n.name);
-      state.customFolders.set(n.id, { ...n, parentId });
-      indexTree(n.children, n.id, state);
-    }
-  }
-
-  state.sortOrder.set(parentId, childKeys);
+  if (Array.isArray(route.formFields) && route.formFields.length > 0) return true;
+  if (Array.isArray(route.urlencodedFields) && route.urlencodedFields.length > 0) return true;
+  if (route.binaryFilePath && route.binaryFilePath.trim() !== "") return true;
+  if (Array.isArray(route.params) && route.params.some((p) => p.value && p.value.trim() !== "")) return true;
+  return false;
 }
 
-function indexScannedTree(
-  nodes: (ApiFolder | ApiRoute)[],
-  defaultParentPath: string[],
-  state: {
-    routes: (ApiRoute & { defaultParentPath: string[] })[];
-  }
-) {
-  for (const n of nodes) {
-    if (isRoute(n)) {
-      state.routes.push({ ...n, defaultParentPath });
-    } else {
-      const folderPath = [...defaultParentPath, n.name];
-      indexScannedTree(n.children, folderPath, state);
-    }
-  }
-}
+const normKey = (r: Pick<ApiRoute, "method" | "path">) => {
+  const method = String(r.method || "GET").toUpperCase();
+  const p = String(r.path || "")
+    .replace(/\/+/g, "/")
+    .replace(/\/$/, "")
+    .replace(/[:{][^/]+[}]?/g, ":param");
+  return `${method}:${p || "/"}`;
+};
 
 export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): ApiFolder[] {
-  const userState = {
-    manualRequests: new Map<string, UserRouteItem>(),
-    customFolders: new Map<string, UserFolderItem>(),
-    scannedRoutesById: new Map<string, UserRouteItem>(),
-    scannedRoutesByKey: new Map<string, UserRouteItem>(),
-    folderNames: new Map<string, string>(),
-    sortOrder: new Map<string | null, string[]>(),
-  };
-  indexTree(userTree, null, userState);
+  // 1. Index all user routes, custom folders, and manual requests
+  const userRoutesById = new Map<string, ApiRoute>();
+  const userRoutesByKey = new Map<string, ApiRoute>();
+  const userRoutesByNormKey = new Map<string, ApiRoute>();
+  const manualRequests: { route: ApiRoute; parentFolderPath: string[] }[] = [];
 
-  const scannedState = {
-    routes: [] as (ApiRoute & { defaultParentPath: string[] })[],
-  };
-  indexScannedTree(scannedTree, [], scannedState);
-
-  const folderPathToIdMap = new Map<string, string>();
-
-  const mapFolderPaths = (nodes: (ApiFolder | ApiRoute)[], currentPath: string[]) => {
+  function indexUserNodes(
+    nodes: (ApiFolder | ApiRoute)[],
+    currentFolderPath: string[]
+  ) {
     for (const n of nodes) {
-      if (!isRoute(n)) {
-        const pathKey = [...currentPath, n.name].join("/");
-        folderPathToIdMap.set(pathKey, n.id);
-        mapFolderPaths(n.children, [...currentPath, n.name]);
-      }
-    }
-  };
-  mapFolderPaths(userTree, []);
-
-  const mergedFolderChildren = new Map<string | null, (ApiFolder | ApiRoute)[]>();
-
-  const addToParent = (parentId: string | null, node: ApiFolder | ApiRoute) => {
-    if (!mergedFolderChildren.has(parentId)) {
-      mergedFolderChildren.set(parentId, []);
-    }
-    mergedFolderChildren.get(parentId)!.push(node);
-  };
-
-  const matchedUserRouteIds = new Set<string>();
-
-  // 1. Process all newly scanned routes
-  for (const scannedRoute of scannedState.routes) {
-    const userRoute =
-      (scannedRoute.id ? userState.scannedRoutesById.get(scannedRoute.id) : undefined) ||
-      userState.scannedRoutesByKey.get(toRouteKey(scannedRoute));
-
-    if (userRoute?.id) {
-      matchedUserRouteIds.add(userRoute.id);
-    }
-
-    let targetParentId: string | null = null;
-    let finalName = scannedRoute.name;
-
-    if (userRoute) {
-      targetParentId = userRoute.parentId;
-      finalName = userRoute.name;
-    } else {
-      let currentParentId: string | null = null;
-      const pathAccumulator: string[] = [];
-
-      for (const seg of scannedRoute.defaultParentPath) {
-        pathAccumulator.push(seg);
-        const pathKey = pathAccumulator.join("/");
-        const existingId = folderPathToIdMap.get(pathKey);
-
-        if (existingId) {
-          currentParentId = existingId;
+      if (isRoute(n)) {
+        const isManual = Boolean(n.id?.startsWith("request_") || n.isManual);
+        if (isManual) {
+          manualRequests.push({
+            route: { ...n, isManual: true },
+            parentFolderPath: [...currentFolderPath],
+          });
         } else {
-          const newFolderId = `folder_scan_${Math.random().toString(36).substring(7)}`;
-          const newFolder: ApiFolder = {
-            id: newFolderId,
-            name: seg,
-            children: [],
-          };
-
-          userState.customFolders.set(newFolderId, { ...newFolder, parentId: currentParentId });
-          folderPathToIdMap.set(pathKey, newFolderId);
-          currentParentId = newFolderId;
+          if (n.id) userRoutesById.set(n.id, n);
+          userRoutesByKey.set(toRouteKey(n), n);
+          userRoutesByNormKey.set(normKey(n), n);
+        }
+      } else {
+        const nextPath = [...currentFolderPath, n.name];
+        if (Array.isArray(n.children)) {
+          indexUserNodes(n.children, nextPath);
         }
       }
-      targetParentId = currentParentId;
-    }
-
-    // Build default body text if none exists
-    let defaultBodyText = "{\n  \n}";
-    if (Array.isArray(scannedRoute.inferredBodyFields) && scannedRoute.inferredBodyFields.length > 0) {
-      const template: Record<string, string> = {};
-      scannedRoute.inferredBodyFields.forEach((field) => {
-        template[field] = "";
-      });
-      defaultBodyText = JSON.stringify(template, null, 2);
-    }
-
-    const mergedRoute: ApiRoute = {
-      ...scannedRoute,
-      id: userRoute?.id || scannedRoute.id,
-      name: finalName,
-      method: userRoute?.method || scannedRoute.method,
-      path: userRoute?.path || scannedRoute.path,
-      url: userRoute?.url,
-      // Preserve all user request configuration:
-      params: userRoute?.params !== undefined ? userRoute.params : (scannedRoute.inferredQueryFields?.map((field) => ({
-        id: `query_${field}_${Math.random().toString(36).slice(2, 5)}`,
-        enabled: true,
-        key: field,
-        value: "",
-      })) || []),
-      headers: userRoute?.headers || [],
-      auth: userRoute?.auth || { type: "none" },
-      bodyMode: userRoute?.bodyMode || (scannedRoute.method === "GET" || scannedRoute.method === "HEAD" ? "none" : "json"),
-      bodyText: userRoute?.bodyText !== undefined ? userRoute.bodyText : defaultBodyText,
-      formFields: userRoute?.formFields || [],
-      urlencodedFields: userRoute?.urlencodedFields || [],
-      binaryFilePath: userRoute?.binaryFilePath || "",
-      preRequestScript: userRoute?.preRequestScript || "",
-      postResponseScript: userRoute?.postResponseScript || "",
-      pathVariables: userRoute?.pathVariables || [],
-      isManual: false,
-      isStale: false,
-    };
-
-    addToParent(targetParentId, mergedRoute);
-  }
-
-  // 2. Retain previously scanned routes that are MISSING in new scan (do NOT delete user data!)
-  for (const [_, userRoute] of userState.scannedRoutesById) {
-    if (!matchedUserRouteIds.has(userRoute.id)) {
-      addToParent(userRoute.parentId, {
-        ...userRoute,
-        isStale: true,
-      });
     }
   }
+  indexUserNodes(userTree, []);
 
-  // 3. Retain 100% of user-created manual requests
-  for (const [_, req] of userState.manualRequests) {
-    addToParent(req.parentId, {
-      ...req,
-      isManual: true,
+  const matchedUserIds = new Set<string>();
+  const matchedUserKeys = new Set<string>();
+
+  // 2. Clone and enrich scannedTree with user request configurations
+  function enrichScannedNodes(nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] {
+    return nodes.map((node) => {
+      if (isRoute(node)) {
+        const key = toRouteKey(node);
+        const nk = normKey(node);
+        const userRoute =
+          (node.id ? userRoutesById.get(node.id) : undefined) ||
+          userRoutesByKey.get(key) ||
+          userRoutesByNormKey.get(nk);
+
+        if (userRoute) {
+          if (userRoute.id) matchedUserIds.add(userRoute.id);
+          matchedUserKeys.add(toRouteKey(userRoute));
+          matchedUserKeys.add(normKey(userRoute));
+        }
+
+        let defaultBodyText = "{\n  \n}";
+        if (Array.isArray(node.inferredBodyFields) && node.inferredBodyFields.length > 0) {
+          const template: Record<string, string> = {};
+          node.inferredBodyFields.forEach((field) => {
+            template[field] = "";
+          });
+          defaultBodyText = JSON.stringify(template, null, 2);
+        }
+
+        const merged: ApiRoute = {
+          ...node,
+          id: userRoute?.id || node.id,
+          name: node.name,
+          method: node.method,
+          path: node.path,
+          url: userRoute?.url || node.url,
+          params:
+            userRoute?.params !== undefined
+              ? userRoute.params
+              : node.inferredQueryFields?.map((field) => ({
+                  id: `query_${field}_${Math.random().toString(36).slice(2, 5)}`,
+                  enabled: true,
+                  key: field,
+                  value: "",
+                })) || [],
+          headers: userRoute?.headers || [],
+          auth: userRoute?.auth || { type: "none" },
+          bodyMode:
+            userRoute?.bodyMode ||
+            (node.method === "GET" || node.method === "HEAD" ? "none" : "json"),
+          bodyText:
+            userRoute?.bodyText !== undefined ? userRoute.bodyText : defaultBodyText,
+          formFields: userRoute?.formFields || [],
+          urlencodedFields: userRoute?.urlencodedFields || [],
+          binaryFilePath: userRoute?.binaryFilePath || "",
+          preRequestScript: userRoute?.preRequestScript || "",
+          postResponseScript: userRoute?.postResponseScript || "",
+          pathVariables: userRoute?.pathVariables || [],
+          isManual: false,
+          isStale: false,
+        };
+        return merged;
+      } else {
+        return {
+          ...node,
+          children: enrichScannedNodes(node.children || []),
+        };
+      }
     });
   }
 
-  // 4. Activate all folders that have contents or were user-created
-  const activeFolders = new Set<string>();
-  const markActive = (folderId: string) => {
-    if (activeFolders.has(folderId)) return;
-    activeFolders.add(folderId);
-    const folder = userState.customFolders.get(folderId);
-    if (folder && folder.parentId) {
-      markActive(folder.parentId);
+  const resultTree = enrichScannedNodes(scannedTree);
+
+  // Helper to find folder in resultTree by path
+  const findFolderByPath = (
+    tree: (ApiFolder | ApiRoute)[],
+    path: string[]
+  ): ApiFolder | null => {
+    if (path.length === 0) return null;
+    let currentNodes = tree;
+    let targetFolder: ApiFolder | null = null;
+    for (const seg of path) {
+      const found = currentNodes.find(
+        (n) => !isRoute(n) && n.name.toLowerCase() === seg.toLowerCase()
+      ) as ApiFolder | undefined;
+      if (!found) return null;
+      targetFolder = found;
+      currentNodes = found.children;
     }
+    return targetFolder;
   };
 
-  for (const folderId of mergedFolderChildren.keys()) {
-    if (folderId) markActive(folderId);
-  }
-
-  for (const [folderId, folder] of userState.customFolders) {
-    if (folderId.startsWith("folder_")) {
-      activeFolders.add(folderId);
-      if (folder.parentId) markActive(folder.parentId);
+  // 3. Attach manual requests
+  for (const item of manualRequests) {
+    const parentFolder = findFolderByPath(resultTree, item.parentFolderPath);
+    if (parentFolder) {
+      parentFolder.children.push(item.route);
+    } else {
+      resultTree.push(item.route);
     }
   }
 
-  // 5. Build folder nodes
-  const folderNodes = new Map<string, ApiFolder>();
-  for (const folderId of activeFolders) {
-    const orig = userState.customFolders.get(folderId);
-    folderNodes.set(folderId, {
-      id: folderId,
-      name: orig?.name || userState.folderNames.get(folderId) || "Folder",
-      children: [],
-    });
-  }
-
-  // Attach folders to parents (or root if parent not active)
-  for (const [folderId, folder] of folderNodes) {
-    const orig = userState.customFolders.get(folderId);
-    const parentId = orig?.parentId && activeFolders.has(orig.parentId) ? orig.parentId : null;
-    addToParent(parentId, folder);
-  }
-
-  // Populate children
-  for (const [folderId, folder] of folderNodes) {
-    const children = mergedFolderChildren.get(folderId) || [];
-    folder.children = children;
-  }
-
-  // Ensure any orphaned requests whose parent folder no longer exists are attached to root
-  for (const [parentId, children] of mergedFolderChildren) {
-    if (parentId !== null && !activeFolders.has(parentId)) {
-      for (const child of children) {
-        addToParent(null, child);
+  // 4. Retain customized missing routes (only if genuinely customized)
+  for (const [id, userRoute] of userRoutesById) {
+    const key = toRouteKey(userRoute);
+    const nk = normKey(userRoute);
+    if (
+      !matchedUserIds.has(id) &&
+      !matchedUserKeys.has(key) &&
+      !matchedUserKeys.has(nk)
+    ) {
+      if (hasUserCustomization(userRoute)) {
+        resultTree.push({ ...userRoute, isStale: true });
       }
     }
   }
 
-  const rootChildren = mergedFolderChildren.get(null) || [];
-
-  // 6. Sort children according to user sort order
+  // 5. Deterministic Sort: Folders A-Z first, then Routes by Method then Path
   const methodOrder: Record<string, number> = {
     GET: 1,
     POST: 2,
@@ -346,22 +273,8 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
     ALL: 9,
   };
 
-  const sortChildren = (nodes: (ApiFolder | ApiRoute)[], parentId: string | null) => {
-    const originalOrder = userState.sortOrder.get(parentId) || [];
-
+  const sortNodes = (nodes: (ApiFolder | ApiRoute)[]) => {
     nodes.sort((a, b) => {
-      const keyA = isRoute(a) ? (a.id.startsWith("request_") ? a.id : (a.id || toRouteKey(a))) : a.id;
-      const keyB = isRoute(b) ? (b.id.startsWith("request_") ? b.id : (b.id || toRouteKey(b))) : b.id;
-
-      const idxA = originalOrder.indexOf(keyA);
-      const idxB = originalOrder.indexOf(keyB);
-
-      if (idxA !== -1 && idxB !== -1) {
-        return idxA - idxB;
-      }
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-
       const aIsRoute = isRoute(a);
       const bIsRoute = isRoute(b);
       if (aIsRoute !== bIsRoute) return aIsRoute ? 1 : -1;
@@ -370,23 +283,23 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
         return a.name.localeCompare(b.name);
       }
 
-      const am = String((a as any).method || "");
-      const bm = String((b as any).method || "");
+      const am = String((a as ApiRoute).method || "");
+      const bm = String((b as ApiRoute).method || "");
       const byMethod = (methodOrder[am] ?? 99) - (methodOrder[bm] ?? 99);
       if (byMethod !== 0) return byMethod;
-      return String((a as any).path || "").localeCompare(String((b as any).path || ""));
+      return String((a as ApiRoute).path || "").localeCompare(String((b as ApiRoute).path || ""));
     });
 
     for (const child of nodes) {
-      if (!isRoute(child)) {
-        sortChildren(child.children, child.id);
+      if (!isRoute(child) && Array.isArray(child.children)) {
+        sortNodes(child.children);
       }
     }
   };
 
-  sortChildren(rootChildren, null);
+  sortNodes(resultTree);
 
-  return rootChildren as ApiFolder[];
+  return resultTree as ApiFolder[];
 }
 
 // Local storage sync removed. Replaced by generic Electron Store getters/setters.
