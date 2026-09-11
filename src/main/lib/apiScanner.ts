@@ -58,7 +58,7 @@ export async function scanProjectForRoutes(
       return { 
         tree, 
         logs,
-        potentialRoutesCount: Math.max(result.candidateFilesCount, apiRoutes.length),
+        potentialRoutesCount: apiRoutes.length,
         detectedRoutesCount: apiRoutes.length
       };
     };

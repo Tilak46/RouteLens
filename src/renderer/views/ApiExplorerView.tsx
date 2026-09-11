@@ -976,7 +976,7 @@ export function ApiExplorerSidebarPanel({
               <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
                 Endpoints
                 <span className="px-1.5 py-0.5 text-[9px] font-bold bg-muted-foreground/15 text-muted-foreground rounded-full leading-none font-mono">
-                  {detectedCount}/{potentialCount}
+                  {detectedCount}
                 </span>
               </span>
               <div className="flex items-center gap-1.5">
