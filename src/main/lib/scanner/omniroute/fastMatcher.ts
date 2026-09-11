@@ -84,7 +84,7 @@ export function fastMatchRoutes(
     // C. Next.js App Router (export async function GET / export const POST)
     if (relativePath.includes("/app/") && /\/route\.[jt]sx?$/.test(relativePath)) {
       const nextExportRegex =
-        /\bexport\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|DELETE|PATCH)\b/g;
+        /\bexport\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/g;
       let nextMatch: RegExpExecArray | null;
       const routeSegment = relativePath
         .split("/app/")[1]

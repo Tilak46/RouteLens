@@ -509,21 +509,46 @@ export function extractTsJsRoutes(
 
     if (framework === "next-app") {
       const exportedMethods = new Set<Method>();
+      const VALID_HTTP_METHODS = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]);
+
       walkTree(tree.rootNode, (node) => {
         if (node.type === "export_statement") {
-          function checkExport(n: Parser.SyntaxNode) {
-            if (n.type === "shorthand_property_identifier_pattern" || n.type === "identifier") {
-              const upper = n.text.toUpperCase();
-              if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(upper)) {
-                exportedMethods.add(upper as Method);
+          for (let j = 0; j < node.childCount; j++) {
+            const child = node.child(j)!;
+
+            // 1. Function declaration: export (async) function GET(...)
+            if (child.type === "function_declaration") {
+              const nameNode = child.childForFieldName("name");
+              if (nameNode && VALID_HTTP_METHODS.has(nameNode.text)) {
+                exportedMethods.add(nameNode.text as Method);
               }
             }
-            for (let i = 0; i < n.childCount; i++) {
-              checkExport(n.child(i)!);
+
+            // 2. Variable declaration: export const GET = ...
+            if (child.type === "lexical_declaration" || child.type === "variable_declaration") {
+              for (let k = 0; k < child.childCount; k++) {
+                const decl = child.child(k)!;
+                if (decl.type === "variable_declarator") {
+                  const nameNode = decl.childForFieldName("name");
+                  if (nameNode && VALID_HTTP_METHODS.has(nameNode.text)) {
+                    exportedMethods.add(nameNode.text as Method);
+                  }
+                }
+              }
             }
-          }
-          for (let i = 0; i < node.childCount; i++) {
-            checkExport(node.child(i)!);
+
+            // 3. Named export specifier: export { GET, handler as POST }
+            if (child.type === "export_clause") {
+              for (let k = 0; k < child.childCount; k++) {
+                const spec = child.child(k)!;
+                if (spec.type === "export_specifier") {
+                  const targetNode = spec.childForFieldName("alias") || spec.childForFieldName("name");
+                  if (targetNode && VALID_HTTP_METHODS.has(targetNode.text)) {
+                    exportedMethods.add(targetNode.text as Method);
+                  }
+                }
+              }
+            }
           }
         }
       });
