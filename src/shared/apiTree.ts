@@ -37,6 +37,79 @@ const KNOWN_ACRONYMS = new Map<string, string>([
   ["pmo", "PMO"],
 ]);
 
+function isAlphanumericChar(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) || // 0-9
+    (code >= 65 && code <= 90) || // A-Z
+    (code >= 97 && code <= 122)   // a-z
+  );
+}
+
+function stripTrailingExtension(s: string): string {
+  const lastDot = s.lastIndexOf(".");
+  if (lastDot > 0) {
+    const ext = s.slice(lastDot + 1);
+    if (ext.length > 0 && !s.slice(lastDot).includes("}") && !s.slice(lastDot).includes(">") && !s.slice(lastDot).includes("]")) {
+      let allAlphaNum = true;
+      for (let i = 0; i < ext.length; i++) {
+        if (!isAlphanumericChar(ext.charCodeAt(i))) {
+          allAlphaNum = false;
+          break;
+        }
+      }
+      if (allAlphaNum) return s.slice(0, lastDot);
+    }
+  }
+  return s;
+}
+
+function isVersionSegment(seg: string): boolean {
+  const lower = seg.toLowerCase();
+  if (lower.charCodeAt(0) !== 118 /* 'v' */ || lower.length < 2) return false;
+  let hasDigits = false;
+  for (let i = 1; i < lower.length; i++) {
+    const c = lower.charCodeAt(i);
+    if (c >= 48 && c <= 57) {
+      hasDigits = true;
+    } else if (c === 46 /* '.' */) {
+      // allow v1.0, v2.1
+    } else {
+      return false;
+    }
+  }
+  return hasDigits;
+}
+
+function splitSlugIntoWords(slug: string): string[] {
+  const words: string[] = [];
+  let currentWord = "";
+  for (let i = 0; i < slug.length; i++) {
+    const c = slug.charCodeAt(i);
+    const isSep = c === 45 /* '-' */ || c === 95 /* '_' */ || c === 46 /* '.' */ || c === 32 /* ' ' */;
+    if (isSep) {
+      if (currentWord.length > 0) {
+        words.push(currentWord);
+        currentWord = "";
+      }
+      continue;
+    }
+    const isUpper = c >= 65 && c <= 90;
+    const prevChar = i > 0 ? slug.charCodeAt(i - 1) : 0;
+    const prevIsLowerOrDigit = (prevChar >= 97 && prevChar <= 122) || (prevChar >= 48 && prevChar <= 57);
+
+    if (isUpper && prevIsLowerOrDigit && currentWord.length > 0) {
+      words.push(currentWord);
+      currentWord = slug.charAt(i);
+    } else {
+      currentWord += slug.charAt(i);
+    }
+  }
+  if (currentWord.length > 0) {
+    words.push(currentWord);
+  }
+  return words;
+}
+
 /**
  * Universal Dynamic Route Parameter Classifier.
  * Finite Delimiter & Boundary Parser covering 100% of web routing specifications:
@@ -63,7 +136,7 @@ export function isDynamicSegment(seg: string): boolean {
   }
 
   // Strip trailing file extensions (.json, .xml, .atom, .html, .csv, .pdf, etc.)
-  core = core.replace(/\.[a-zA-Z0-9]+$/, "");
+  core = stripTrailingExtension(core);
 
   // Strip trailing modifiers (? for optional, * for wildcard splats)
   if (core.endsWith("?") || core.endsWith("*")) {
@@ -109,13 +182,14 @@ export function extractParamName(seg: string): string {
   if (s.startsWith("@") || s.startsWith("~")) s = s.slice(1);
 
   // Strip trailing file extensions
-  s = s.replace(/\.[a-zA-Z0-9]+$/, "");
+  s = stripTrailingExtension(s);
 
   if (s.startsWith(":") || s.startsWith("*")) {
     s = s.slice(1);
     if (s.endsWith("?") || s.endsWith("*")) s = s.slice(0, -1);
-    // Handle inline regex in Express/Hono like :id{[0-9]+}
+    // Handle inline regex/validation in Express/Hono like :id{[0-9]+} or :id(\\d+)
     if (s.includes("{")) s = s.split("{")[0];
+    if (s.includes("(")) s = s.split("(")[0];
     return s;
   }
 
@@ -142,6 +216,23 @@ export function extractParamName(seg: string): string {
   return s;
 }
 
+const KNOWN_CODE_SUFFIXES = [
+  ".routes", ".controller", ".views", ".handlers", ".endpoint", ".router", ".service",
+  "routes", "controller", "views", "handlers", "endpoint", "router", "service"
+];
+
+function stripCodeSuffixes(name: string): string {
+  let s = stripTrailingExtension(name);
+  const lower = s.toLowerCase();
+  for (const suffix of KNOWN_CODE_SUFFIXES) {
+    if (lower.endsWith(suffix)) {
+      s = s.slice(0, -suffix.length);
+      break;
+    }
+  }
+  return s;
+}
+
 /**
  * Converts a URL slug into professional title case while preserving developer acronyms.
  * e.g. "gmb-accounts" -> "GMB Accounts", "idp-client" -> "IDP Client", "crm" -> "CRM"
@@ -155,11 +246,7 @@ export function toTitleCaseFromSlug(slug: string): string {
   }
 
   const words: string[] = [];
-  const parts = cleaned
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[-_.]+/g, " ")
-    .split(" ")
-    .filter(Boolean);
+  const parts = splitSlugIntoWords(cleaned);
 
   for (const part of parts) {
     const pLower = part.toLowerCase();
@@ -184,7 +271,7 @@ export function normalizePathSegments(routePath: string): string[] {
 
   // Protect optional route parameters like {id?} or {genre?} before splitting query strings
   if (cleaned.includes("?}")) {
-    cleaned = cleaned.replace(/\{([a-zA-Z0-9_$]+)\?\}/g, "{$1}");
+    cleaned = cleaned.split("?}").join("}");
   }
 
   // Only strip query string if it is a real query string (?key=value)
@@ -210,7 +297,7 @@ export function normalizePathSegments(routePath: string): string[] {
         index++;
         continue;
       }
-      if (/^v\d+(?:\.\d+)?$/i.test(segLower)) {
+      if (isVersionSegment(segLower)) {
         index++;
         continue;
       }
@@ -241,15 +328,12 @@ export function normalizePathSegments(routePath: string): string[] {
  */
 export function extractFallbackDomain(file?: string): string {
   if (!file) return "System";
-  const normalized = file.replace(/\\/g, "/");
+  const normalized = file.split("\\").join("/");
   const parts = normalized.split("/").filter(Boolean);
   if (parts.length === 0) return "System";
 
   const fileName = parts[parts.length - 1];
-  const baseName = fileName
-    .replace(/\.[a-zA-Z0-9]+$/, "")
-    .replace(/\.(routes|controller|views|handlers|endpoint|router|service)$/i, "")
-    .replace(/(routes|controller|views|handlers|endpoint|router|service)$/i, "");
+  const baseName = stripCodeSuffixes(fileName);
 
   const genericNames = new Set([
     "index", "main", "app", "server", "routes", "router", "api", "mod", "lib", "urls", "views"
