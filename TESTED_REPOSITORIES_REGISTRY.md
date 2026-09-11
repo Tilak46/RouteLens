@@ -113,6 +113,7 @@
 | 51 | `chatwoot/chatwoot` | Ruby | Rails 7 API | 890 | **1,240** | 100% | 100% | 22 ms | Live customer support platform | 2026-09-08 |
 | 52 | `gin-gonic/examples` | Go | Gin / Net-HTTP | 48 | **94** | 100% | 100% | 41 ms | Official Gin routing patterns | 2026-09-08 |
 | 53 | `tiangolo/full-stack-fastapi` | Python | FastAPI / Pydantic | 42 | **60** | 100% | 100% | 88 ms | Canonical full-stack FastAPI | 2026-09-08 |
+| 54 | `odoo/odoo` | Python | Odoo HTTP / Werkzeug | 8,561 | **517** | 100% | 100% | 311.7 s | Mega-ERP 48k files, 106 domain modules | 2026-09-11 |
 
 ---
 
