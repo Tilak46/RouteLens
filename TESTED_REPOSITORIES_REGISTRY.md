@@ -63,6 +63,7 @@
 | 23 | `ChatGPTNextWeb/NextChat` | [github](https://github.com/ChatGPTNextWeb/NextChat) | B3 | 24 | **14** | 100% | 100% | 55 ms | `app/api` AI proxy & endpoints | 2026-09-09 |
 | 24 | `baptisteArno/typebot.io` | [github](https://github.com/baptisteArno/typebot.io) | B3 | 36 | **22** | 100% | 100% | 15 ms | `apps/builder/src/app/api` | 2026-09-09 |
 | 25 | `lobehub/lobe-chat` | [github](https://github.com/lobehub/lobe-chat) | B3 | 32 | **20** | 100% | 100% | 19 ms | `src/app/(backend)/api` group routing | 2026-09-09 |
+| 26 | `yash-ox/mid-editor` | [github](https://github.com/yash-ox/mid-editor) | User | 164 | **7** | 100% | 100% | 584 ms | Next.js 15 App Router + embedded backend starters | 2026-09-11 |
 
 ---
 
