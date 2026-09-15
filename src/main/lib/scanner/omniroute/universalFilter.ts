@@ -105,30 +105,56 @@ export function getFileLanguage(filePath: string): string {
 export function isClientUiPath(filePath: string, rootPath: string): boolean {
   const rel = path.relative(rootPath, filePath).replace(/\\/g, "/").toLowerCase();
   const fileName = path.basename(rel);
+  const ext = path.extname(filePath).toLowerCase();
 
-  // Invariant: Backend routes, APIs, controllers, and endpoints are ALWAYS backend code
+  // 1. Next.js App Router contract:
+  // In App Router, backend APIs are strictly route.ts / route.js / route.tsx / route.jsx.
+  // All page.*, layout.*, template.*, loading.*, error.*, not-found.* and non-route JSX/TSX are UI views.
+  const isAppRouter = rel.includes("/app/") || rel.startsWith("app/");
+  if (isAppRouter) {
+    if (fileName === "route.ts" || fileName === "route.js" || fileName === "route.tsx" || fileName === "route.jsx") {
+      return false;
+    }
+    if (
+      fileName.startsWith("page.") ||
+      fileName.startsWith("layout.") ||
+      fileName.startsWith("template.") ||
+      fileName.startsWith("loading.") ||
+      fileName.startsWith("error.") ||
+      fileName.startsWith("not-found.")
+    ) {
+      return true;
+    }
+    if (ext === ".tsx" || ext === ".jsx") {
+      return true;
+    }
+  }
+
+  // 2. Next.js Pages Router contract:
+  // In Pages Router, backend APIs are strictly under pages/api/. All other pages/* are React UI views.
+  const isPagesRouter = rel.includes("/pages/") || rel.startsWith("pages/");
+  if (isPagesRouter) {
+    if (rel.includes("/pages/api/") || rel.startsWith("pages/api/")) {
+      return false;
+    }
+    return true;
+  }
+
+  // 3. Invariant: Dedicated backend routes, controllers, and router modules
   if (
-    rel.includes("app/api/") ||
-    rel.includes("pages/api/") ||
-    rel.includes("/api/") ||
+    fileName.startsWith("route.") ||
+    fileName.startsWith("routes.") ||
+    fileName.includes("controller.") ||
+    fileName.includes("router.") ||
     rel.includes("/routes/") ||
     rel.includes("/endpoints/") ||
     rel.includes("/controllers/") ||
-    rel.includes("server/web/api") ||
-    fileName === "route.ts" ||
-    fileName === "route.js" ||
-    fileName === "route.tsx" ||
-    fileName === "route.jsx" ||
-    fileName === "routes.ts" ||
-    fileName === "routes.js" ||
-    fileName.includes("controller.") ||
-    fileName.includes("router.")
+    rel.includes("server/web/api")
   ) {
     return false;
   }
 
-  const segments = rel.split("/");
-  const ext = path.extname(filePath).toLowerCase();
+  // 4. Pure backend languages
   const isPureBackendCode =
     ext === ".go" ||
     ext === ".java" ||
@@ -141,6 +167,7 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
     return false;
   }
 
+  // 5. Client directory conventions
   const clientDirNames = new Set([
     "clientapp",
     "client",
@@ -155,18 +182,16 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
     "styles",
   ]);
 
+  const segments = rel.split("/");
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     if (clientDirNames.has(seg)) {
-      // Exception: pages/api in Next.js is backend API
-      if (seg === "pages" && rel.includes("pages/api/")) {
-        return false;
-      }
       return true;
     }
   }
 
-  if (rel.includes("/pages/") && !rel.includes("/pages/api/")) {
+  // 6. Standalone UI components (Vue, Svelte)
+  if (ext === ".vue" || ext === ".svelte") {
     return true;
   }
 
@@ -210,6 +235,12 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
   }
 
   // 2. Relative test directory segments inside the project
+  const isFsApiRoute =
+    (rel.includes("/app/") || rel.startsWith("app/")) &&
+    (fileName === "route.ts" || fileName === "route.js" || fileName === "route.tsx" || fileName === "route.jsx");
+  const isPagesApiRoute = rel.includes("/pages/api/");
+  const isBackendApiRoute = isFsApiRoute || isPagesApiRoute;
+
   const segments = rel.split("/");
   for (let i = 0; i < segments.length - 1; i++) {
     const seg = segments[i];
@@ -222,6 +253,11 @@ export function isTestFilePath(filePath: string, rootPath: string): boolean {
       seg === "e2e" ||
       seg === "cypress"
     ) {
+      // In Next.js App Router or Pages Router, a folder named "test" or "tests" inside an API directory
+      // (e.g. app/api/webhooks/test/route.ts) is an actual API endpoint subpath, not a test suite.
+      if (isBackendApiRoute && (seg === "test" || seg === "tests")) {
+        continue;
+      }
       return true;
     }
   }

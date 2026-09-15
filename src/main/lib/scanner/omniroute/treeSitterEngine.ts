@@ -934,10 +934,12 @@ export function extractTsJsRoutes(
       }
     }
 
-    // C. Route definition objects: api.foo = { method: 'POST', url: '/path' }
+    // C. Declarative route definition objects (Gateways, Controllers, Route tables, Mock servers)
     if (node.type === "object") {
       let mStr: Method | null = null;
       let pStr: string | null = null;
+      let hasRouteTarget = false;
+
       for (let i = 0; i < node.childCount; i++) {
         const c = node.child(i)!;
         if (c.type === "pair") {
@@ -955,24 +957,77 @@ export function extractTsJsRoutes(
               if (val.startsWith("/")) {
                 pStr = val;
               }
+            } else if (
+              keyText === "handler" ||
+              keyText === "action" ||
+              keyText === "controller" ||
+              keyText === "resolve" ||
+              keyText === "fn" ||
+              keyText === "target" ||
+              keyText === "service" ||
+              keyText === "upstream" ||
+              keyText === "proxy" ||
+              keyText === "redirect" ||
+              keyText === "rewrite" ||
+              keyText === "variants" ||
+              keyText === "response" ||
+              keyText === "reply" ||
+              keyText === "middleware" ||
+              keyText === "middlewares" ||
+              keyText === "prehandler"
+            ) {
+              hasRouteTarget = true;
             }
           }
         }
       }
+
       if (mStr && pStr) {
         // Prevent duplicate if parent is server.route({ ... }) which was already handled
         const parent = node.parent;
         const isAlreadyHandledByCall = parent && parent.type === "arguments" && parent.parent?.type === "call_expression";
         if (!isAlreadyHandledByCall) {
-          routes.push({
-            id: stableId(filePath, mStr, pStr),
-            framework: "express",
-            method: mStr,
-            path: pStr,
-            file: filePath,
-            confidence: "high",
-            source: "tree_sitter",
-          });
+          // Architectural boundary:
+          // An object literal represents a server route if:
+          // 1. It defines an execution, proxy, or response target (hasRouteTarget), OR
+          // 2. The file is a dedicated route/controller/gateway module
+          const lowerPath = filePath.replace(/\\/g, "/").toLowerCase();
+          const baseName = path.basename(lowerPath);
+          const isDedicatedRouteModule =
+            lowerPath.includes("/routes/") ||
+            lowerPath.includes("/router/") ||
+            lowerPath.includes("/controllers/") ||
+            lowerPath.includes("/endpoints/") ||
+            lowerPath.includes("/gateway/") ||
+            lowerPath.includes("/gateways/") ||
+            lowerPath.includes("/proxies/") ||
+            baseName.includes("route.") ||
+            baseName.includes("routes.") ||
+            baseName.includes("router.") ||
+            baseName.includes("controller.") ||
+            baseName.includes("endpoint.") ||
+            baseName.includes("gateway.") ||
+            baseName.includes("proxy.");
+
+          if (hasRouteTarget || isDedicatedRouteModule) {
+            const fileText = tree.rootNode.text;
+            let jsFramework: OmniFramework = "express";
+            if (fileText.includes("hono") || fileText.includes("new Hono")) {
+              jsFramework = "hono";
+            } else if (fileText.includes("fastify") || fileText.includes("fastify-plugin")) {
+              jsFramework = "fastify";
+            }
+
+            routes.push({
+              id: stableId(filePath, mStr, pStr),
+              framework: jsFramework,
+              method: mStr,
+              path: pStr,
+              file: filePath,
+              confidence: "high",
+              source: "tree_sitter",
+            });
+          }
         }
       }
     }
