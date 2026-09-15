@@ -16,6 +16,9 @@ import {
   Lock,
   Ghost,
   SlidersHorizontal,
+  Minus,
+  Square,
+  X,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -110,11 +113,36 @@ export function DashboardLayout({
         {/* TOP TITLEBAR STRIP */}
         <header
           style={{ height: "42px", WebkitAppRegion: "drag" } as React.CSSProperties}
-          className="w-full bg-[var(--bg-secondary)] border-b border-border/80 flex items-center px-3 shrink-0 select-none z-50"
+          className="w-full bg-[var(--bg-secondary)] border-b border-border/80 flex items-center justify-between px-3 shrink-0 select-none z-50"
         >
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             <img src={logoImg} alt="RouteLens" className="w-4 h-4 object-contain rounded" />
             <span className="text-xs font-semibold text-foreground/90 tracking-wide">RouteLens</span>
+          </div>
+
+          {/* Custom Window Controls (Edge-to-Edge with full border continuity) */}
+          <div className="flex items-center h-full -mr-3" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <button
+              onClick={() => window.api?.minimizeWindow?.()}
+              className="h-full px-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Minimize"
+            >
+              <Minus size={13} />
+            </button>
+            <button
+              onClick={() => window.api?.maximizeWindow?.()}
+              className="h-full px-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Maximize"
+            >
+              <Square size={11} />
+            </button>
+            <button
+              onClick={() => window.api?.closeWindow?.()}
+              className="h-full px-4 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-red-500 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X size={13} />
+            </button>
           </div>
         </header>
 

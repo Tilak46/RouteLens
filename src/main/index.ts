@@ -180,12 +180,7 @@ function createWindow(): void {
     height,
     show: false,
     autoHideMenuBar: true,
-    titleBarStyle: "hidden",
-    titleBarOverlay: {
-      color: "#100f0f",
-      symbolColor: "#a1a1aa",
-      height: 42,
-    },
+    frame: false,
     backgroundColor: "#100f0f",
     icon,
     webPreferences: {
