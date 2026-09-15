@@ -77,6 +77,12 @@ export const api = {
   showItemInFolder: (path: string) => {
     ipcRenderer.send("shell:showItemInFolder", path);
   },
+  inspectElement: (x: number, y: number) => {
+    ipcRenderer.send("window:inspect-element", { x, y });
+  },
+  reloadWindow: () => {
+    ipcRenderer.send("window:reload");
+  },
 
   // --- Log Management ---
   clearLogs: (projectId: string) => {

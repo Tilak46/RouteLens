@@ -105,11 +105,23 @@ export function DashboardLayout({
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans">
+      <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden font-sans">
         
-        {/* 1. LEFT NARROW ICON TOOLBAR */}
-        <div className="w-12 bg-[hsl(240,6%,4%)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
-          <div className="flex flex-col items-center gap-4 w-full">
+        {/* TOP TITLEBAR STRIP */}
+        <header
+          style={{ height: "42px", WebkitAppRegion: "drag" } as React.CSSProperties}
+          className="w-full bg-[var(--bg-secondary)] border-b border-border/80 flex items-center px-3 shrink-0 select-none z-50"
+        >
+          <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <img src={logoImg} alt="RouteLens" className="w-4 h-4 object-contain rounded" />
+            <span className="text-xs font-semibold text-foreground/90 tracking-wide">RouteLens</span>
+          </div>
+        </header>
+
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* 1. LEFT NARROW ICON TOOLBAR */}
+          <div className="w-12 bg-[var(--bg-secondary)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
+            <div className="flex flex-col items-center gap-4 w-full">
             {/* Logo Icon - click to toggle sidebar */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -199,7 +211,7 @@ export function DashboardLayout({
         {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
         <aside
           className={cn(
-            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-30 isolate transform-gpu",
+            "bg-[var(--bg-secondary)] border-r border-border/60 flex flex-col shrink-0 relative z-30 isolate transform-gpu",
             isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
           )}
           style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px`, transform: "translateZ(0)" } : undefined}
@@ -208,14 +220,9 @@ export function DashboardLayout({
             <div className="flex flex-col h-full p-3.5 overflow-hidden">
               {/* App Brand Header */}
               <div className="flex items-center justify-between mb-4 shrink-0">
-                <div className="flex items-center gap-1.5 overflow-hidden">
-                  <span className="text-sm font-bold tracking-wider text-foreground">
-                    Route<span className="text-primary">Lens</span>
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
-                    v{appVersion || "0.1.0"}
-                  </span>
-                </div>
+                <span className="text-xs font-semibold tracking-wide text-foreground">
+                  RouteLens
+                </span>
                 <button
                   onClick={onToggleSidebar}
                   className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
@@ -262,7 +269,7 @@ export function DashboardLayout({
         </aside>
 
         {/* 3. MAIN WORKSPACE AREA */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[hsl(240,5%,11%)] overflow-hidden relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-primary)] overflow-hidden relative">
           {updateBanner}
           {/* Main workspace container (no padding so request/response tab layouts can fit edge-to-edge) */}
           <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
@@ -272,6 +279,7 @@ export function DashboardLayout({
           {/* 4. BOTTOM LOGS CONSOLE */}
           {consoleDrawer}
         </div>
+      </div>
       </div>
     </TooltipProvider>
   );

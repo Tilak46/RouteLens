@@ -9,6 +9,9 @@
     /* ========================================== */
     /* DEFAULT THEME: ROUTELENS MATTE CHARCOAL    */
     /* ========================================== */
+    --bg-primary: #0b0b0a;    /* Primary background: main screen, right panels */
+    --bg-secondary: #100f0f;  /* Secondary background: navbar, sidebars */
+
     --background: 0 0% 8.5%; /* Premium Dark Grey (#161616) */
     --foreground: 0 0% 98%;
 

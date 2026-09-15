@@ -45,6 +45,7 @@ import { ProjectIdleView } from "@/components/project/ProjectIdleView";
 import { ScanningFactsOverlay } from "@/components/scanner/ScanningFactsOverlay";
 import { UpdateGraceBanner, UpdateEnforcementData } from "@/components/updates/UpdateGraceBanner";
 import { MandatoryUpdateModal } from "@/components/updates/MandatoryUpdateModal";
+import { GlobalContextMenu } from "@/components/ui/GlobalContextMenu";
 
 // Environments system imports
 import {
@@ -2301,6 +2302,8 @@ function App() {
         enforcement={enforcementStatus}
         onInstall={handleInstallUpdate}
       />
+
+      <GlobalContextMenu />
     </TooltipProvider>
   );
 }

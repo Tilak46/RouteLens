@@ -257,7 +257,7 @@ export function WorkspaceTabs({
   }
 
   return (
-    <div className="h-10 bg-[hsl(240,6%,4%)] border-b border-border/80 flex items-center justify-between px-2 shrink-0 select-none z-15 relative">
+    <div className="h-10 bg-[var(--bg-secondary)] border-b border-border/80 flex items-center justify-between px-2 shrink-0 select-none z-15 relative">
       {/* Scrollable Tabs List on Left */}
       <DndContext
         sensors={sensors}
