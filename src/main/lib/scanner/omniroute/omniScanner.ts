@@ -3,7 +3,6 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { OmniRoute, OmniScanResult, FileCandidate } from "./types";
 import { isCandidateFilePath, analyzeRouteCandidate, UNIVERSAL_IGNORED_DIRECTORIES } from "./universalFilter";
-import { fastMatchRoutes } from "./fastMatcher";
 import { extractRoutesWithTreeSitter } from "./treeSitterEngine";
 import { SymbolicMountLinker } from "./mountLinker";
 import { isLocalAiAvailable, extractRoutesWithAI } from "./localAiEngine";
@@ -96,7 +95,7 @@ export async function scanOmniRoutes(
 
   // Step 2: Build Symbolic Mount Table across the project
   const mountLinker = new SymbolicMountLinker();
-  mountLinker.buildMountTable(fileCodeMap, projectPath);
+  await mountLinker.buildMountTable(fileCodeMap, projectPath);
 
   const allRoutes: OmniRoute[] = [];
   const rescueCandidates: FileCandidate[] = [];
@@ -114,17 +113,7 @@ export async function scanOmniRoutes(
     });
 
     try {
-      const extractPromise = (async () => {
-        let matched = await extractRoutesWithTreeSitter(candidate, mountLinker);
-        if (matched.length === 0) {
-          const fastMatches = fastMatchRoutes(candidate, mountLinker);
-          if (fastMatches.length > 0) {
-            matched = fastMatches;
-          }
-        }
-        return matched;
-      })();
-
+      const extractPromise = extractRoutesWithTreeSitter(candidate, mountLinker);
       return await Promise.race([extractPromise, timeoutPromise]);
     } finally {
       if (timeoutId) clearTimeout(timeoutId);

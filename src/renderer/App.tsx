@@ -90,6 +90,16 @@ const defaultTab = (projectId?: string | null): RequestTab => ({
 // Early Access Beta Expiration Configuration
 const BETA_EXPIRY_DATE_STR = "2026-09-28T23:59:59Z"; // GMT / UTC time format
 
+// Development Diagnostic Tool: Live scan stopwatch & completion timing toast.
+// Guarded for development testing; will not be included in production releases.
+const IS_DEV_SCAN_BENCHMARK = true;
+const showDevScanTimer = IS_DEV_SCAN_BENCHMARK || import.meta.env.DEV;
+
+function formatScanDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(2)}s (${ms}ms)`;
+}
+
 function App() {
   const [testForceExpired, setTestForceExpired] = useState(false);
   const isBetaExpired = (Date.now() > new Date(BETA_EXPIRY_DATE_STR).getTime()) || testForceExpired;
@@ -119,6 +129,22 @@ function App() {
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [scanningProjectId, setScanningProjectId] = useState<string | null>(null);
+  // Development scan benchmark stopwatch
+  const [scanStartTime, setScanStartTime] = useState<number | null>(null);
+  const [scanElapsedMs, setScanElapsedMs] = useState<number>(0);
+
+  // Live stopwatch ticker for development scan timer
+  useEffect(() => {
+    if (!scanStartTime) {
+      setScanElapsedMs(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setScanElapsedMs(Date.now() - scanStartTime);
+    }, 50);
+    return () => clearInterval(interval);
+  }, [scanStartTime]);
+
   const scanGameContainerRef = useRef<HTMLDivElement>(null);
   const [isTabsRestored, setIsTabsRestored] = useState(false);
   const [isProjectsLoaded, setIsProjectsLoaded] = useState(false);
@@ -1291,7 +1317,10 @@ function App() {
   const handleQuickOpenFolder = handleAddBackendFolder;
 
   const handleRescanProject = async (project: Project) => {
+    const scanStartMs = Date.now();
     setScanningProjectId(project.id);
+    setScanStartTime(scanStartMs);
+    setScanElapsedMs(0);
 
     // Mock Demo project rescan handler (preserves routes and simulates realistic scan)
     if (project.path.startsWith("mock://") || project.id === "proj_demo_store") {
@@ -1316,8 +1345,12 @@ function App() {
           return next;
         });
         setScanningProjectId(null);
+        setScanStartTime(null);
+        const elapsed = Date.now() - scanStartMs;
         toast.success("Scan complete", {
-          description: `Discovered 7 routes in ${project.name}`,
+          description: showDevScanTimer
+            ? `Discovered 7 routes in ${formatScanDuration(elapsed)} • ${project.name}`
+            : `Discovered 7 routes in ${project.name}`,
         });
       }, scanDuration);
       return;
@@ -1325,9 +1358,13 @@ function App() {
 
     try {
       const result = await apiClient.scanProject(project.path);
+      const elapsed = Date.now() - scanStartMs;
+
       if (result?.cancelled) {
         toast.info("Scan cancelled", {
-          description: `Route scan was stopped for ${project.name}`,
+          description: showDevScanTimer
+            ? `Route scan stopped after ${formatScanDuration(elapsed)} • ${project.name}`
+            : `Route scan was stopped for ${project.name}`,
         });
         return;
       }
@@ -1354,21 +1391,30 @@ function App() {
         return next;
       });
 
+      const discoveredCount = result?.detectedRoutesCount || merged.length;
       toast.success("Scan complete", {
-        description: `Discovered ${result?.detectedRoutesCount || merged.length} routes in ${project.name}`,
+        description: showDevScanTimer
+          ? `Discovered ${discoveredCount} routes in ${formatScanDuration(elapsed)} • ${project.name}`
+          : `Discovered ${discoveredCount} routes in ${project.name}`,
       });
     } catch (err: any) {
+      const elapsed = Date.now() - scanStartMs;
       if (err?.message?.includes("cancelled") || err?.message?.includes("aborted")) {
         toast.info("Scan cancelled", {
-          description: `Route scan was stopped for ${project.name}`,
+          description: showDevScanTimer
+            ? `Route scan stopped after ${formatScanDuration(elapsed)} • ${project.name}`
+            : `Route scan was stopped for ${project.name}`,
         });
       } else {
         toast.error("Scan failed", {
-          description: err?.message || "Please verify backend directory access or rescan.",
+          description: showDevScanTimer
+            ? `${err?.message || "Please verify backend directory access or rescan."} (after ${formatScanDuration(elapsed)})`
+            : (err?.message || "Please verify backend directory access or rescan."),
         });
       }
     } finally {
       setScanningProjectId(null);
+      setScanStartTime(null);
       requestAnimationFrame(() => {
         window.dispatchEvent(new Event("resize"));
       });
@@ -1379,11 +1425,13 @@ function App() {
     try {
       await apiClient.cancelScanProject(project.path);
       setScanningProjectId(null);
+      setScanStartTime(null);
       toast.info("Scan cancelled", {
         description: `Route scan was stopped for ${project.name}`,
       });
     } catch {
-      // Ignore
+      setScanningProjectId(null);
+      setScanStartTime(null);
     }
   };
 
@@ -1480,7 +1528,10 @@ function App() {
       }
     }
 
+    const startMs = Date.now();
     setScanningProjectId(targetProject.id);
+    setScanStartTime(startMs);
+    setScanElapsedMs(0);
     toast.info("Scanning backend routes...");
 
     if (!targetProject.path.startsWith("mock://")) {
@@ -1507,17 +1558,25 @@ function App() {
         new Promise((resolve) => setTimeout(resolve, 5000)),
       ]);
       setScanningProjectId(null);
+      setScanStartTime(null);
+      const elapsed = Date.now() - startMs;
       requestAnimationFrame(() => {
         window.dispatchEvent(new Event("resize"));
       });
-      toast.success("Scan complete!");
+      toast.success("Scan complete!", {
+        description: showDevScanTimer ? `Finished in ${formatScanDuration(elapsed)}` : undefined,
+      });
     } else {
       setTimeout(() => {
         setScanningProjectId(null);
+        setScanStartTime(null);
+        const elapsed = Date.now() - startMs;
         requestAnimationFrame(() => {
           window.dispatchEvent(new Event("resize"));
         });
-        toast.success("Scan complete!");
+        toast.success("Scan complete!", {
+          description: showDevScanTimer ? `Finished in ${formatScanDuration(elapsed)}` : undefined,
+        });
       }, 5000);
     }
   };
@@ -1947,6 +2006,25 @@ function App() {
   return (
     <TooltipProvider>
       <Toaster position="top-right" richColors closeButton theme="dark" />
+
+      {/* Development Diagnostic Tool: Live Top-Right Scan Stopwatch */}
+      {showDevScanTimer && scanStartTime !== null && (
+        <div
+          className={cn(
+            "fixed top-5 z-[9999] flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10121A]/95 border border-primary/50 shadow-xl shadow-primary/15 text-xs font-mono select-none backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200 pointer-events-none transition-all",
+            Boolean(scanningProjectId) ? "right-56" : "right-6"
+          )}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+          </span>
+          <span className="text-zinc-400 text-[10px] font-semibold tracking-wider uppercase">Scan Timer</span>
+          <span className="font-bold text-primary tabular-nums text-xs">
+            {(scanElapsedMs / 1000).toFixed(1)}s
+          </span>
+        </div>
+      )}
       {/* Updating & Auto-Relaunch Screen */}
       {isApplyingUpdate && (
         <div className="fixed inset-0 z-[10000] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
