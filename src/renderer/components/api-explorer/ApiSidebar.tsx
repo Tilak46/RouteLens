@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, ChevronDown, Folder, FileCode, Edit2, Trash, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, Edit2, Trash, MoreHorizontal, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiFolder, ApiRoute, isRoute } from "../../../types";
 import {
@@ -537,7 +537,7 @@ export function TreeNode({
           }
         }}
         className={cn(
-          "group flex items-center gap-2 py-1.5 pr-2 text-sm text-foreground/80 hover:bg-white/5 rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
+          "group flex items-center gap-1.5 py-1.5 pr-2 text-sm text-foreground/80 hover:bg-white/5 rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
           "hover:pr-8 data-[menu-open=true]:pr-8",
           dragOverPosition === "inside" && "bg-primary/10 border-primary/20 text-foreground"
         )}
@@ -557,14 +557,44 @@ export function TreeNode({
         )}
 
         {isOpen ? (
-          <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+          <ChevronDown size={13} className="text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+          <ChevronRight size={13} className="text-muted-foreground shrink-0" />
         )}
-        <Folder
-          size={14}
-          className={cn("text-blue-400/80 shrink-0", isOpen && "text-blue-400")}
-        />
+        {isOpen ? (
+          /* Open Folder Outline - Smooth rounded corners */
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-foreground/80 group-hover:text-foreground shrink-0 transition-colors"
+          >
+            {/* Back tab with rounded corners */}
+            <path d="M2.5 5.5V3.8C2.5 2.8 3.3 2 4.3 2H6.2C6.7 2 7.1 2.2 7.4 2.6L8.2 3.6C8.5 4 8.9 4.2 9.4 4.2H11.7C12.7 4.2 13.5 5 13.5 6V6.5" />
+            {/* Open front pocket with rounded corners */}
+            <path d="M2.4 6.8H13.6C14.3 6.8 14.8 7.3 14.7 8L13.8 12.6C13.6 13.4 12.9 14 12.1 14H3.9C3.1 14 2.4 13.4 2.2 12.6L1.3 8C1.2 7.3 1.7 6.8 2.4 6.8Z" />
+          </svg>
+        ) : (
+          /* Closed Folder Outline - Smooth rounded corners */
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-foreground/80 group-hover:text-foreground shrink-0 transition-colors"
+          >
+            <path d="M2 4.2C2 3 3 2 4.2 2H6.2C6.7 2 7.2 2.2 7.5 2.6L8.3 3.6C8.6 4 9.1 4.2 9.6 4.2H11.8C13 4.2 14 5.2 14 6.4V11.8C14 13 13 14 11.8 14H4.2C3 14 2 13 2 11.8V4.2Z" />
+          </svg>
+        )}
 
         {isRenaming ? (
           <input

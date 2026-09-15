@@ -791,7 +791,7 @@ export function ApiExplorerSidebarPanel({
           
           <button
             onClick={onAddProjectClick}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/80 border border-border/80 rounded transition-all cursor-pointer"
+            className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded transition-all cursor-pointer"
             title="Add backend project folder"
           >
             <Plus size={12} />
@@ -804,7 +804,7 @@ export function ApiExplorerSidebarPanel({
             {projects.length === 0 ? (
               <div 
                 onClick={onAddProjectClick}
-                className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border/60 hover:border-border rounded-lg p-2 select-none cursor-pointer transition-colors"
+                className="text-center py-4 text-xs text-muted-foreground hover:text-foreground rounded-lg p-2 select-none cursor-pointer transition-colors"
               >
                 No backends linked. Click <span className="text-primary font-medium">+ Add Backend</span>.
               </div>
@@ -820,10 +820,10 @@ export function ApiExplorerSidebarPanel({
                     key={p.id}
                     onClick={() => onActiveProjectIdChange?.(p.id)}
                     className={cn(
-                      "group px-2.5 py-1.5 rounded-lg border flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
+                      "group px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
                       isActive
-                        ? "bg-card border-border/80 text-foreground shadow-sm"
-                        : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        ? "bg-white/[0.06] text-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                     )}
                     title={p.path}
                   >
@@ -892,8 +892,6 @@ export function ApiExplorerSidebarPanel({
         )}
       </div>
 
-      <div className="h-px bg-border/50 shrink-0" />
-
       {/* 2. ENDPOINTS TREE */}
       <div className="flex-1 flex flex-col min-h-0 select-none">
         {activeProject ? (
@@ -932,25 +930,25 @@ export function ApiExplorerSidebarPanel({
                 value={activeProject.url || "http://localhost:3000"}
                 onChange={(e) => updateActiveBaseUrl(e.target.value)}
                 placeholder="Base URL (e.g. http://localhost:3000)"
-                className="h-7 bg-input border-border text-xs text-foreground font-mono focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                className="h-7 bg-white/[0.03] border-white/[0.06] text-xs text-foreground font-mono focus:ring-1 focus:ring-primary/40 focus:border-transparent"
               />
 
               <div className="grid grid-cols-2 gap-1.5">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => handleAddRequest(null)}
-                  className="h-7 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/15 hover:border-emerald-500/30 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
+                  className="h-7 hover:bg-white/5 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
                   title="Add a new custom request at the root level"
                 >
                   <FileCode size={11} className="text-emerald-400" />
                   + Request
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => handleAddFolder(null)}
-                  className="h-7 bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/15 hover:border-blue-500/30 text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
+                  className="h-7 hover:bg-white/5 text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
                   title="Add a new folder at the root level"
                 >
                   <FolderPlus size={11} className="text-blue-400" />
@@ -965,7 +963,7 @@ export function ApiExplorerSidebarPanel({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter endpoints..."
-                  className="h-7 pl-7 bg-card/40 border-border/60 text-xs text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/40"
+                  className="h-7 pl-7 bg-white/[0.03] border-white/[0.06] text-xs text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/40"
                 />
                 {searchQuery && (
                   <button
@@ -979,7 +977,7 @@ export function ApiExplorerSidebarPanel({
             </div>
 
             <div
-              className="flex-1 min-h-0 overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2 transform-gpu"
+              className="flex-1 min-h-0 overflow-y-auto pr-1 transform-gpu"
               style={{ transform: "translateZ(0)", willChange: "scroll-position" }}
             >
               {isScanning && scanningProjectId === activeProject?.id ? (

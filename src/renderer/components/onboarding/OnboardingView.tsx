@@ -150,19 +150,23 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           )}
         >
           <div>
-            <FolderOpen size={18} className="text-muted-foreground group-hover:text-foreground transition-colors mb-3" />
-            <h3 className="text-xs font-semibold text-foreground mb-1 flex items-center justify-between">
-              <span>Open Project</span>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <FolderOpen size={16} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                <h3 className="text-xs font-semibold text-foreground">
+                  Open Project
+                </h3>
+              </div>
               <ArrowRight
                 size={12}
                 className="text-muted-foreground/50 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
               />
-            </h3>
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            </div>
+            <p className="text-[11px] text-muted-foreground/70 leading-relaxed pl-6">
               Select or drop an Express, Next.js, Fastify or NestJS backend.
             </p>
           </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/60">
+          <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/60 pl-6">
             <span>Choose folder</span>
             <kbd className="font-mono px-1 py-0.5 rounded bg-white/[0.04] text-muted-foreground/70">
               Ctrl+O
@@ -181,19 +185,23 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           )}
         >
           <div>
-            <Sparkles size={18} className="text-muted-foreground group-hover:text-foreground transition-colors mb-3" />
-            <h3 className="text-xs font-semibold text-foreground mb-1 flex items-center justify-between">
-              <span>Explore Demo</span>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                <h3 className="text-xs font-semibold text-foreground">
+                  Explore Demo
+                </h3>
+              </div>
               <ArrowRight
                 size={12}
                 className="text-muted-foreground/50 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
               />
-            </h3>
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            </div>
+            <p className="text-[11px] text-muted-foreground/70 leading-relaxed pl-6">
               Sample Store &amp; Auth API with pre-populated endpoints.
             </p>
           </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/60">
+          <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/60 pl-6">
             <span>Load sample</span>
             <kbd className="font-mono px-1 py-0.5 rounded bg-white/[0.04] text-muted-foreground/70">
               D
@@ -212,19 +220,23 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           )}
         >
           <div>
-            <Zap size={18} className="text-muted-foreground group-hover:text-foreground transition-colors mb-3" />
-            <h3 className="text-xs font-semibold text-foreground mb-1 flex items-center justify-between">
-              <span>Quick Request</span>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <Zap size={16} className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                <h3 className="text-xs font-semibold text-foreground">
+                  Quick Request
+                </h3>
+              </div>
               <ArrowRight
                 size={12}
                 className="text-muted-foreground/50 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
               />
-            </h3>
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            </div>
+            <p className="text-[11px] text-muted-foreground/70 leading-relaxed pl-6">
               Send a request to any URL without a project.
             </p>
           </div>
-          <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/60">
+          <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/60 pl-6">
             <span>New request</span>
             <kbd className="font-mono px-1 py-0.5 rounded bg-white/[0.04] text-muted-foreground/70">
               Ctrl+T

@@ -82,19 +82,16 @@ export function DashboardLayout({
               onTabChange(tabId);
             }}
             className={cn(
-              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 cursor-pointer",
+              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-150 cursor-pointer",
               isActive
-                ? "bg-primary/10 text-primary"
+                ? "bg-white/[0.08] text-foreground"
                 : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
             )}
           >
-            {isActive && (
-              <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-primary rounded-r-md" />
-            )}
             <Icon
               className={cn(
-                "h-4 w-4 transition-transform duration-200",
-                isActive ? "scale-110" : "group-hover:scale-110"
+                "h-4 w-4 transition-transform duration-150",
+                isActive ? "scale-105" : "group-hover:scale-105"
               )}
             />
           </button>
@@ -150,22 +147,6 @@ export function DashboardLayout({
           {/* 1. LEFT NARROW ICON TOOLBAR */}
           <div className="w-12 bg-[var(--bg-secondary)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
             <div className="flex flex-col items-center gap-4 w-full">
-            {/* Logo Icon - click to toggle sidebar */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onToggleSidebar}
-                  className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center p-0.5 bg-black/40 border border-white/10 mb-2 shadow-[0_0_15px_rgba(255,108,55,0.15)] hover:border-primary/50 hover:scale-105 transition-all cursor-pointer"
-                  title="RouteLens"
-                >
-                  <img src={logoImg} alt="RouteLens" className="w-full h-full object-contain rounded-md select-none" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
-                {isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-              </TooltipContent>
-            </Tooltip>
-
             {/* Tabs */}
             <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
             <ToolbarButton tabId="environments" icon={SlidersHorizontal} label="Environments" />
