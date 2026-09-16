@@ -2201,7 +2201,7 @@ function App() {
               />
             </div>
           ) : (
-            <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] overflow-hidden">
               {/* Request Tabs Row */}
               <WorkspaceTabs
                 tabs={tabs}
@@ -2246,7 +2246,7 @@ function App() {
                   <div
                     onMouseDown={startRequestResize}
                     onDoubleClick={resetRequestSplit}
-                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-border/40"
+                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-white/[0.06]"
                     title="Drag to resize panels (Double-click to reset 50/50)"
                   />
 

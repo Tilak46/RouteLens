@@ -55,20 +55,20 @@ export function getStatusText(status: number, fallback?: string): string {
   return fallback || HTTP_STATUS_TEXT[status] || "";
 }
 
-function getStatusBadgeStyle(status: number) {
+function getStatusTextStyle(status: number) {
   if (status === 0) {
-    return "bg-rose-500/10 text-rose-400 border-rose-500/25";
+    return "text-rose-400";
   }
   if (status >= 200 && status < 300) {
-    return "bg-emerald-500/10 text-emerald-400 border-emerald-500/25";
+    return "text-emerald-400";
   }
   if (status >= 300 && status < 400) {
-    return "bg-sky-500/10 text-sky-400 border-sky-500/25";
+    return "text-sky-400";
   }
   if (status >= 400 && status < 500) {
-    return "bg-amber-500/10 text-amber-400 border-amber-500/25";
+    return "text-amber-400";
   }
-  return "bg-rose-500/10 text-rose-400 border-rose-500/25";
+  return "text-rose-400";
 }
 
 type ResponsePanelProps = {
@@ -243,29 +243,29 @@ export function ResponsePanel({
         </div>
 
         {/* Right: Status Indicators, Timers, Size & Action Buttons */}
-        <div className="flex items-center gap-2.5 text-xs pr-1">
+        <div className="flex items-center gap-3 text-xs pr-1">
           {loading ? (
-            <span className="flex items-center gap-1.5 font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 animate-pulse text-[11px]">
+            <span className="flex items-center gap-1.5 font-medium text-primary text-xs animate-pulse">
               <Loader2 className="animate-spin" size={12} />
               Sending Request...
             </span>
           ) : response ? (
             <span
               className={cn(
-                "flex items-center gap-1.5 font-semibold px-2 py-0.5 rounded border select-none transition-colors text-[11px]",
-                getStatusBadgeStyle(response.status)
+                "flex items-center gap-1.5 font-semibold text-xs select-none transition-colors",
+                getStatusTextStyle(response.status)
               )}
             >
               {response.status === 0 ? (
-                <AlertCircle size={12} className="text-rose-400" />
+                <AlertCircle size={13} className="text-rose-400" />
               ) : response.status >= 200 && response.status < 300 ? (
-                <CheckCircle2 size={12} className="text-emerald-400" />
+                <CheckCircle2 size={13} className="text-emerald-400" />
               ) : response.status >= 300 && response.status < 400 ? (
-                <ArrowUpRight size={12} className="text-sky-400" />
+                <ArrowUpRight size={13} className="text-sky-400" />
               ) : response.status >= 400 && response.status < 500 ? (
-                <AlertTriangle size={12} className="text-amber-400" />
+                <AlertTriangle size={13} className="text-amber-400" />
               ) : (
-                <AlertCircle size={12} className="text-rose-400" />
+                <AlertCircle size={13} className="text-rose-400" />
               )}
               {response.status === 0
                 ? "Could Not Connect"
@@ -274,13 +274,13 @@ export function ResponsePanel({
           ) : null}
 
           {timeLabel && (
-            <span className="text-muted-foreground/80 font-mono text-[11px] font-medium bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06] animate-in fade-in duration-200">
+            <span className="text-sky-400 font-mono text-xs font-medium animate-in fade-in duration-200">
               {timeLabel}
             </span>
           )}
 
           {sizeLabel && (
-            <span className="text-muted-foreground/80 font-mono text-[11px] font-medium bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06] animate-in fade-in duration-200">
+            <span className="text-violet-400 font-mono text-xs font-medium animate-in fade-in duration-200">
               {sizeLabel}
             </span>
           )}
@@ -289,7 +289,7 @@ export function ResponsePanel({
             <button
               type="button"
               onClick={handleCopy}
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] px-2 py-0.5 rounded transition-all cursor-pointer select-none"
+              className="flex items-center gap-1 text-xs font-medium text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer select-none ml-0.5"
               title="Copy Response JSON to Clipboard"
             >
               {copied ? (
