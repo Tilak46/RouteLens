@@ -725,9 +725,18 @@
   font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace !important;
 }
 .cm-editor {
-  background-color: hsl(var(--input)) !important;
+  background-color: hsl(var(--input));
   color: hsl(var(--foreground)) !important;
   border-radius: 6px;
+}
+.cm-transparent .cm-editor,
+.cm-transparent.cm-editor,
+.cm-editor.cm-transparent,
+.cm-transparent .cm-scroller,
+.cm-transparent .cm-content,
+.cm-transparent .cm-gutters {
+  background-color: transparent !important;
+  border-radius: 0 !important;
 }
 .cm-editor .cm-gutters {
   background-color: transparent !important;

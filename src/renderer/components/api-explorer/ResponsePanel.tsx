@@ -384,7 +384,7 @@ export function ResponsePanel({
               extensions={hasJson ? [json()] : []}
               readOnly={true}
               editable={false}
-              className="flex-grow overflow-hidden text-[13px]"
+              className="flex-grow overflow-hidden text-[13px] cm-transparent bg-transparent"
               height="100%"
             />
           ) : (
