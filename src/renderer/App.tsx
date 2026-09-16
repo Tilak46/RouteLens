@@ -377,12 +377,8 @@ function App() {
 
   // Ensure activeProjectId is valid whenever projects change or are loaded
   useEffect(() => {
-    if (projects.length > 0) {
-      if (!activeProjectId || !projects.some((p) => p.id === activeProjectId)) {
-        setActiveProjectId(projects[0].id);
-      }
-    } else if (activeProjectId) {
-      setActiveProjectId(null);
+    if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+      setActiveProjectId(projects[0]?.id || null);
     }
   }, [projects, activeProjectId]);
 
@@ -2094,6 +2090,8 @@ function App() {
                 activeProject={projects.find((p) => p.id === activeProjectId)}
                 onSelectProject={(id) => setActiveProjectId(id)}
                 onAddProjectClick={handleAddBackendFolder}
+                onCloseBackend={() => setActiveProjectId(null)}
+                onRemoveProject={handleRemoveProject}
               />
             )
           }
@@ -2192,7 +2190,7 @@ function App() {
               onDuplicateEnvironment={handleDuplicateEnvironment}
               onExportEnvironment={handleExportEnvironment}
             />
-          ) : isProjectsLoaded && isTabsRestored && projects.length === 0 && tabs.length === 0 ? (
+          ) : isProjectsLoaded && isTabsRestored && (projects.length === 0 || !activeProjectId) && tabs.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
               <OnboardingView
                 onOpenFolder={handleAddBackendFolder}
@@ -2253,7 +2251,7 @@ function App() {
                   />
 
                   {/* Bottom Response Panel */}
-                  <div className="flex-1 flex flex-col min-h-[180px] p-4 pt-0 overflow-hidden">
+                  <div className="flex-1 flex flex-col min-h-[180px] overflow-hidden">
                     <ResponsePanel
                       response={activeTab.response}
                       loading={activeTab.loading}
@@ -2282,9 +2280,20 @@ function App() {
                       onRescan={() => handleRescanProject(activeProject)}
                       onCancelScan={() => handleCancelScan(activeProject)}
                       onRevealInExplorer={() => apiClient.showItemInFolder(activeProject.path)}
+                      onCloseProject={() => setActiveProjectId(null)}
                     />
                   );
                 })()
+              ) : !activeProjectId ? (
+                <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
+                  <OnboardingView
+                    onOpenFolder={handleAddBackendFolder}
+                    onQuickRequest={handleQuickRequest}
+                    onLoadDemo={handleLoadDemoProject}
+                    onOpenManualModal={handleAddBackendFolder}
+                    appVersion={appVersion}
+                  />
+                </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/5 select-none animate-in fade-in duration-200">
                   <div className="flex items-center justify-center mb-3">

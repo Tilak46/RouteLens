@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, Edit2, Trash, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, Edit2, Trash, MoreHorizontal, Plus, Home, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiFolder, ApiRoute, isRoute } from "../../../types";
 import {
@@ -36,6 +36,8 @@ type SidebarProps = {
   onClearNewlyCreatedNodeId?: () => void;
   onDuplicateNode?: (nodeId: string) => void;
   onCopyNode?: (route: ApiRoute) => void;
+  onCloseProject?: () => void;
+  onRemoveProject?: () => void;
 };
 
 import { toRouteKey } from "@/views/ApiExplorerView";
@@ -67,6 +69,8 @@ export function Sidebar({
   onClearNewlyCreatedNodeId,
   onDuplicateNode,
   onCopyNode,
+  onCloseProject,
+  onRemoveProject,
 }: SidebarProps) {
   const [isDragOverRoot, setIsDragOverRoot] = useState(false);
   const [deleteConfirmNode, setDeleteConfirmNode] = useState<{ id: string; name: string; isFolder: boolean } | null>(null);
@@ -163,6 +167,15 @@ export function Sidebar({
                   <Plus size={13} />
                 </button>
               )}
+              {onCloseProject && (
+                <button
+                  onClick={onCloseProject}
+                  className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Close backend (return to Home)"
+                >
+                  <X size={13} />
+                </button>
+              )}
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -172,7 +185,7 @@ export function Sidebar({
                     <MoreHorizontal size={13} />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-[#121214] border border-white/[0.08] text-foreground w-[170px] shadow-2xl rounded-lg z-50 p-1">
+                <DropdownMenuContent align="end" className="bg-[#121214] border border-white/[0.08] text-foreground w-[180px] shadow-2xl rounded-lg z-50 p-1">
                   {onAddRequest && (
                     <DropdownMenuItem
                       onClick={() => onAddRequest(null as any)}
@@ -189,6 +202,27 @@ export function Sidebar({
                     >
                       <Folder size={12} className="text-muted-foreground" />
                       New Folder
+                    </DropdownMenuItem>
+                  )}
+                  {(onCloseProject || onRemoveProject) && (
+                    <DropdownMenuSeparator className="bg-white/[0.06] my-1" />
+                  )}
+                  {onCloseProject && (
+                    <DropdownMenuItem
+                      onClick={onCloseProject}
+                      className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
+                    >
+                      <Home size={12} className="text-muted-foreground" />
+                      Close Backend (Home)
+                    </DropdownMenuItem>
+                  )}
+                  {onRemoveProject && (
+                    <DropdownMenuItem
+                      onClick={onRemoveProject}
+                      className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-300 transition-colors"
+                    >
+                      <Trash size={12} className="text-rose-400" />
+                      Remove from Workspace
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>

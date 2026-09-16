@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Project } from "@/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, Search, Plus, Check, Server } from "lucide-react";
+import { ChevronDown, Search, Plus, Check, Server, Home, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type BackendSelectorDropdownProps = {
@@ -9,6 +9,8 @@ type BackendSelectorDropdownProps = {
   activeProject?: Project | null;
   onSelectProject: (projectId: string) => void;
   onAddProjectClick: () => void;
+  onCloseBackend?: () => void;
+  onRemoveProject?: (projectId: string) => void;
 };
 
 export function BackendSelectorDropdown({
@@ -16,6 +18,8 @@ export function BackendSelectorDropdown({
   activeProject,
   onSelectProject,
   onAddProjectClick,
+  onCloseBackend,
+  onRemoveProject,
 }: BackendSelectorDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,7 +42,12 @@ export function BackendSelectorDropdown({
           title={activeProject ? `${activeProject.name} (${activeProject.path})` : "Select Backend"}
         >
           <div className="flex items-center gap-1.5 truncate">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+            <span
+              className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                activeProject ? "bg-primary" : "bg-muted-foreground/40"
+              )}
+            />
             <span className="truncate max-w-[150px]">
               {activeProject?.name || "Backends"}
             </span>
@@ -90,7 +99,7 @@ export function BackendSelectorDropdown({
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "flex items-center justify-between px-2 py-1.5 rounded-md text-[11.5px] cursor-pointer transition-colors select-none",
+                    "group/item flex items-center justify-between px-2 py-1.5 rounded-md text-[11.5px] cursor-pointer transition-colors select-none",
                     isActive
                       ? "bg-white/[0.07] text-foreground font-medium"
                       : "text-muted-foreground/80 hover:text-foreground hover:bg-white/[0.04]"
@@ -106,17 +115,31 @@ export function BackendSelectorDropdown({
                     />
                     <span className="truncate">{p.name}</span>
                   </div>
-                  {isActive && (
-                    <Check size={11} className="text-primary shrink-0" />
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isActive && (
+                      <Check size={11} className="text-primary shrink-0" />
+                    )}
+                    {onRemoveProject && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveProject(p.id);
+                        }}
+                        className="opacity-0 group-hover/item:opacity-100 p-0.5 text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-all cursor-pointer"
+                        title={`Remove "${p.name}" from workspace`}
+                      >
+                        <X size={11} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Separator & Add Backend */}
-        <div className="border-t border-white/[0.06] mt-1.5 pt-1.5">
+        {/* Separator & Actions */}
+        <div className="border-t border-white/[0.06] mt-1.5 pt-1.5 space-y-0.5">
           <button
             onClick={() => {
               setIsOpen(false);
@@ -127,6 +150,20 @@ export function BackendSelectorDropdown({
             <Plus size={11} />
             <span>Add Backend</span>
           </button>
+
+          {activeProject && onCloseBackend && (
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onCloseBackend();
+              }}
+              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.04] rounded-md transition-colors cursor-pointer"
+              title="Close current backend and return to Home"
+            >
+              <Home size={11} className="text-muted-foreground/70" />
+              <span>Close Backend (Home)</span>
+            </button>
+          )}
         </div>
       </PopoverContent>
     </Popover>

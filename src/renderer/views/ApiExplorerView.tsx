@@ -329,7 +329,8 @@ export function ApiExplorerSidebarPanel({
   const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useState<string | null>(null);
 
   const activeProject = useMemo(() => {
-    return projects.find((p) => p.id === activeProjectId) || projects[0] || null;
+    if (!activeProjectId) return null;
+    return projects.find((p) => p.id === activeProjectId) || null;
   }, [projects, activeProjectId]);
 
   useEffect(() => {
@@ -337,8 +338,8 @@ export function ApiExplorerSidebarPanel({
   }, [activeRouteKey]);
 
   useEffect(() => {
-    if (projects.length > 0 && (!activeProjectId || !projects.some((p) => p.id === activeProjectId))) {
-      onActiveProjectIdChange?.(projects[0].id);
+    if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+      onActiveProjectIdChange?.(null);
     }
   }, [projects, activeProjectId, onActiveProjectIdChange]);
 
@@ -849,6 +850,8 @@ export function ApiExplorerSidebarPanel({
                   onClearNewlyCreatedNodeId={() => setNewlyCreatedNodeId(null)}
                   onDuplicateNode={handleDuplicateNode}
                   onCopyNode={handleCopyNode}
+                  onCloseProject={() => onActiveProjectIdChange?.(null)}
+                  onRemoveProject={() => activeProject && onRemoveProject?.(activeProject.id)}
                 />
               ) : searchQuery ? (
                 <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
