@@ -22,6 +22,7 @@ import {
 
 type SidebarProps = {
   tree: ApiFolder[];
+  rootProjectName?: string;
   selectedKey?: string;
   onSelect: (route: ApiRoute) => void;
   onRenameNode?: (nodeId: string, newName: string) => void;
@@ -52,6 +53,7 @@ const findNodeInTree = (id: string, nodes: (ApiFolder | ApiRoute)[]): ApiFolder 
 
 export function Sidebar({
   tree,
+  rootProjectName,
   selectedKey,
   onSelect,
   onRenameNode,
@@ -68,6 +70,36 @@ export function Sidebar({
 }: SidebarProps) {
   const [isDragOverRoot, setIsDragOverRoot] = useState(false);
   const [deleteConfirmNode, setDeleteConfirmNode] = useState<{ id: string; name: string; isFolder: boolean } | null>(null);
+
+  const renderedTree = tree.map((node) => (
+    <TreeNode
+      key={node.id}
+      node={node}
+      level={rootProjectName ? 1 : 0}
+      selectedKey={selectedKey}
+      onSelect={onSelect}
+      onRenameNode={onRenameNode}
+      onDeleteNode={(nodeId) => {
+        const found = findNodeInTree(nodeId, tree);
+        if (found) {
+          setDeleteConfirmNode({
+            id: nodeId,
+            name: found.name,
+            isFolder: !isRoute(found),
+          });
+        }
+      }}
+      onAddFolder={onAddFolder}
+      onAddRequest={onAddRequest}
+      onMoveNode={onMoveNode}
+      expandedFolderIds={expandedFolderIds}
+      onToggleFolderExpanded={onToggleFolderExpanded}
+      newlyCreatedNodeId={newlyCreatedNodeId}
+      onClearNewlyCreatedNodeId={onClearNewlyCreatedNodeId}
+      onDuplicateNode={onDuplicateNode}
+      onCopyNode={onCopyNode}
+    />
+  ));
 
   return (
     <div
@@ -96,35 +128,37 @@ export function Sidebar({
         isDragOverRoot && "border-dashed border-primary/40 bg-primary/5"
       )}
     >
-      {tree.map((node) => (
-        <TreeNode
-          key={node.id}
-          node={node}
-          level={0}
-          selectedKey={selectedKey}
-          onSelect={onSelect}
-          onRenameNode={onRenameNode}
-          onDeleteNode={(nodeId) => {
-            const found = findNodeInTree(nodeId, tree);
-            if (found) {
-              setDeleteConfirmNode({
-                id: nodeId,
-                name: found.name,
-                isFolder: !isRoute(found),
-              });
-            }
-          }}
-          onAddFolder={onAddFolder}
-          onAddRequest={onAddRequest}
-          onMoveNode={onMoveNode}
-          expandedFolderIds={expandedFolderIds}
-          onToggleFolderExpanded={onToggleFolderExpanded}
-          newlyCreatedNodeId={newlyCreatedNodeId}
-          onClearNewlyCreatedNodeId={onClearNewlyCreatedNodeId}
-          onDuplicateNode={onDuplicateNode}
-          onCopyNode={onCopyNode}
-        />
-      ))}
+      {rootProjectName ? (
+        <div className="space-y-0.5">
+          {/* Permanent Non-collapsible Root Project Folder */}
+          <div
+            className="flex items-center gap-1.5 py-1.5 px-2 text-sm text-foreground font-semibold rounded-md select-none"
+            title={`Root: ${rootProjectName}`}
+          >
+            {/* Open Folder Outline */}
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-foreground/90 shrink-0"
+            >
+              <path d="M2.5 5.5V3.8C2.5 2.8 3.3 2 4.3 2H6.2C6.7 2 7.1 2.2 7.4 2.6L8.2 3.6C8.5 4 8.9 4.2 9.4 4.2H11.7C12.7 4.2 13.5 5 13.5 6V6.5" />
+              <path d="M2.4 6.8H13.6C14.3 6.8 14.8 7.3 14.7 8L13.8 12.6C13.6 13.4 12.9 14 12.1 14H3.9C3.1 14 2.4 13.4 2.2 12.6L1.3 8C1.2 7.3 1.7 6.8 2.4 6.8Z" />
+            </svg>
+            <span className="truncate">{rootProjectName}</span>
+          </div>
+
+          {/* Root Children */}
+          {renderedTree}
+        </div>
+      ) : (
+        renderedTree
+      )}
 
       {/* Delete Confirmation Alert Dialog */}
       <AlertDialog
@@ -295,7 +329,7 @@ export function TreeNode({
             ? "bg-primary/10 text-primary font-medium"
             : "hover:bg-white/5 text-muted-foreground hover:text-white",
         )}
-        style={{ paddingLeft: paddingLeft + 22 }}
+        style={{ paddingLeft: paddingLeft + 4 }}
         data-menu-open={isMenuOpen}
       >
         {/* Drop Indicators */}
@@ -782,7 +816,7 @@ function MethodBadge({ method }: { method: string }) {
   return (
     <span
       className={cn(
-        "text-[10px] font-bold w-8 shrink-0 text-center tracking-tight inline-block select-none",
+        "text-[10px] font-bold min-w-[28px] shrink-0 text-right tracking-tight inline-block select-none",
         colors[raw] || colors[formatted] || "text-gray-400",
       )}
       title={raw}

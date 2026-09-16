@@ -30,6 +30,7 @@ type DashboardLayoutProps = {
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   sidebarContent: React.ReactNode;
+  sidebarHeader?: React.ReactNode;
   consoleDrawer?: React.ReactNode;
   isSidebarExpanded: boolean;
   onToggleSidebar: () => void;
@@ -48,6 +49,7 @@ export function DashboardLayout({
   activeTab,
   onTabChange,
   sidebarContent,
+  sidebarHeader,
   consoleDrawer,
   isSidebarExpanded,
   onToggleSidebar,
@@ -226,24 +228,28 @@ export function DashboardLayout({
           style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px`, transform: "translateZ(0)" } : undefined}
         >
           {isSidebarExpanded && (
-            <div className="flex flex-col h-full p-3.5 overflow-hidden">
-              {/* App Brand Header */}
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <span className="text-xs font-semibold tracking-wide text-foreground">
-                  RouteLens
-                </span>
+            <div className="flex flex-col h-full overflow-hidden">
+              {/* Sidebar Header: height h-10 and border-b matching request tabs bar */}
+              <div className="h-10 px-3 bg-[var(--bg-secondary)] border-b border-border/80 flex items-center justify-between shrink-0 select-none">
+                <div className="flex-1 min-w-0 pr-2">
+                  {sidebarHeader || (
+                    <span className="text-xs font-semibold tracking-wide text-foreground">
+                      RouteLens
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={onToggleSidebar}
-                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer"
                   title="Collapse Sidebar"
                 >
                   <ChevronLeft size={14} />
                 </button>
               </div>
 
-              {/* Sidebar Content (bounded layout with hardware compositor isolation) */}
+              {/* Sidebar Content */}
               <div
-                className="flex-1 min-h-0 flex flex-col overflow-hidden isolate transform-gpu"
+                className="flex-1 min-h-0 flex flex-col p-3.5 overflow-hidden isolate transform-gpu"
                 style={{ transform: "translateZ(0)" }}
               >
                 {sidebarContent}

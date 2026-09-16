@@ -28,6 +28,7 @@ import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send, RefreshCw, Arr
 import { cn } from "@/lib/utils";
 
 import { ApiExplorerSidebarPanel, mergeTrees, extractRoutePath, toRouteKey } from "@/views/ApiExplorerView";
+import { BackendSelectorDropdown } from "@/components/api-explorer/BackendSelectorDropdown";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
 import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarPanel";
 
@@ -2082,6 +2083,14 @@ function App() {
           activeTab={activeSidebarTab}
           onTabChange={setActiveSidebarTab}
           sidebarContent={sidebarContent}
+          sidebarHeader={
+            <BackendSelectorDropdown
+              projects={projects}
+              activeProject={projects.find((p) => p.id === activeProjectId)}
+              onSelectProject={(id) => setActiveProjectId(id)}
+              onAddProjectClick={handleAddBackendFolder}
+            />
+          }
           isSidebarExpanded={isSidebarExpanded}
           onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
           sidebarWidth={sidebarWidth}

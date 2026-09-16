@@ -770,129 +770,7 @@ export function ApiExplorerSidebarPanel({
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 space-y-3 isolate transform-gpu">
-      {/* 1. BACKENDS LIST */}
-      <div className="flex flex-col gap-2 shrink-0">
-        <div className="flex items-center justify-between mb-1 select-none">
-          <button
-            onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground tracking-wider uppercase flex items-center gap-1.5 transition-colors focus:outline-none cursor-pointer"
-          >
-            <ChevronDown
-              className={cn(
-                "w-3 h-3 transition-transform duration-200",
-                !isProjectsExpanded && "-rotate-90"
-              )}
-            />
-            <span>Backends</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-muted/60 text-muted-foreground font-mono">
-              {projects.length}
-            </span>
-          </button>
-          
-          <button
-            onClick={onAddProjectClick}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded transition-all cursor-pointer"
-            title="Add backend project folder"
-          >
-            <Plus size={12} />
-            <span>Add Backend</span>
-          </button>
-        </div>
-
-        {isProjectsExpanded && (
-          <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto pr-1 animate-in fade-in slide-in-from-top-1 duration-200">
-            {projects.length === 0 ? (
-              <div 
-                onClick={onAddProjectClick}
-                className="text-center py-4 text-xs text-muted-foreground hover:text-foreground rounded-lg p-2 select-none cursor-pointer transition-colors"
-              >
-                No backends linked. Click <span className="text-primary font-medium">+ Add Backend</span>.
-              </div>
-            ) : (
-              projects.map((p) => {
-                const isActive = activeProject?.id === p.id;
-                const isScanningThis = scanningProjectId === p.id;
-                const pTree = treeCache[p.path]?.tree || [];
-                const routeCount = countRoutes(pTree);
-
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => onActiveProjectIdChange?.(p.id)}
-                    className={cn(
-                      "group px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
-                      isActive
-                        ? "bg-white/[0.06] text-foreground font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                    )}
-                    title={p.path}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300",
-                          isScanningThis
-                            ? "bg-cyan-400 animate-breathe"
-                            : isActive
-                            ? "bg-primary"
-                            : "bg-muted-foreground/40"
-                        )}
-                      />
-                      <span className="truncate max-w-[120px] font-medium">{p.name}</span>
-                      <span className="text-[10px] text-muted-foreground/60 font-mono">
-                        {routeCount}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isScanningThis ? (
-                        <button
-                          className="text-cyan-400 hover:text-rose-400 p-0.5 rounded hover:bg-rose-500/10 cursor-pointer flex items-center gap-1 text-[10px]"
-                          title="Cancel active scan"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCancelScanProject?.(p);
-                          }}
-                        >
-                          <RefreshCw size={11} className="animate-spin" />
-                          <span className="text-[9px] text-muted-foreground hover:text-rose-400">Stop</span>
-                        </button>
-                      ) : (
-                        onRescanProject && (
-                          <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/10 cursor-pointer"
-                            title="Rescan backend routes"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRescanProject(p);
-                            }}
-                          >
-                            <RefreshCw size={11} />
-                          </button>
-                        )
-                      )}
-                      {onRemoveProject && (
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-rose-400 p-0.5 rounded hover:bg-rose-500/10 cursor-pointer"
-                          title="Remove backend"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRemoveProject(p.id);
-                          }}
-                        >
-                          <X size={11} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 2. ENDPOINTS TREE */}
+      {/* ENDPOINTS TREE */}
       <div className="flex-1 flex flex-col min-h-0 select-none">
         {activeProject ? (
           <>
@@ -925,36 +803,7 @@ export function ApiExplorerSidebarPanel({
               </div>
             </div>
 
-            <div className="space-y-2 shrink-0 mb-2">
-              <Input
-                value={activeProject.url || "http://localhost:3000"}
-                onChange={(e) => updateActiveBaseUrl(e.target.value)}
-                placeholder="Base URL (e.g. http://localhost:3000)"
-                className="h-7 bg-white/[0.03] border-white/[0.06] text-xs text-foreground font-mono focus:ring-1 focus:ring-primary/40 focus:border-transparent"
-              />
-
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleAddRequest(null)}
-                  className="h-7 hover:bg-white/5 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
-                  title="Add a new custom request at the root level"
-                >
-                  <FileCode size={11} className="text-emerald-400" />
-                  + Request
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleAddFolder(null)}
-                  className="h-7 hover:bg-white/5 text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
-                  title="Add a new folder at the root level"
-                >
-                  <FolderPlus size={11} className="text-blue-400" />
-                  + Folder
-                </Button>
-              </div>
+            <div className="shrink-0 mb-2">
 
               {/* Search / Filter Input */}
               <div className="relative">
@@ -987,6 +836,7 @@ export function ApiExplorerSidebarPanel({
               ) : filteredTree.length > 0 ? (
                 <Sidebar
                   tree={filteredTree}
+                  rootProjectName={activeProject?.name}
                   selectedKey={selectedRouteKey || undefined}
                   onSelect={handleRouteClick}
                   onRenameNode={handleRenameNode}
