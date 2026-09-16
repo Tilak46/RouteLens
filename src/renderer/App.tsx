@@ -2084,12 +2084,18 @@ function App() {
           onTabChange={setActiveSidebarTab}
           sidebarContent={sidebarContent}
           sidebarHeader={
-            <BackendSelectorDropdown
-              projects={projects}
-              activeProject={projects.find((p) => p.id === activeProjectId)}
-              onSelectProject={(id) => setActiveProjectId(id)}
-              onAddProjectClick={handleAddBackendFolder}
-            />
+            activeSidebarTab === "environments" ? (
+              <span className="text-[12px] font-medium tracking-wide text-foreground/90">
+                Environments
+              </span>
+            ) : (
+              <BackendSelectorDropdown
+                projects={projects}
+                activeProject={projects.find((p) => p.id === activeProjectId)}
+                onSelectProject={(id) => setActiveProjectId(id)}
+                onAddProjectClick={handleAddBackendFolder}
+              />
+            )
           }
           isSidebarExpanded={isSidebarExpanded}
           onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}

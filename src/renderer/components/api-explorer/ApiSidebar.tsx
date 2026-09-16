@@ -132,29 +132,79 @@ export function Sidebar({
         <div className="space-y-0.5">
           {/* Permanent Non-collapsible Root Project Folder */}
           <div
-            className="flex items-center gap-1.5 py-1.5 px-2 text-sm text-foreground font-semibold rounded-md select-none"
+            className="group flex items-center justify-between py-1 px-1.5 text-[12px] text-foreground/90 font-medium rounded-md select-none hover:bg-white/[0.03] transition-colors relative"
             title={`Root: ${rootProjectName}`}
           >
-            {/* Open Folder Outline */}
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-foreground/90 shrink-0"
-            >
-              <path d="M2.5 5.5V3.8C2.5 2.8 3.3 2 4.3 2H6.2C6.7 2 7.1 2.2 7.4 2.6L8.2 3.6C8.5 4 8.9 4.2 9.4 4.2H11.7C12.7 4.2 13.5 5 13.5 6V6.5" />
-              <path d="M2.4 6.8H13.6C14.3 6.8 14.8 7.3 14.7 8L13.8 12.6C13.6 13.4 12.9 14 12.1 14H3.9C3.1 14 2.4 13.4 2.2 12.6L1.3 8C1.2 7.3 1.7 6.8 2.4 6.8Z" />
-            </svg>
-            <span className="truncate">{rootProjectName}</span>
+            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-foreground/90 shrink-0"
+              >
+                <path d="M2.5 5.5V3.8C2.5 2.8 3.3 2 4.3 2H6.2C6.7 2 7.1 2.2 7.4 2.6L8.2 3.6C8.5 4 8.9 4.2 9.4 4.2H11.7C12.7 4.2 13.5 5 13.5 6V6.5" />
+                <path d="M2.4 6.8H13.6C14.3 6.8 14.8 7.3 14.7 8L13.8 12.6C13.6 13.4 12.9 14 12.1 14H3.9C3.1 14 2.4 13.4 2.2 12.6L1.3 8C1.2 7.3 1.7 6.8 2.4 6.8Z" />
+              </svg>
+              <span className="truncate">{rootProjectName}</span>
+            </div>
+
+            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
+              {onAddRequest && (
+                <button
+                  onClick={() => onAddRequest(null as any)}
+                  className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Add request to root"
+                >
+                  <Plus size={13} />
+                </button>
+              )}
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Root Options"
+                  >
+                    <MoreHorizontal size={13} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-[#121214] border border-white/[0.08] text-foreground w-[170px] shadow-2xl rounded-lg z-50 p-1">
+                  {onAddRequest && (
+                    <DropdownMenuItem
+                      onClick={() => onAddRequest(null as any)}
+                      className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
+                    >
+                      <FileCode size={12} className="text-muted-foreground" />
+                      New Request
+                    </DropdownMenuItem>
+                  )}
+                  {onAddFolder && (
+                    <DropdownMenuItem
+                      onClick={() => onAddFolder(null as any)}
+                      className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
+                    >
+                      <Folder size={12} className="text-muted-foreground" />
+                      New Folder
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Root Children */}
-          {renderedTree}
+          <div className="relative space-y-0.5">
+            {/* Vertical Hierarchy Indent Guide Line from Root */}
+            <div
+              className="absolute top-0 bottom-2 w-[1px] bg-white/[0.04] group-hover/sidebar:bg-white/[0.08] pointer-events-none transition-colors duration-150"
+              style={{ left: "13px" }}
+            />
+            {renderedTree}
+          </div>
         </div>
       ) : (
         renderedTree
@@ -167,14 +217,14 @@ export function Sidebar({
           if (!open) setDeleteConfirmNode(null);
         }}
       >
-        <AlertDialogContent className="bg-popover border border-border text-foreground w-[90%] max-w-[400px]">
+        <AlertDialogContent className="bg-[#121214] border border-white/[0.08] text-foreground w-[90%] max-w-[380px] shadow-2xl rounded-xl p-5">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">
+            <AlertDialogTitle className="text-foreground text-sm font-semibold">
               Delete {deleteConfirmNode?.isFolder ? "Folder" : "Request"}?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground text-xs leading-normal">
+            <AlertDialogDescription className="text-muted-foreground text-[11.5px] leading-relaxed">
               Are you sure you want to delete{" "}
-              <strong className="text-foreground">
+              <strong className="text-foreground font-medium">
                 "{deleteConfirmNode?.name}"
               </strong>
               {deleteConfirmNode?.isFolder
@@ -183,7 +233,7 @@ export function Sidebar({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4 gap-2 sm:gap-0">
-            <AlertDialogCancel className="bg-transparent border border-border text-foreground hover:bg-white/5 text-xs h-9">
+            <AlertDialogCancel className="bg-transparent border border-white/[0.08] text-muted-foreground hover:text-foreground hover:bg-white/5 text-[11.5px] h-8 rounded-md">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -193,7 +243,7 @@ export function Sidebar({
                 }
                 setDeleteConfirmNode(null);
               }}
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold h-9"
+              className="bg-red-600 hover:bg-red-700 text-white text-[11.5px] font-medium h-8 rounded-md"
             >
               Delete
             </AlertDialogAction>
@@ -274,7 +324,7 @@ export function TreeNode({
     }
   }, [isRenaming]);
   
-  const paddingLeft = level * 20 + 8; // Indent
+  const paddingLeft = level * 14 + 2; // Tightened indent
 
   if (isRoute(node)) {
     const isSelected = selectedKey === node.id || selectedKey === toRouteKey(node);
@@ -323,13 +373,13 @@ export function TreeNode({
         }}
         onClick={() => !isRenaming && onSelect(node)}
         className={cn(
-          "group flex items-center gap-1.5 py-1.5 pr-2 rounded-md cursor-pointer transition-all duration-150 text-sm relative border border-transparent",
+          "group flex items-center gap-1.5 py-1 pr-2 rounded-md cursor-pointer transition-all duration-150 text-[12px] relative border border-transparent",
           "hover:pr-8 data-[menu-open=true]:pr-8",
           isSelected
-            ? "bg-primary/10 text-primary font-medium"
-            : "hover:bg-white/5 text-muted-foreground hover:text-white",
+            ? "bg-white/[0.08] text-foreground font-medium"
+            : "hover:bg-white/[0.04] text-muted-foreground/80 hover:text-foreground",
         )}
-        style={{ paddingLeft: paddingLeft + 4 }}
+        style={{ paddingLeft: paddingLeft + 2 }}
         data-menu-open={isMenuOpen}
       >
         {/* Drop Indicators */}
@@ -379,7 +429,7 @@ export function TreeNode({
               }
               setIsRenaming(false);
             }}
-            className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-medium text-foreground text-left"
+            className="h-5.5 bg-black/40 border border-primary/50 text-[11.5px] px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-normal text-foreground text-left"
           />
         ) : (
           <span className="flex-1 min-w-0 truncate text-left" title={node.name}>
@@ -428,13 +478,13 @@ export function TreeNode({
                   <MoreHorizontal size={13} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover border-border text-foreground w-[180px] z-50 p-1">
+              <DropdownMenuContent align="end" className="bg-[#121214] border border-white/[0.08] text-foreground w-[170px] shadow-2xl rounded-lg z-50 p-1">
                 <DropdownMenuItem
                   onClick={() => {
                     setRenameVal(node.name);
                     setIsRenaming(true);
                   }}
-                  className="text-xs py-2 px-3 cursor-pointer flex items-center gap-2 font-medium"
+                  className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
                 >
                   <Edit2 size={12} className="text-muted-foreground" />
                   Rename
@@ -443,7 +493,7 @@ export function TreeNode({
                 {onCopyNode && (
                   <DropdownMenuItem
                     onClick={() => onCopyNode(node)}
-                    className="text-xs py-2 px-3 cursor-pointer flex items-center gap-2 font-medium"
+                    className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
                   >
                     <svg
                       width="12"
@@ -466,7 +516,7 @@ export function TreeNode({
                 {onDuplicateNode && (
                   <DropdownMenuItem
                     onClick={() => onDuplicateNode(node.id)}
-                    className="text-xs py-2 px-3 cursor-pointer flex items-center gap-2 font-medium"
+                    className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
                   >
                     <svg
                       width="12"
@@ -486,10 +536,10 @@ export function TreeNode({
                   </DropdownMenuItem>
                 )}
 
-                <DropdownMenuSeparator className="bg-border/40" />
+                <DropdownMenuSeparator className="bg-white/[0.06] my-1" />
                 <DropdownMenuItem
                   onClick={() => onDeleteNode && onDeleteNode(node.id)}
-                  className="text-xs py-2 px-3 cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-500/10 flex items-center gap-2 font-medium"
+                  className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 focus:text-rose-400 focus:bg-rose-500/10 flex items-center gap-2 font-normal transition-colors"
                 >
                   <Trash size={12} />
                   Delete
@@ -571,7 +621,7 @@ export function TreeNode({
           }
         }}
         className={cn(
-          "group flex items-center gap-1.5 py-1.5 pr-2 text-sm text-foreground/80 hover:bg-white/5 rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
+          "group flex items-center gap-1.5 py-1 pr-2 text-[12px] text-foreground/75 hover:text-foreground hover:bg-white/[0.04] rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
           "hover:pr-8 data-[menu-open=true]:pr-8",
           dragOverPosition === "inside" && "bg-primary/10 border-primary/20 text-foreground"
         )}
@@ -663,10 +713,10 @@ export function TreeNode({
               }
               setIsRenaming(false);
             }}
-            className="h-5 bg-input border border-primary/45 text-xs px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-medium text-foreground text-left"
+            className="h-5.5 bg-black/40 border border-primary/50 text-[11.5px] px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary flex-1 min-w-[120px] max-w-[220px] font-normal text-foreground text-left"
           />
         ) : (
-          <span className="flex-1 min-w-0 truncate text-left font-medium">{node.name}</span>
+          <span className="flex-1 min-w-0 truncate text-left font-normal">{node.name}</span>
         )}
 
         {!isRenaming && (
@@ -687,7 +737,7 @@ export function TreeNode({
                 }
                 onAddRequest && onAddRequest(node.id);
               }}
-              className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10"
+              className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10 transition-colors cursor-pointer"
               title="Add request inside folder"
             >
               <Plus size={13} />
@@ -695,13 +745,13 @@ export function TreeNode({
             <DropdownMenu modal={false} onOpenChange={setIsMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10"
+                  className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-white/10 transition-colors cursor-pointer"
                   title="Actions"
                 >
                   <MoreHorizontal size={13} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover border-border text-foreground w-[180px] z-50 p-1">
+              <DropdownMenuContent align="end" className="bg-[#121214] border border-white/[0.08] text-foreground w-[170px] shadow-2xl rounded-lg z-50 p-1">
                 <DropdownMenuItem
                   onClick={() => {
                     if (onToggleFolderExpanded) {
@@ -711,7 +761,7 @@ export function TreeNode({
                     }
                     onAddRequest && onAddRequest(node.id);
                   }}
-                  className="text-xs py-2 px-3 cursor-pointer flex items-center gap-2 font-medium"
+                  className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
                 >
                   <FileCode size={12} className="text-muted-foreground" />
                   New Request
@@ -725,7 +775,7 @@ export function TreeNode({
                     }
                     onAddFolder && onAddFolder(node.id);
                   }}
-                  className="text-xs py-2 px-3 cursor-pointer flex items-center gap-2 font-medium"
+                  className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
                 >
                   <Folder className="h-3 w-3 text-muted-foreground" />
                   New Folder
@@ -735,15 +785,15 @@ export function TreeNode({
                     setRenameVal(node.name);
                     setIsRenaming(true);
                   }}
-                  className="text-xs py-2 px-3 cursor-pointer flex items-center gap-2 font-medium"
+                  className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer flex items-center gap-2 font-normal text-muted-foreground/90 hover:text-foreground hover:bg-white/[0.06] focus:bg-white/[0.06] focus:text-foreground transition-colors"
                 >
                   <Edit2 size={12} className="text-muted-foreground" />
                   Rename
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-border/40" />
+                <DropdownMenuSeparator className="bg-white/[0.06] my-1" />
                 <DropdownMenuItem
                   onClick={() => onDeleteNode && onDeleteNode(node.id)}
-                  className="text-xs py-2 px-3 cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-500/10 flex items-center gap-2 font-medium"
+                  className="text-[11.5px] py-1.5 px-2.5 rounded-md cursor-pointer text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 focus:text-rose-400 focus:bg-rose-500/10 flex items-center gap-2 font-normal transition-colors"
                 >
                   <Trash size={12} />
                   Delete Folder
@@ -757,8 +807,8 @@ export function TreeNode({
         <div className="relative">
           {/* Vertical Hierarchy Indent Guide Line */}
           <div
-            className="absolute top-0 bottom-3 w-[1px] bg-white/[0.03] group-hover/sidebar:bg-white/[0.08] group-hover/node:!bg-white/20 pointer-events-none transition-colors duration-150"
-            style={{ left: `${level * 20 + 15}px` }}
+            className="absolute top-0 bottom-3 w-[1px] bg-white/[0.04] group-hover/sidebar:bg-white/[0.08] group-hover/node:!bg-white/15 pointer-events-none transition-colors duration-150"
+            style={{ left: `${level * 14 + 8}px` }}
           />
           {node.children.map((child) => (
             <TreeNode
@@ -816,7 +866,7 @@ function MethodBadge({ method }: { method: string }) {
   return (
     <span
       className={cn(
-        "text-[10px] font-bold min-w-[28px] shrink-0 text-right tracking-tight inline-block select-none",
+        "text-[9.5px] font-semibold min-w-[26px] shrink-0 text-right tracking-tight inline-block select-none",
         colors[raw] || colors[formatted] || "text-gray-400",
       )}
       title={raw}

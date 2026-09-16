@@ -98,7 +98,7 @@ export function DashboardLayout({
             />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+        <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
           {label}
         </TooltipContent>
       </Tooltip>
@@ -112,11 +112,11 @@ export function DashboardLayout({
         {/* TOP TITLEBAR STRIP */}
         <header
           style={{ height: "42px", WebkitAppRegion: "drag" } as React.CSSProperties}
-          className="w-full bg-[var(--bg-secondary)] border-b border-border/80 flex items-center justify-between px-3 shrink-0 select-none z-50"
+          className="w-full bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between px-3 shrink-0 select-none z-50"
         >
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <img src={logoImg} alt="RouteLens" className="w-4 h-4 object-contain rounded" />
-            <span className="text-xs font-semibold text-foreground/90 tracking-wide">RouteLens</span>
+            <img src={logoImg} alt="RouteLens" className="w-3.5 h-3.5 object-contain rounded" />
+            <span className="text-[12px] font-medium text-foreground/80 tracking-wide">RouteLens</span>
           </div>
 
           {/* Custom Window Controls (Edge-to-Edge with full border continuity) */}
@@ -131,7 +131,7 @@ export function DashboardLayout({
             <button
               onClick={() => window.api?.maximizeWindow?.()}
               className="h-full px-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Maximize"
+              title="Maximize / Restore"
             >
               <Square size={11} />
             </button>
@@ -147,7 +147,7 @@ export function DashboardLayout({
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* 1. LEFT NARROW ICON TOOLBAR */}
-          <div className="w-12 bg-[var(--bg-secondary)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
+          <div className="w-12 bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
             <div className="flex flex-col items-center gap-4 w-full">
             {/* Tabs */}
             <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
@@ -161,12 +161,12 @@ export function DashboardLayout({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onDevToolsClick}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-200"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-200 cursor-pointer"
                   >
                     <Terminal size={16} />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border-border text-xs">
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
                   Developer Panel
                 </TooltipContent>
               </Tooltip>
@@ -184,7 +184,7 @@ export function DashboardLayout({
                     <Ghost size={16} className="group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform duration-200" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border-border text-xs font-medium text-cyan-300">
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-cyan-300 text-[11px] font-medium shadow-xl px-2 py-1 rounded">
                   Dev: Test Scan Screen
                 </TooltipContent>
               </Tooltip>
@@ -196,12 +196,12 @@ export function DashboardLayout({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onTestExpiryClick}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200 cursor-pointer"
                   >
                     <Lock size={15} />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border-border text-xs">
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
                   Test Expiry Screen
                 </TooltipContent>
               </Tooltip>
@@ -222,7 +222,7 @@ export function DashboardLayout({
         {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
         <aside
           className={cn(
-            "bg-[var(--bg-secondary)] border-r border-border/60 flex flex-col shrink-0 relative z-30 isolate transform-gpu",
+            "bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col shrink-0 relative z-30 isolate transform-gpu",
             isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
           )}
           style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px`, transform: "translateZ(0)" } : undefined}
@@ -230,10 +230,10 @@ export function DashboardLayout({
           {isSidebarExpanded && (
             <div className="flex flex-col h-full overflow-hidden">
               {/* Sidebar Header: height h-10 and border-b matching request tabs bar */}
-              <div className="h-10 px-3 bg-[var(--bg-secondary)] border-b border-border/80 flex items-center justify-between shrink-0 select-none">
+              <div className="h-10 px-3 bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
                 <div className="flex-1 min-w-0 pr-2">
                   {sidebarHeader || (
-                    <span className="text-xs font-semibold tracking-wide text-foreground">
+                    <span className="text-[12px] font-medium tracking-wide text-foreground/80">
                       RouteLens
                     </span>
                   )}
@@ -249,7 +249,7 @@ export function DashboardLayout({
 
               {/* Sidebar Content */}
               <div
-                className="flex-1 min-h-0 flex flex-col p-3.5 overflow-hidden isolate transform-gpu"
+                className="flex-1 min-h-0 flex flex-col p-3 overflow-hidden isolate transform-gpu"
                 style={{ transform: "translateZ(0)" }}
               >
                 {sidebarContent}
@@ -271,12 +271,12 @@ export function DashboardLayout({
               <TooltipTrigger asChild>
                 <button
                   onClick={onToggleSidebar}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(240,6%,8%)] border border-l-0 border-border/80 text-muted-foreground hover:text-primary hover:bg-primary/15 hover:border-primary/40 h-14 w-4 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[#121214] border border-l-0 border-white/[0.08] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] h-14 w-3.5 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
                 >
                   <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+              <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
                 Expand Sidebar (Backends & APIs)
               </TooltipContent>
             </Tooltip>

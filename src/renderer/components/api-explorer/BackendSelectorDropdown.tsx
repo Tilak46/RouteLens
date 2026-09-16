@@ -34,7 +34,7 @@ export function BackendSelectorDropdown({
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-2 px-1.5 py-1 -ml-1 text-xs font-semibold text-foreground hover:bg-white/5 rounded-md transition-colors max-w-full truncate cursor-pointer group focus:outline-none"
+          className="flex items-center gap-2 px-1.5 py-1 -ml-1 text-[12px] font-medium text-foreground/90 hover:bg-white/5 rounded-md transition-colors max-w-full truncate cursor-pointer group focus:outline-none"
           title={activeProject ? `${activeProject.name} (${activeProject.path})` : "Select Backend"}
         >
           <div className="flex items-center gap-1.5 truncate">
@@ -44,9 +44,9 @@ export function BackendSelectorDropdown({
             </span>
           </div>
           <ChevronDown
-            size={12}
+            size={11}
             className={cn(
-              "text-muted-foreground/70 group-hover:text-foreground transition-transform duration-200 shrink-0",
+              "text-muted-foreground/60 group-hover:text-foreground transition-transform duration-200 shrink-0",
               isOpen && "rotate-180"
             )}
           />
@@ -56,19 +56,19 @@ export function BackendSelectorDropdown({
       <PopoverContent
         align="start"
         sideOffset={8}
-        className="w-64 p-2 bg-[#121214] border border-white/[0.08] text-foreground rounded-lg shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
+        className="w-64 p-2 bg-[#121214] border border-white/[0.06] text-foreground rounded-lg shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
       >
         {/* Mini search bar */}
         <div className="relative mb-2">
           <Search
-            size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70 pointer-events-none"
+            size={11}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none"
           />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search backends..."
-            className="w-full h-7 pl-7 pr-2.5 bg-white/[0.04] border border-white/[0.08] focus:border-white/20 rounded text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none transition-colors"
+            className="w-full h-7 pl-7 pr-2.5 bg-white/[0.03] border-0 focus:bg-white/[0.05] rounded text-[11.5px] text-foreground placeholder:text-muted-foreground/45 focus:outline-none outline-none ring-0 transition-colors"
             autoFocus
           />
         </div>
@@ -76,7 +76,7 @@ export function BackendSelectorDropdown({
         {/* Backends list */}
         <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
           {filteredProjects.length === 0 ? (
-            <div className="text-[11px] text-muted-foreground/60 text-center py-3 select-none">
+            <div className="text-[11px] text-muted-foreground/50 text-center py-3 select-none">
               No backends match "{searchQuery}"
             </div>
           ) : (
@@ -90,10 +90,10 @@ export function BackendSelectorDropdown({
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors select-none",
+                    "flex items-center justify-between px-2 py-1.5 rounded-md text-[11.5px] cursor-pointer transition-colors select-none",
                     isActive
-                      ? "bg-white/[0.08] text-foreground font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                      ? "bg-white/[0.07] text-foreground font-medium"
+                      : "text-muted-foreground/80 hover:text-foreground hover:bg-white/[0.04]"
                   )}
                   title={p.path}
                 >
@@ -107,7 +107,7 @@ export function BackendSelectorDropdown({
                     <span className="truncate">{p.name}</span>
                   </div>
                   {isActive && (
-                    <Check size={12} className="text-primary shrink-0" />
+                    <Check size={11} className="text-primary shrink-0" />
                   )}
                 </div>
               );
@@ -122,9 +122,9 @@ export function BackendSelectorDropdown({
               setIsOpen(false);
               onAddProjectClick();
             }}
-            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-white/[0.04] rounded-md transition-colors cursor-pointer"
+            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.04] rounded-md transition-colors cursor-pointer"
           >
-            <Plus size={12} />
+            <Plus size={11} />
             <span>Add Backend</span>
           </button>
         </div>
