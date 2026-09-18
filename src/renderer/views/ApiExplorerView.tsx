@@ -357,9 +357,8 @@ export function ApiExplorerSidebarPanel({
   );
 
   const activeProject = useMemo(() => {
-    return (
-      projects.find((p) => p.id === activeProjectId) || projects[0] || null
-    );
+    if (!activeProjectId) return null;
+    return projects.find((p) => p.id === activeProjectId) || null;
   }, [projects, activeProjectId]);
 
   useEffect(() => {
@@ -367,17 +366,14 @@ export function ApiExplorerSidebarPanel({
   }, [activeRouteKey]);
 
   useEffect(() => {
+<<<<<<< HEAD
     if (
       projects.length > 0 &&
       (!activeProjectId || !projects.some((p) => p.id === activeProjectId))
     ) {
       onActiveProjectIdChange?.(projects[0].id);
-    }
-  }, [projects, activeProjectId, onActiveProjectIdChange]);
-
   useEffect(() => {
     apiClient.storeGet("expandedFolderIds").then((val) => {
-      if (val && typeof val === "object") setExpandedFolderMap(val);
     });
   }, []);
 
@@ -873,6 +869,7 @@ export function ApiExplorerSidebarPanel({
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 space-y-3 isolate transform-gpu">
+<<<<<<< HEAD
       {/* 1. BACKENDS LIST */}
       <div className="flex flex-col gap-2 shrink-0">
         <div className="flex items-center justify-between mb-1 select-none">
@@ -1003,17 +1000,20 @@ export function ApiExplorerSidebarPanel({
       <div className="h-px bg-border/50 shrink-0" />
 
       {/* 2. ENDPOINTS TREE */}
+=======
+      {/* ENDPOINTS TREE */}
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
       <div className="flex-1 flex flex-col min-h-0 select-none">
         {activeProject ? (
           <>
-            <div className="flex items-center justify-between mb-2 shrink-0">
-              <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase flex items-center gap-1.5">
+            <div className="flex items-center justify-between mb-1.5 shrink-0">
+              <span className="text-[10px] font-medium text-muted-foreground/70 tracking-wider uppercase flex items-center gap-1.5">
                 Endpoints
-                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-muted-foreground/15 text-muted-foreground rounded-full leading-none font-mono">
+                <span className="px-1.5 py-0.2 text-[9px] font-mono font-medium bg-white/[0.04] text-muted-foreground/60 rounded-full leading-none">
                   {detectedCount}
                 </span>
               </span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 {isScanning ? (
                   <button
                     className="text-cyan-400 hover:text-rose-400 p-0.5 px-1.5 rounded hover:bg-rose-500/10 cursor-pointer flex items-center gap-1 text-[10px]"
@@ -1030,7 +1030,7 @@ export function ApiExplorerSidebarPanel({
                   </button>
                 ) : (
                   <button
-                    className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-white/5 cursor-pointer"
+                    className="text-muted-foreground/60 hover:text-foreground p-0.5 rounded hover:bg-white/5 transition-colors cursor-pointer"
                     onClick={() => onRescanProject?.(activeProject)}
                     title="Rescan project routes"
                   >
@@ -1040,6 +1040,7 @@ export function ApiExplorerSidebarPanel({
               </div>
             </div>
 
+<<<<<<< HEAD
             <div className="space-y-2 shrink-0 mb-2">
               <Input
                 value={activeProject.url || "http://localhost:3000"}
@@ -1076,15 +1077,22 @@ export function ApiExplorerSidebarPanel({
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
+=======
+            <div className="shrink-0 mb-1.5">
+              {/* Search / Filter Input */}
+              <div className="relative">
+                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
+                <input
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter endpoints..."
-                  className="h-7 pl-7 bg-card/40 border-border/60 text-xs text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/40"
+                  className="w-full h-7 pl-7 pr-7 bg-white/[0.03] hover:bg-white/[0.05] focus:bg-white/[0.05] border-0 text-[11.5px] text-foreground placeholder:text-muted-foreground/45 rounded-md focus:outline-none focus:ring-0 outline-none transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground cursor-pointer"
                   >
                     <X size={10} />
                   </button>
@@ -1093,11 +1101,16 @@ export function ApiExplorerSidebarPanel({
             </div>
 
             <div
+<<<<<<< HEAD
               className="flex-1 min-h-0 overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2 transform-gpu"
               style={{
                 transform: "translateZ(0)",
                 willChange: "scroll-position",
               }}
+=======
+              className="flex-1 min-h-0 overflow-y-auto pr-1 transform-gpu"
+              style={{ transform: "translateZ(0)", willChange: "scroll-position" }}
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
             >
               {isScanning && scanningProjectId === activeProject?.id ? (
                 <div className="p-4 text-xs text-cyan-400 flex items-center justify-center gap-2">
@@ -1107,6 +1120,7 @@ export function ApiExplorerSidebarPanel({
               ) : filteredTree.length > 0 ? (
                 <Sidebar
                   tree={filteredTree}
+                  rootProjectName={activeProject?.name}
                   selectedKey={selectedRouteKey || undefined}
                   onSelect={handleRouteClick}
                   onRenameNode={handleRenameNode}
@@ -1120,44 +1134,61 @@ export function ApiExplorerSidebarPanel({
                   onClearNewlyCreatedNodeId={() => setNewlyCreatedNodeId(null)}
                   onDuplicateNode={handleDuplicateNode}
                   onCopyNode={handleCopyNode}
+                  onCloseProject={() => onActiveProjectIdChange?.(null)}
+                  onRemoveProject={() => activeProject && onRemoveProject?.(activeProject.id)}
                 />
               ) : searchQuery ? (
                 <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
-                  <div className="w-10 h-10 rounded-xl bg-card/60 border border-dashed border-border/80 flex items-center justify-center text-muted-foreground/60 mb-2.5">
-                    <Search size={16} className="text-muted-foreground/60" />
+                  <div className="w-9 h-9 rounded-lg bg-white/[0.025] border border-dashed border-white/[0.08] flex items-center justify-center text-muted-foreground/50 mb-2">
+                    <Search size={14} className="text-muted-foreground/50" />
                   </div>
-                  <p className="text-xs font-medium text-foreground/85 mb-1">
+                  <p className="text-[11.5px] font-medium text-foreground/90 mb-0.5">
                     No matching endpoints
                   </p>
+<<<<<<< HEAD
                   <p className="text-[11px] text-muted-foreground/70 max-w-[200px] mb-3 truncate">
                     No routes found for{" "}
                     <span className="text-primary font-mono font-semibold">
                       "{searchQuery}"
                     </span>
+=======
+                  <p className="text-[11px] text-muted-foreground/60 max-w-[190px] mb-2.5 truncate">
+                    No routes found for <span className="text-primary font-mono font-medium">"{searchQuery}"</span>
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
                   </p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => setSearchQuery("")}
-                    className="h-6 text-[11px] px-2.5 bg-secondary/40 hover:bg-secondary/70 border-border/50 text-muted-foreground hover:text-foreground cursor-pointer"
+                    className="h-6 text-[11px] px-2.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-muted-foreground hover:text-foreground cursor-pointer rounded-md"
                   >
                     Clear filter
                   </Button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
+<<<<<<< HEAD
                   <div className="w-10 h-10 rounded-xl bg-card/60 border border-dashed border-border/80 flex items-center justify-center text-muted-foreground/60 mb-2.5">
                     <FolderCode
                       size={18}
                       className="text-muted-foreground/60"
                     />
+=======
+                  <div className="w-9 h-9 rounded-lg bg-white/[0.025] border border-dashed border-white/[0.08] flex items-center justify-center text-muted-foreground/50 mb-2">
+                    <FolderCode size={15} className="text-muted-foreground/50" />
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
                   </div>
-                  <p className="text-xs font-semibold text-foreground/85 mb-1">
+                  <p className="text-[11.5px] font-medium text-foreground/90 mb-0.5">
                     No APIs detected
                   </p>
+<<<<<<< HEAD
                   <p className="text-[11px] text-muted-foreground/70 max-w-[210px] mb-3 leading-relaxed">
                     No API routes were found in this directory. Rescan or create
                     a manual request.
+=======
+                  <p className="text-[11px] text-muted-foreground/60 max-w-[200px] mb-2.5 leading-relaxed">
+                    No API routes were found in this directory. Rescan or create a manual request.
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
                   </p>
                   <div className="flex items-center gap-2">
                     {isScanning && activeProject ? (
@@ -1165,7 +1196,7 @@ export function ApiExplorerSidebarPanel({
                         size="sm"
                         variant="outline"
                         onClick={() => onCancelScanProject?.(activeProject)}
-                        className="h-6 text-[11px] px-2.5 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 cursor-pointer"
+                        className="h-6 text-[11px] px-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-400 cursor-pointer rounded-md"
                       >
                         <RefreshCw
                           size={10}
@@ -1178,23 +1209,23 @@ export function ApiExplorerSidebarPanel({
                         size="sm"
                         variant="outline"
                         onClick={() => onRescanProject(activeProject)}
-                        className="h-6 text-[11px] px-2.5 bg-primary/10 hover:bg-primary/20 border-primary/20 text-primary cursor-pointer"
+                        className="h-6 text-[11px] px-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-foreground cursor-pointer rounded-md"
                       >
                         <RefreshCw size={10} className="mr-1" />
-                        Rescan Routes
+                        Rescan
                       </Button>
                     ) : null}
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleAddRequest(null)}
-                      className="h-6 text-[11px] px-2.5 bg-secondary/40 hover:bg-secondary/70 border-border/50 text-muted-foreground hover:text-foreground cursor-pointer"
+                      className="h-6 text-[11px] px-2.5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-muted-foreground hover:text-foreground cursor-pointer rounded-md"
                     >
                       + Request
                     </Button>
                   </div>
                   {currentLogs.length > 0 && (
-                    <div className="mt-4 w-full bg-black/30 rounded p-2 text-[9px] font-mono text-muted-foreground overflow-x-auto text-left whitespace-pre-wrap select-text max-h-28 border border-border/30">
+                    <div className="mt-3 w-full bg-black/30 rounded p-2 text-[9px] font-mono text-muted-foreground/70 overflow-x-auto text-left whitespace-pre-wrap select-text max-h-24 border border-white/[0.06]">
                       {currentLogs.map((log, i) => (
                         <div key={i}>{log}</div>
                       ))}
@@ -1206,6 +1237,7 @@ export function ApiExplorerSidebarPanel({
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-muted-foreground text-xs select-none">
+<<<<<<< HEAD
             <FolderCode size={28} className="text-muted-foreground/40 mb-2" />
             <p className="font-medium text-foreground mb-1">
               No Backend Selected
@@ -1213,12 +1245,17 @@ export function ApiExplorerSidebarPanel({
             <p className="text-[11px] max-w-[180px] mb-3">
               Add or select a backend above to view its endpoints.
             </p>
+=======
+            <FolderCode size={24} className="text-muted-foreground/35 mb-2" />
+            <p className="text-[12px] font-medium text-foreground mb-0.5">No Backend Selected</p>
+            <p className="text-[11px] text-muted-foreground/60 max-w-[180px] mb-3">Add or select a backend above to view its endpoints.</p>
+>>>>>>> d931a7bc195942a4270efe47363efcaf87fb7e54
             <Button
               size="sm"
               onClick={onAddProjectClick}
-              className="h-7 text-xs bg-primary text-primary-foreground font-semibold cursor-pointer"
+              className="h-7 text-[11.5px] bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-md cursor-pointer"
             >
-              <Plus size={12} className="mr-1" /> Add Backend
+              <Plus size={11} className="mr-1" /> Add Backend
             </Button>
           </div>
         )}
