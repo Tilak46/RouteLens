@@ -28,6 +28,7 @@ import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send, RefreshCw, Arr
 import { cn } from "@/lib/utils";
 
 import { ApiExplorerSidebarPanel, mergeTrees, extractRoutePath, toRouteKey } from "@/views/ApiExplorerView";
+import { BackendSelectorDropdown } from "@/components/api-explorer/BackendSelectorDropdown";
 import { AutomationsPanel } from "@/components/api-explorer/AutomationsPanel";
 import { SettingsSidebarPanel } from "@/components/api-explorer/SettingsSidebarPanel";
 
@@ -45,6 +46,7 @@ import { ProjectIdleView } from "@/components/project/ProjectIdleView";
 import { ScanningFactsOverlay } from "@/components/scanner/ScanningFactsOverlay";
 import { UpdateGraceBanner, UpdateEnforcementData } from "@/components/updates/UpdateGraceBanner";
 import { MandatoryUpdateModal } from "@/components/updates/MandatoryUpdateModal";
+import { GlobalContextMenu } from "@/components/ui/GlobalContextMenu";
 
 // Environments system imports
 import {
@@ -375,12 +377,8 @@ function App() {
 
   // Ensure activeProjectId is valid whenever projects change or are loaded
   useEffect(() => {
-    if (projects.length > 0) {
-      if (!activeProjectId || !projects.some((p) => p.id === activeProjectId)) {
-        setActiveProjectId(projects[0].id);
-      }
-    } else if (activeProjectId) {
-      setActiveProjectId(null);
+    if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+      setActiveProjectId(projects[0]?.id || null);
     }
   }, [projects, activeProjectId]);
 
@@ -2081,6 +2079,22 @@ function App() {
           activeTab={activeSidebarTab}
           onTabChange={setActiveSidebarTab}
           sidebarContent={sidebarContent}
+          sidebarHeader={
+            activeSidebarTab === "environments" ? (
+              <span className="text-[12px] font-medium tracking-wide text-foreground/90">
+                Environments
+              </span>
+            ) : (
+              <BackendSelectorDropdown
+                projects={projects}
+                activeProject={projects.find((p) => p.id === activeProjectId)}
+                onSelectProject={(id) => setActiveProjectId(id)}
+                onAddProjectClick={handleAddBackendFolder}
+                onCloseBackend={() => setActiveProjectId(null)}
+                onRemoveProject={handleRemoveProject}
+              />
+            )
+          }
           isSidebarExpanded={isSidebarExpanded}
           onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
           sidebarWidth={sidebarWidth}
@@ -2176,7 +2190,7 @@ function App() {
               onDuplicateEnvironment={handleDuplicateEnvironment}
               onExportEnvironment={handleExportEnvironment}
             />
-          ) : isProjectsLoaded && isTabsRestored && projects.length === 0 && tabs.length === 0 ? (
+          ) : isProjectsLoaded && isTabsRestored && (projects.length === 0 || !activeProjectId) && tabs.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
               <OnboardingView
                 onOpenFolder={handleAddBackendFolder}
@@ -2187,7 +2201,7 @@ function App() {
               />
             </div>
           ) : (
-            <div className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] overflow-hidden">
               {/* Request Tabs Row */}
               <WorkspaceTabs
                 tabs={tabs}
@@ -2232,12 +2246,12 @@ function App() {
                   <div
                     onMouseDown={startRequestResize}
                     onDoubleClick={resetRequestSplit}
-                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-border/40"
+                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-white/[0.06]"
                     title="Drag to resize panels (Double-click to reset 50/50)"
                   />
 
                   {/* Bottom Response Panel */}
-                  <div className="flex-1 flex flex-col min-h-[180px] p-4 pt-0 overflow-hidden">
+                  <div className="flex-1 flex flex-col min-h-[180px] overflow-hidden">
                     <ResponsePanel
                       response={activeTab.response}
                       loading={activeTab.loading}
@@ -2266,9 +2280,20 @@ function App() {
                       onRescan={() => handleRescanProject(activeProject)}
                       onCancelScan={() => handleCancelScan(activeProject)}
                       onRevealInExplorer={() => apiClient.showItemInFolder(activeProject.path)}
+                      onCloseProject={() => setActiveProjectId(null)}
                     />
                   );
                 })()
+              ) : !activeProjectId ? (
+                <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
+                  <OnboardingView
+                    onOpenFolder={handleAddBackendFolder}
+                    onQuickRequest={handleQuickRequest}
+                    onLoadDemo={handleLoadDemoProject}
+                    onOpenManualModal={handleAddBackendFolder}
+                    appVersion={appVersion}
+                  />
+                </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card/5 select-none animate-in fade-in duration-200">
                   <div className="flex items-center justify-center mb-3">
@@ -2301,6 +2326,8 @@ function App() {
         enforcement={enforcementStatus}
         onInstall={handleInstallUpdate}
       />
+
+      <GlobalContextMenu />
     </TooltipProvider>
   );
 }

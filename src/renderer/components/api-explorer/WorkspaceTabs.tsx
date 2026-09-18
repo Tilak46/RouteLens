@@ -100,7 +100,7 @@ function SortableTab({
       className={cn(
         "group h-8 px-3 rounded-t-md border-t border-l border-r flex items-center gap-2 cursor-pointer transition-all duration-150 shrink-0 select-none text-xs font-medium relative top-[1px]",
         isActive
-          ? "bg-[hsl(240,5%,11%)] border-border/80 text-foreground"
+          ? "bg-[var(--bg-primary)] border-white/[0.08] text-foreground"
           : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5",
         isDragging && "shadow-md"
       )}
@@ -257,7 +257,7 @@ export function WorkspaceTabs({
   }
 
   return (
-    <div className="h-10 bg-[hsl(240,6%,4%)] border-b border-border/80 flex items-center justify-between px-2 shrink-0 select-none z-15 relative">
+    <div className="h-10 bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between px-2 shrink-0 select-none z-15 relative">
       {/* Scrollable Tabs List on Left */}
       <DndContext
         sensors={sensors}
@@ -315,7 +315,7 @@ export function WorkspaceTabs({
             }}
           />
           <div
-            className="fixed z-50 min-w-[190px] bg-[hsl(240,6%,10%)] border border-border/80 rounded-md shadow-2xl p-1 text-xs select-none text-foreground/90 font-medium animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-0.5"
+            className="fixed z-50 min-w-[190px] bg-[#141416] border border-white/[0.08] rounded-md shadow-2xl p-1 text-xs select-none text-foreground/90 font-medium animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-0.5"
             style={{ top: `${menuY}px`, left: `${menuX}px` }}
           >
             <button

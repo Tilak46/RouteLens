@@ -180,7 +180,8 @@ function createWindow(): void {
     height,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: "#090A0F",
+    frame: false,
+    backgroundColor: "#100f0f",
     icon,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -190,7 +191,7 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.setBackgroundColor("#090A0F");
+  mainWindow.setBackgroundColor("#100f0f");
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.maximize();
@@ -219,6 +220,39 @@ function createWindow(): void {
     if (input.key === "F12" || (input.control && input.shift && input.key.toLowerCase() === "i")) {
       mainWindow?.webContents.toggleDevTools();
       event.preventDefault();
+    }
+  });
+
+  ipcMain.on("window:minimize", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
+  });
+
+  ipcMain.on("window:maximize", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
+
+  ipcMain.on("window:close", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  });
+
+  ipcMain.on("window:inspect-element", (_event, { x, y }: { x: number; y: number }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.inspectElement(x, y);
+      if (!mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.openDevTools();
+      }
+    }
+  });
+
+  ipcMain.on("window:reload", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.reload();
     }
   });
 

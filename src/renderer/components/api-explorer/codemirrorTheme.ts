@@ -186,8 +186,49 @@ export const jsonCommentsPlugin = ViewPlugin.fromClass(
   }
 );
 
+const transparentThemeExtension = EditorView.theme({
+  "&": {
+    backgroundColor: "transparent !important",
+    color: "hsl(var(--foreground)) !important",
+  },
+  ".cm-scroller, .cm-content, .cm-line": {
+    fontFamily: "'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace !important",
+    backgroundColor: "transparent !important",
+  },
+  ".cm-gutters": {
+    backgroundColor: "transparent !important",
+    color: "hsl(var(--muted-foreground) / 0.5) !important",
+    borderRight: "1px solid hsl(var(--border) / 0.3) !important",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "rgba(255, 255, 255, 0.02) !important",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "rgba(255, 255, 255, 0.02) !important",
+    color: "hsl(var(--foreground)) !important",
+  },
+  ".cm-cursor": {
+    borderLeft: "2px solid hsl(var(--primary)) !important",
+  },
+  ".cm-selectionBackground": {
+    background: "rgba(75, 144, 226, 0.25) !important",
+  },
+  ".cm-comment-override, .cm-comment-override *": {
+    color: "hsl(var(--muted-foreground) / 0.6) !important",
+    fontStyle: "italic !important",
+    textDecoration: "none !important",
+  },
+});
+
 export const postmanTheme = [
   myThemeExtension,
   syntaxHighlighting(myHighlightStyle),
   indentGuidePlugin,
 ];
+
+export const postmanTransparentTheme = [
+  transparentThemeExtension,
+  syntaxHighlighting(myHighlightStyle),
+  indentGuidePlugin,
+];
+

@@ -9,6 +9,9 @@
     /* ========================================== */
     /* DEFAULT THEME: ROUTELENS MATTE CHARCOAL    */
     /* ========================================== */
+    --bg-primary: #0b0b0a;    /* Primary background: main screen, right panels */
+    --bg-secondary: #100f0f;  /* Secondary background: navbar, sidebars */
+
     --background: 0 0% 8.5%; /* Premium Dark Grey (#161616) */
     --foreground: 0 0% 98%;
 
@@ -722,9 +725,18 @@
   font-family: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace !important;
 }
 .cm-editor {
-  background-color: hsl(var(--input)) !important;
+  background-color: hsl(var(--input));
   color: hsl(var(--foreground)) !important;
   border-radius: 6px;
+}
+.cm-transparent .cm-editor,
+.cm-transparent.cm-editor,
+.cm-editor.cm-transparent,
+.cm-transparent .cm-scroller,
+.cm-transparent .cm-content,
+.cm-transparent .cm-gutters {
+  background-color: transparent !important;
+  border-radius: 0 !important;
 }
 .cm-editor .cm-gutters {
   background-color: transparent !important;

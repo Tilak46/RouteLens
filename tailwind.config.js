@@ -5,6 +5,10 @@ export default {
   theme: {
     extend: {
       colors: {
+        // --- ROUTELENS BRAND BACKGROUND TOKENS ---
+        "bg-primary": "var(--bg-primary)",
+        "bg-secondary": "var(--bg-secondary)",
+
         // --- BRIDGE: MAPPING LEGACY NAMES TO NEW THEME ---
         bg: "hsl(var(--background))",
         "bg-darker": "hsl(var(--background))", // or map to secondary if needed

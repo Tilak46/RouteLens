@@ -16,6 +16,9 @@ import {
   Lock,
   Ghost,
   SlidersHorizontal,
+  Minus,
+  Square,
+  X,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -27,6 +30,7 @@ type DashboardLayoutProps = {
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   sidebarContent: React.ReactNode;
+  sidebarHeader?: React.ReactNode;
   consoleDrawer?: React.ReactNode;
   isSidebarExpanded: boolean;
   onToggleSidebar: () => void;
@@ -45,6 +49,7 @@ export function DashboardLayout({
   activeTab,
   onTabChange,
   sidebarContent,
+  sidebarHeader,
   consoleDrawer,
   isSidebarExpanded,
   onToggleSidebar,
@@ -79,24 +84,21 @@ export function DashboardLayout({
               onTabChange(tabId);
             }}
             className={cn(
-              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 cursor-pointer",
+              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-150 cursor-pointer",
               isActive
-                ? "bg-primary/10 text-primary"
+                ? "bg-white/[0.08] text-foreground"
                 : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
             )}
           >
-            {isActive && (
-              <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-primary rounded-r-md" />
-            )}
             <Icon
               className={cn(
-                "h-4 w-4 transition-transform duration-200",
-                isActive ? "scale-110" : "group-hover:scale-110"
+                "h-4 w-4 transition-transform duration-150",
+                isActive ? "scale-105" : "group-hover:scale-105"
               )}
             />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+        <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
           {label}
         </TooltipContent>
       </Tooltip>
@@ -105,27 +107,48 @@ export function DashboardLayout({
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans">
+      <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden font-sans">
         
-        {/* 1. LEFT NARROW ICON TOOLBAR */}
-        <div className="w-12 bg-[hsl(240,6%,4%)] border-r border-border/80 flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
-          <div className="flex flex-col items-center gap-4 w-full">
-            {/* Logo Icon - click to toggle sidebar */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onToggleSidebar}
-                  className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center p-0.5 bg-black/40 border border-white/10 mb-2 shadow-[0_0_15px_rgba(255,108,55,0.15)] hover:border-primary/50 hover:scale-105 transition-all cursor-pointer"
-                  title="RouteLens"
-                >
-                  <img src={logoImg} alt="RouteLens" className="w-full h-full object-contain rounded-md select-none" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
-                {isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-              </TooltipContent>
-            </Tooltip>
+        {/* TOP TITLEBAR STRIP */}
+        <header
+          style={{ height: "42px", WebkitAppRegion: "drag" } as React.CSSProperties}
+          className="w-full bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between px-3 shrink-0 select-none z-50"
+        >
+          <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <img src={logoImg} alt="RouteLens" className="w-3.5 h-3.5 object-contain rounded" />
+            <span className="text-[12px] font-medium text-foreground/80 tracking-wide">RouteLens</span>
+          </div>
 
+          {/* Custom Window Controls (Edge-to-Edge with full border continuity) */}
+          <div className="flex items-center h-full -mr-3" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <button
+              onClick={() => window.api?.minimizeWindow?.()}
+              className="h-full px-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Minimize"
+            >
+              <Minus size={13} />
+            </button>
+            <button
+              onClick={() => window.api?.maximizeWindow?.()}
+              className="h-full px-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Maximize / Restore"
+            >
+              <Square size={11} />
+            </button>
+            <button
+              onClick={() => window.api?.closeWindow?.()}
+              className="h-full px-4 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-red-500 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </header>
+
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* 1. LEFT NARROW ICON TOOLBAR */}
+          <div className="w-12 bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
+            <div className="flex flex-col items-center gap-4 w-full">
             {/* Tabs */}
             <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
             <ToolbarButton tabId="environments" icon={SlidersHorizontal} label="Environments" />
@@ -138,12 +161,12 @@ export function DashboardLayout({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onDevToolsClick}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-200"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all duration-200 cursor-pointer"
                   >
                     <Terminal size={16} />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border-border text-xs">
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
                   Developer Panel
                 </TooltipContent>
               </Tooltip>
@@ -161,7 +184,7 @@ export function DashboardLayout({
                     <Ghost size={16} className="group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform duration-200" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border-border text-xs font-medium text-cyan-300">
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-cyan-300 text-[11px] font-medium shadow-xl px-2 py-1 rounded">
                   Dev: Test Scan Screen
                 </TooltipContent>
               </Tooltip>
@@ -173,12 +196,12 @@ export function DashboardLayout({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onTestExpiryClick}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200 cursor-pointer"
                   >
                     <Lock size={15} />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border-border text-xs">
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
                   Test Expiry Screen
                 </TooltipContent>
               </Tooltip>
@@ -199,35 +222,34 @@ export function DashboardLayout({
         {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
         <aside
           className={cn(
-            "bg-[hsl(240,5%,9%)] border-r border-border/60 flex flex-col shrink-0 relative z-30 isolate transform-gpu",
+            "bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col shrink-0 relative z-30 isolate transform-gpu",
             isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
           )}
           style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px`, transform: "translateZ(0)" } : undefined}
         >
           {isSidebarExpanded && (
-            <div className="flex flex-col h-full p-3.5 overflow-hidden">
-              {/* App Brand Header */}
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <div className="flex items-center gap-1.5 overflow-hidden">
-                  <span className="text-sm font-bold tracking-wider text-foreground">
-                    Route<span className="text-primary">Lens</span>
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
-                    v{appVersion || "0.1.0"}
-                  </span>
+            <div className="flex flex-col h-full overflow-hidden">
+              {/* Sidebar Header: height h-10 and border-b matching request tabs bar */}
+              <div className="h-10 px-3 bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
+                <div className="flex-1 min-w-0 pr-2">
+                  {sidebarHeader || (
+                    <span className="text-[12px] font-medium tracking-wide text-foreground/80">
+                      RouteLens
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={onToggleSidebar}
-                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer"
                   title="Collapse Sidebar"
                 >
                   <ChevronLeft size={14} />
                 </button>
               </div>
 
-              {/* Sidebar Content (bounded layout with hardware compositor isolation) */}
+              {/* Sidebar Content */}
               <div
-                className="flex-1 min-h-0 flex flex-col overflow-hidden isolate transform-gpu"
+                className="flex-1 min-h-0 flex flex-col p-3 overflow-hidden isolate transform-gpu"
                 style={{ transform: "translateZ(0)" }}
               >
                 {sidebarContent}
@@ -249,12 +271,12 @@ export function DashboardLayout({
               <TooltipTrigger asChild>
                 <button
                   onClick={onToggleSidebar}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[hsl(240,6%,8%)] border border-l-0 border-border/80 text-muted-foreground hover:text-primary hover:bg-primary/15 hover:border-primary/40 h-14 w-4 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[#121214] border border-l-0 border-white/[0.08] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] h-14 w-3.5 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
                 >
                   <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" className="bg-popover border-border text-popover-foreground text-xs">
+              <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
                 Expand Sidebar (Backends & APIs)
               </TooltipContent>
             </Tooltip>
@@ -262,7 +284,7 @@ export function DashboardLayout({
         </aside>
 
         {/* 3. MAIN WORKSPACE AREA */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[hsl(240,5%,11%)] overflow-hidden relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-primary)] overflow-hidden relative">
           {updateBanner}
           {/* Main workspace container (no padding so request/response tab layouts can fit edge-to-edge) */}
           <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
@@ -272,6 +294,7 @@ export function DashboardLayout({
           {/* 4. BOTTOM LOGS CONSOLE */}
           {consoleDrawer}
         </div>
+      </div>
       </div>
     </TooltipProvider>
   );
