@@ -107,7 +107,7 @@ export function DashboardLayout({
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-screen w-screen bg-background text-foreground overflow-hidden font-sans">
+      <div className="flex flex-col h-screen w-screen bg-[var(--bg-primary)] text-foreground overflow-hidden font-sans">
         
         {/* TOP TITLEBAR STRIP */}
         <header
