@@ -1,0 +1,116 @@
+{
+  "$schema": "https://routelens.internal/schemas/benchmark_registry.json",
+  "registryVersion": "2.0.0",
+  "policyName": "Universal Multi-Language Certified Matrix",
+  "status": "ACTIVE",
+  "governance": {
+    "authoritativeRole": "RouteLens Engineering Manager",
+    "requiresHumanApprovalToModify": true,
+    "disallowRemovingFailingBenchmarks": true
+  },
+  "categories": {
+    "active_certified": "Production-verified reference repositories used for mandatory regression gating",
+    "previously_tested": "Repositories tested during research or historical validation",
+    "experimental": "Complex or dynamic repositories currently undergoing parser research",
+    "unseen_candidates": "Fresh external repositories reserved for Batch 2 generalization testing"
+  },
+  "activeCertifiedBenchmarks": [
+    {
+      "id": "bench-express-01",
+      "name": "hackathon-starter",
+      "ecosystem": "express",
+      "language": "JavaScript",
+      "repoUrl": "https://github.com/sahat/hackathon-starter",
+      "localPath": "c:/Office-Work/Testing/hackathon-starter",
+      "certifiedRoutesCount": 100,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "Core Express route mounting and session middleware verification"
+    },
+    {
+      "id": "bench-fastify-01",
+      "name": "fastify-backend",
+      "ecosystem": "fastify",
+      "language": "TypeScript",
+      "repoUrl": "https://github.com/fastify/example-backend",
+      "localPath": "c:/Office-Work/Testing/fastify-backend",
+      "certifiedRoutesCount": 24,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "Fastify plugin registration and prefix mount linking"
+    },
+    {
+      "id": "bench-nestjs-01",
+      "name": "nestjs-realworld-example-app",
+      "ecosystem": "nest",
+      "language": "TypeScript",
+      "repoUrl": "https://github.com/lujakresh/nestjs-realworld-example-app",
+      "localPath": "c:/Office-Work/Testing/nestjs-realworld-example-app",
+      "certifiedRoutesCount": 21,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "NestJS class decorators and sub-controller mapping"
+    },
+    {
+      "id": "bench-spring-01",
+      "name": "spring-boot-realworld-example-app",
+      "ecosystem": "spring",
+      "language": "Java",
+      "repoUrl": "https://github.com/gothinkster/spring-boot-realworld-example-app",
+      "localPath": "c:/Office-Work/Testing/java-spring",
+      "certifiedRoutesCount": 214,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "Java Spring Boot @RestController and @RequestMapping parsing"
+    },
+    {
+      "id": "bench-fastapi-01",
+      "name": "KAI-enterprise",
+      "ecosystem": "fastapi",
+      "language": "Python",
+      "repoUrl": "https://github.com/kai-enterprise/kai",
+      "localPath": "c:/Office-Work/Testing/KAI",
+      "certifiedRoutesCount": 305,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "Python FastAPI APIRouter and Pydantic schema extraction"
+    },
+    {
+      "id": "bench-gin-01",
+      "name": "golang-gin-realworld-example-app",
+      "ecosystem": "gin",
+      "language": "Go",
+      "repoUrl": "https://github.com/gothinkster/golang-gin-realworld-example-app",
+      "localPath": "c:/Office-Work/Testing/go-gin",
+      "certifiedRoutesCount": 20,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "Go Gin route groups and handler registration"
+    },
+    {
+      "id": "bench-aspnet-01",
+      "name": "decatron",
+      "ecosystem": "aspnet",
+      "language": "C#",
+      "repoUrl": "https://github.com/enterprise/decatron",
+      "localPath": "c:/Office-Work/Testing/decatron",
+      "certifiedRoutesCount": 300,
+      "expectedMinRecall": 0.98,
+      "expectedPrecision": 1.0,
+      "purpose": "ASP.NET Core attribute routing and Minimal APIs"
+    },
+    {
+      "id": "bench-laravel-01",
+      "name": "laravel-realworld-example-app",
+      "ecosystem": "laravel",
+      "language": "PHP",
+      "repoUrl": "https://github.com/gothinkster/laravel-realworld-example-app",
+      "localPath": "c:/Office-Work/Testing/php-laravel",
+      "certifiedRoutesCount": 18,
+      "expectedMinRecall": 1.0,
+      "expectedPrecision": 1.0,
+      "purpose": "PHP Laravel Route:: facade extraction"
+    }
+  ],
+  "supersededRegistries": ["1.0.0-legacy-babel-express"]
+}

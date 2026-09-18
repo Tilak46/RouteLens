@@ -85,9 +85,12 @@ export function hasUserCustomization(route: ApiRoute): boolean {
   if (route.id && route.id.startsWith("request_")) return true;
   if (Array.isArray(route.headers) && route.headers.length > 0) return true;
   if (route.auth && route.auth.type && route.auth.type !== "none") return true;
-  if (route.preRequestScript && route.preRequestScript.trim() !== "") return true;
-  if (route.postResponseScript && route.postResponseScript.trim() !== "") return true;
-  if (route.bodyMode && route.bodyMode !== "none" && route.bodyMode !== "json") return true;
+  if (route.preRequestScript && route.preRequestScript.trim() !== "")
+    return true;
+  if (route.postResponseScript && route.postResponseScript.trim() !== "")
+    return true;
+  if (route.bodyMode && route.bodyMode !== "none" && route.bodyMode !== "json")
+    return true;
   if (
     route.bodyText &&
     route.bodyText.trim() !== "" &&
@@ -96,10 +99,19 @@ export function hasUserCustomization(route: ApiRoute): boolean {
   ) {
     return true;
   }
-  if (Array.isArray(route.formFields) && route.formFields.length > 0) return true;
-  if (Array.isArray(route.urlencodedFields) && route.urlencodedFields.length > 0) return true;
+  if (Array.isArray(route.formFields) && route.formFields.length > 0)
+    return true;
+  if (
+    Array.isArray(route.urlencodedFields) &&
+    route.urlencodedFields.length > 0
+  )
+    return true;
   if (route.binaryFilePath && route.binaryFilePath.trim() !== "") return true;
-  if (Array.isArray(route.params) && route.params.some((p) => p.value && p.value.trim() !== "")) return true;
+  if (
+    Array.isArray(route.params) &&
+    route.params.some((p) => p.value && p.value.trim() !== "")
+  )
+    return true;
   return false;
 }
 
@@ -112,7 +124,10 @@ const normKey = (r: Pick<ApiRoute, "method" | "path">) => {
   return `${method}:${p || "/"}`;
 };
 
-export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): ApiFolder[] {
+export function mergeTrees(
+  userTree: ApiFolder[],
+  scannedTree: ApiFolder[],
+): ApiFolder[] {
   // 1. Index all user routes, custom folders, and manual requests
   const userRoutesById = new Map<string, ApiRoute>();
   const userRoutesByKey = new Map<string, ApiRoute>();
@@ -121,7 +136,7 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
 
   function indexUserNodes(
     nodes: (ApiFolder | ApiRoute)[],
-    currentFolderPath: string[]
+    currentFolderPath: string[],
   ) {
     for (const n of nodes) {
       if (isRoute(n)) {
@@ -150,7 +165,9 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
   const matchedUserKeys = new Set<string>();
 
   // 2. Clone and enrich scannedTree with user request configurations
-  function enrichScannedNodes(nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] {
+  function enrichScannedNodes(
+    nodes: (ApiFolder | ApiRoute)[],
+  ): (ApiFolder | ApiRoute)[] {
     return nodes.map((node) => {
       if (isRoute(node)) {
         const key = toRouteKey(node);
@@ -167,7 +184,10 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
         }
 
         let defaultBodyText = "{\n  \n}";
-        if (Array.isArray(node.inferredBodyFields) && node.inferredBodyFields.length > 0) {
+        if (
+          Array.isArray(node.inferredBodyFields) &&
+          node.inferredBodyFields.length > 0
+        ) {
           const template: Record<string, string> = {};
           node.inferredBodyFields.forEach((field) => {
             template[field] = "";
@@ -197,7 +217,9 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
             userRoute?.bodyMode ||
             (node.method === "GET" || node.method === "HEAD" ? "none" : "json"),
           bodyText:
-            userRoute?.bodyText !== undefined ? userRoute.bodyText : defaultBodyText,
+            userRoute?.bodyText !== undefined
+              ? userRoute.bodyText
+              : defaultBodyText,
           formFields: userRoute?.formFields || [],
           urlencodedFields: userRoute?.urlencodedFields || [],
           binaryFilePath: userRoute?.binaryFilePath || "",
@@ -222,14 +244,14 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
   // Helper to find folder in resultTree by path
   const findFolderByPath = (
     tree: (ApiFolder | ApiRoute)[],
-    path: string[]
+    path: string[],
   ): ApiFolder | null => {
     if (path.length === 0) return null;
     let currentNodes = tree;
     let targetFolder: ApiFolder | null = null;
     for (const seg of path) {
       const found = currentNodes.find(
-        (n) => !isRoute(n) && n.name.toLowerCase() === seg.toLowerCase()
+        (n) => !isRoute(n) && n.name.toLowerCase() === seg.toLowerCase(),
       ) as ApiFolder | undefined;
       if (!found) return null;
       targetFolder = found;
@@ -287,7 +309,9 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
       const bm = String((b as ApiRoute).method || "");
       const byMethod = (methodOrder[am] ?? 99) - (methodOrder[bm] ?? 99);
       if (byMethod !== 0) return byMethod;
-      return String((a as ApiRoute).path || "").localeCompare(String((b as ApiRoute).path || ""));
+      return String((a as ApiRoute).path || "").localeCompare(
+        String((b as ApiRoute).path || ""),
+      );
     });
 
     for (const child of nodes) {
@@ -325,11 +349,17 @@ export function ApiExplorerSidebarPanel({
   const [selectedRouteKey, setSelectedRouteKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
-  const [expandedFolderMap, setExpandedFolderMap] = useState<Record<string, string[]>>({});
-  const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useState<string | null>(null);
+  const [expandedFolderMap, setExpandedFolderMap] = useState<
+    Record<string, string[]>
+  >({});
+  const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useState<string | null>(
+    null,
+  );
 
   const activeProject = useMemo(() => {
-    return projects.find((p) => p.id === activeProjectId) || projects[0] || null;
+    return (
+      projects.find((p) => p.id === activeProjectId) || projects[0] || null
+    );
   }, [projects, activeProjectId]);
 
   useEffect(() => {
@@ -337,7 +367,10 @@ export function ApiExplorerSidebarPanel({
   }, [activeRouteKey]);
 
   useEffect(() => {
-    if (projects.length > 0 && (!activeProjectId || !projects.some((p) => p.id === activeProjectId))) {
+    if (
+      projects.length > 0 &&
+      (!activeProjectId || !projects.some((p) => p.id === activeProjectId))
+    ) {
       onActiveProjectIdChange?.(projects[0].id);
     }
   }, [projects, activeProjectId, onActiveProjectIdChange]);
@@ -348,7 +381,9 @@ export function ApiExplorerSidebarPanel({
     });
   }, []);
 
-  const expandedFolderIds = activeProject ? (expandedFolderMap[activeProject.path] || []) : [];
+  const expandedFolderIds = activeProject
+    ? expandedFolderMap[activeProject.path] || []
+    : [];
 
   const handleToggleFolderExpanded = (folderId: string, isOpen: boolean) => {
     if (!activeProject) return;
@@ -356,7 +391,7 @@ export function ApiExplorerSidebarPanel({
     const nextList = isOpen
       ? [...currentList.filter((id) => id !== folderId), folderId]
       : currentList.filter((id) => id !== folderId);
-      
+
     const nextMap = {
       ...expandedFolderMap,
       [activeProject.path]: nextList,
@@ -441,7 +476,10 @@ export function ApiExplorerSidebarPanel({
   }, [activeProject, treeCache, detectedCount]);
 
   const handleRouteClick = (route: ApiRoute) => {
-    const routeKey = route.id && route.id.startsWith("request_") ? route.id : toRouteKey(route);
+    const routeKey =
+      route.id && route.id.startsWith("request_")
+        ? route.id
+        : toRouteKey(route);
     setSelectedRouteKey(routeKey);
 
     if (activeProject?.path) {
@@ -449,8 +487,12 @@ export function ApiExplorerSidebarPanel({
         selectedRouteKey: routeKey,
       });
     }
-    
-    onSelectRoute(route, activeProject?.url || "http://localhost:3000", activeProject?.id || "");
+
+    onSelectRoute(
+      route,
+      activeProject?.url || "http://localhost:3000",
+      activeProject?.id || "",
+    );
   };
 
   const updateActiveBaseUrl = (baseUrl: string) => {
@@ -461,13 +503,18 @@ export function ApiExplorerSidebarPanel({
   };
 
   const handleRenameNode = (nodeId: string, newName: string) => {
-    const renameRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const renameRecursive = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       return nodes.map((n) => {
         if (n.id === nodeId) {
           return { ...n, name: newName };
         }
         if (!isRoute(n) && Array.isArray(n.children)) {
-          return { ...n, children: renameRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+          return {
+            ...n,
+            children: renameRecursive(n.children) as (ApiFolder | ApiRoute)[],
+          };
         }
         return n;
       });
@@ -493,12 +540,17 @@ export function ApiExplorerSidebarPanel({
       deletedIds.push(nodeId);
     }
 
-    const deleteRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const deleteRecursive = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       return nodes
         .filter((n) => n.id !== nodeId)
         .map((n) => {
           if (!isRoute(n) && Array.isArray(n.children)) {
-            return { ...n, children: deleteRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+            return {
+              ...n,
+              children: deleteRecursive(n.children) as (ApiFolder | ApiRoute)[],
+            };
           }
           return n;
         });
@@ -511,7 +563,9 @@ export function ApiExplorerSidebarPanel({
   const handleDuplicateNode = (nodeId: string) => {
     let duplicatedRequest: ApiRoute | null = null;
 
-    const findAndDuplicateRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const findAndDuplicateRecursive = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       const result: (ApiFolder | ApiRoute)[] = [];
       for (const n of nodes) {
         if (n.id === nodeId && isRoute(n)) {
@@ -525,7 +579,9 @@ export function ApiExplorerSidebarPanel({
             isNew: true,
             params: (n.params || []).map((p) => ({ ...p })),
             headers: (n.headers || []).map((h) => ({ ...h })),
-            auth: n.auth ? JSON.parse(JSON.stringify(n.auth)) : { type: "none" },
+            auth: n.auth
+              ? JSON.parse(JSON.stringify(n.auth))
+              : { type: "none" },
             formFields: (n.formFields || []).map((f) => ({ ...f })),
             urlencodedFields: (n.urlencodedFields || []).map((u) => ({ ...u })),
             pathVariables: (n.pathVariables || []).map((pv) => ({ ...pv })),
@@ -534,7 +590,10 @@ export function ApiExplorerSidebarPanel({
         } else if (!isRoute(n) && Array.isArray(n.children)) {
           result.push({
             ...n,
-            children: findAndDuplicateRecursive(n.children) as (ApiFolder | ApiRoute)[],
+            children: findAndDuplicateRecursive(n.children) as (
+              | ApiFolder
+              | ApiRoute
+            )[],
           });
         } else {
           result.push(n);
@@ -553,7 +612,9 @@ export function ApiExplorerSidebarPanel({
   };
 
   const handleCopyNode = (route: ApiRoute) => {
-    const fullUrl = route.path ? `${(activeProject?.url || "http://localhost:3000").replace(/\/+$/, "")}${route.path}` : "";
+    const fullUrl = route.path
+      ? `${(activeProject?.url || "http://localhost:3000").replace(/\/+$/, "")}${route.path}`
+      : "";
     navigator.clipboard.writeText(fullUrl || route.name);
     toast.success("Request URL copied to clipboard!");
   };
@@ -575,13 +636,18 @@ export function ApiExplorerSidebarPanel({
     // Auto-expand parent folder so the new folder is visible
     handleToggleFolderExpanded(parentFolderId, true);
 
-    const addRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const addRecursive = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       return nodes.map((n) => {
         if (n.id === parentFolderId && !isRoute(n)) {
           return { ...n, children: [...(n.children || []), newFolder] };
         }
         if (!isRoute(n) && Array.isArray(n.children)) {
-          return { ...n, children: addRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+          return {
+            ...n,
+            children: addRecursive(n.children) as (ApiFolder | ApiRoute)[],
+          };
         }
         return n;
       });
@@ -621,13 +687,18 @@ export function ApiExplorerSidebarPanel({
     // Auto-expand parent folder so the new request is visible
     handleToggleFolderExpanded(parentFolderId, true);
 
-    const addRecursive = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const addRecursive = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       return nodes.map((n) => {
         if (n.id === parentFolderId && !isRoute(n)) {
           return { ...n, children: [...(n.children || []), newRequest] };
         }
         if (!isRoute(n) && Array.isArray(n.children)) {
-          return { ...n, children: addRecursive(n.children) as (ApiFolder | ApiRoute)[] };
+          return {
+            ...n,
+            children: addRecursive(n.children) as (ApiFolder | ApiRoute)[],
+          };
         }
         return n;
       });
@@ -637,7 +708,10 @@ export function ApiExplorerSidebarPanel({
     handleRouteClick(newRequest);
   };
 
-  const findNode = (id: string, nodes: (ApiFolder | ApiRoute)[]): ApiFolder | ApiRoute | null => {
+  const findNode = (
+    id: string,
+    nodes: (ApiFolder | ApiRoute)[],
+  ): ApiFolder | ApiRoute | null => {
     for (const n of nodes) {
       if (n.id === id) return n;
       if (!isRoute(n) && Array.isArray(n.children)) {
@@ -648,14 +722,22 @@ export function ApiExplorerSidebarPanel({
     return null;
   };
 
-  const isDescendant = (parentId: string, childId: string, nodes: (ApiFolder | ApiRoute)[]): boolean => {
+  const isDescendant = (
+    parentId: string,
+    childId: string,
+    nodes: (ApiFolder | ApiRoute)[],
+  ): boolean => {
     const parentNode = findNode(parentId, nodes);
     if (!parentNode || isRoute(parentNode)) return false;
-    
+
     const checkChildren = (children: (ApiFolder | ApiRoute)[]): boolean => {
       for (const c of children) {
         if (c.id === childId) return true;
-        if (!isRoute(c) && Array.isArray(c.children) && checkChildren(c.children)) {
+        if (
+          !isRoute(c) &&
+          Array.isArray(c.children) &&
+          checkChildren(c.children)
+        ) {
           return true;
         }
       }
@@ -667,13 +749,15 @@ export function ApiExplorerSidebarPanel({
   const handleMoveNode = (
     draggedId: string,
     targetNodeId: string | null,
-    position: "inside" | "before" | "after" = "inside"
+    position: "inside" | "before" | "after" = "inside",
   ) => {
     if (draggedId === targetNodeId) return;
     if (isDescendant(draggedId, targetNodeId || "", currentTree)) return;
 
     let draggedNode: ApiFolder | ApiRoute | null = null;
-    const removeNode = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const removeNode = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       const filtered = nodes.filter((n) => {
         if (n.id === draggedId) {
           draggedNode = n;
@@ -683,7 +767,10 @@ export function ApiExplorerSidebarPanel({
       });
       return filtered.map((n) => {
         if (!isRoute(n) && Array.isArray(n.children)) {
-          return { ...n, children: removeNode(n.children) as (ApiFolder | ApiRoute)[] };
+          return {
+            ...n,
+            children: removeNode(n.children) as (ApiFolder | ApiRoute)[],
+          };
         }
         return n;
       });
@@ -693,7 +780,9 @@ export function ApiExplorerSidebarPanel({
     if (!draggedNode) return;
 
     let inserted = false;
-    const insertNode = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const insertNode = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       const idx = nodes.findIndex((n) => n.id === targetNodeId);
       if (idx !== -1) {
         inserted = true;
@@ -714,7 +803,10 @@ export function ApiExplorerSidebarPanel({
 
       return nodes.map((n) => {
         if (!isRoute(n) && Array.isArray(n.children)) {
-          return { ...n, children: insertNode(n.children) as (ApiFolder | ApiRoute)[] };
+          return {
+            ...n,
+            children: insertNode(n.children) as (ApiFolder | ApiRoute)[],
+          };
         }
         return n;
       });
@@ -742,19 +834,30 @@ export function ApiExplorerSidebarPanel({
     if (!searchQuery.trim()) return currentTree;
     const q = searchQuery.toLowerCase().trim();
 
-    const filterNodes = (nodes: (ApiFolder | ApiRoute)[]): (ApiFolder | ApiRoute)[] => {
+    const filterNodes = (
+      nodes: (ApiFolder | ApiRoute)[],
+    ): (ApiFolder | ApiRoute)[] => {
       const results: (ApiFolder | ApiRoute)[] = [];
       for (const node of nodes) {
         if (isRoute(node)) {
-          const matchesMethod = String(node.method || "").toLowerCase().includes(q);
-          const matchesPath = String(node.path || "").toLowerCase().includes(q);
-          const matchesName = String(node.name || "").toLowerCase().includes(q);
+          const matchesMethod = String(node.method || "")
+            .toLowerCase()
+            .includes(q);
+          const matchesPath = String(node.path || "")
+            .toLowerCase()
+            .includes(q);
+          const matchesName = String(node.name || "")
+            .toLowerCase()
+            .includes(q);
           if (matchesMethod || matchesPath || matchesName) {
             results.push(node);
           }
         } else {
           const matchingChildren = filterNodes(node.children || []);
-          if (matchingChildren.length > 0 || node.name.toLowerCase().includes(q)) {
+          if (
+            matchingChildren.length > 0 ||
+            node.name.toLowerCase().includes(q)
+          ) {
             results.push({
               ...node,
               children: matchingChildren,
@@ -780,7 +883,7 @@ export function ApiExplorerSidebarPanel({
             <ChevronDown
               className={cn(
                 "w-3 h-3 transition-transform duration-200",
-                !isProjectsExpanded && "-rotate-90"
+                !isProjectsExpanded && "-rotate-90",
               )}
             />
             <span>Backends</span>
@@ -788,7 +891,7 @@ export function ApiExplorerSidebarPanel({
               {projects.length}
             </span>
           </button>
-          
+
           <button
             onClick={onAddProjectClick}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/80 border border-border/80 rounded transition-all cursor-pointer"
@@ -802,11 +905,12 @@ export function ApiExplorerSidebarPanel({
         {isProjectsExpanded && (
           <div className="flex flex-col gap-1 max-h-[140px] overflow-y-auto pr-1 animate-in fade-in slide-in-from-top-1 duration-200">
             {projects.length === 0 ? (
-              <div 
+              <div
                 onClick={onAddProjectClick}
                 className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border/60 hover:border-border rounded-lg p-2 select-none cursor-pointer transition-colors"
               >
-                No backends linked. Click <span className="text-primary font-medium">+ Add Backend</span>.
+                No backends linked. Click{" "}
+                <span className="text-primary font-medium">+ Add Backend</span>.
               </div>
             ) : (
               projects.map((p) => {
@@ -823,7 +927,7 @@ export function ApiExplorerSidebarPanel({
                       "group px-2.5 py-1.5 rounded-lg border flex items-center justify-between cursor-pointer transition-all duration-150 text-xs",
                       isActive
                         ? "bg-card border-border/80 text-foreground shadow-sm"
-                        : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5",
                     )}
                     title={p.path}
                   >
@@ -834,11 +938,13 @@ export function ApiExplorerSidebarPanel({
                           isScanningThis
                             ? "bg-cyan-400 animate-breathe"
                             : isActive
-                            ? "bg-primary"
-                            : "bg-muted-foreground/40"
+                              ? "bg-primary"
+                              : "bg-muted-foreground/40",
                         )}
                       />
-                      <span className="truncate max-w-[120px] font-medium">{p.name}</span>
+                      <span className="truncate max-w-[120px] font-medium">
+                        {p.name}
+                      </span>
                       <span className="text-[10px] text-muted-foreground/60 font-mono">
                         {routeCount}
                       </span>
@@ -855,7 +961,9 @@ export function ApiExplorerSidebarPanel({
                           }}
                         >
                           <RefreshCw size={11} className="animate-spin" />
-                          <span className="text-[9px] text-muted-foreground hover:text-rose-400">Stop</span>
+                          <span className="text-[9px] text-muted-foreground hover:text-rose-400">
+                            Stop
+                          </span>
                         </button>
                       ) : (
                         onRescanProject && (
@@ -912,8 +1020,13 @@ export function ApiExplorerSidebarPanel({
                     onClick={() => onCancelScanProject?.(activeProject)}
                     title="Stop active scan"
                   >
-                    <RefreshCw size={11} className="animate-spin text-cyan-400" />
-                    <span className="text-[9px] text-muted-foreground hover:text-rose-400 font-medium">Cancel</span>
+                    <RefreshCw
+                      size={11}
+                      className="animate-spin text-cyan-400"
+                    />
+                    <span className="text-[9px] text-muted-foreground hover:text-rose-400 font-medium">
+                      Cancel
+                    </span>
                   </button>
                 ) : (
                   <button
@@ -943,8 +1056,7 @@ export function ApiExplorerSidebarPanel({
                   className="h-7 bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/15 hover:border-emerald-500/30 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
                   title="Add a new custom request at the root level"
                 >
-                  <FileCode size={11} className="text-emerald-400" />
-                  + Request
+                  <FileCode size={11} className="text-emerald-400" />+ Request
                 </Button>
                 <Button
                   variant="outline"
@@ -953,14 +1065,16 @@ export function ApiExplorerSidebarPanel({
                   className="h-7 bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/15 hover:border-blue-500/30 text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1.5 rounded-md transition-all cursor-pointer"
                   title="Add a new folder at the root level"
                 >
-                  <FolderPlus size={11} className="text-blue-400" />
-                  + Folder
+                  <FolderPlus size={11} className="text-blue-400" />+ Folder
                 </Button>
               </div>
 
               {/* Search / Filter Input */}
               <div className="relative">
-                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Search
+                  size={11}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -980,11 +1094,15 @@ export function ApiExplorerSidebarPanel({
 
             <div
               className="flex-1 min-h-0 overflow-y-auto pr-1 bg-card/20 rounded-lg border border-border/40 p-2 transform-gpu"
-              style={{ transform: "translateZ(0)", willChange: "scroll-position" }}
+              style={{
+                transform: "translateZ(0)",
+                willChange: "scroll-position",
+              }}
             >
               {isScanning && scanningProjectId === activeProject?.id ? (
                 <div className="p-4 text-xs text-cyan-400 flex items-center justify-center gap-2">
-                  <RefreshCw size={12} className="animate-spin" /> Scanning endpoints...
+                  <RefreshCw size={12} className="animate-spin" /> Scanning
+                  endpoints...
                 </div>
               ) : filteredTree.length > 0 ? (
                 <Sidebar
@@ -1012,7 +1130,10 @@ export function ApiExplorerSidebarPanel({
                     No matching endpoints
                   </p>
                   <p className="text-[11px] text-muted-foreground/70 max-w-[200px] mb-3 truncate">
-                    No routes found for <span className="text-primary font-mono font-semibold">"{searchQuery}"</span>
+                    No routes found for{" "}
+                    <span className="text-primary font-mono font-semibold">
+                      "{searchQuery}"
+                    </span>
                   </p>
                   <Button
                     size="sm"
@@ -1026,13 +1147,17 @@ export function ApiExplorerSidebarPanel({
               ) : (
                 <div className="flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
                   <div className="w-10 h-10 rounded-xl bg-card/60 border border-dashed border-border/80 flex items-center justify-center text-muted-foreground/60 mb-2.5">
-                    <FolderCode size={18} className="text-muted-foreground/60" />
+                    <FolderCode
+                      size={18}
+                      className="text-muted-foreground/60"
+                    />
                   </div>
                   <p className="text-xs font-semibold text-foreground/85 mb-1">
                     No APIs detected
                   </p>
                   <p className="text-[11px] text-muted-foreground/70 max-w-[210px] mb-3 leading-relaxed">
-                    No API routes were found in this directory. Rescan or create a manual request.
+                    No API routes were found in this directory. Rescan or create
+                    a manual request.
                   </p>
                   <div className="flex items-center gap-2">
                     {isScanning && activeProject ? (
@@ -1042,7 +1167,10 @@ export function ApiExplorerSidebarPanel({
                         onClick={() => onCancelScanProject?.(activeProject)}
                         className="h-6 text-[11px] px-2.5 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 cursor-pointer"
                       >
-                        <RefreshCw size={10} className="mr-1 animate-spin text-rose-400" />
+                        <RefreshCw
+                          size={10}
+                          className="mr-1 animate-spin text-rose-400"
+                        />
                         Cancel Scan
                       </Button>
                     ) : onRescanProject && activeProject ? (
@@ -1079,8 +1207,12 @@ export function ApiExplorerSidebarPanel({
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-muted-foreground text-xs select-none">
             <FolderCode size={28} className="text-muted-foreground/40 mb-2" />
-            <p className="font-medium text-foreground mb-1">No Backend Selected</p>
-            <p className="text-[11px] max-w-[180px] mb-3">Add or select a backend above to view its endpoints.</p>
+            <p className="font-medium text-foreground mb-1">
+              No Backend Selected
+            </p>
+            <p className="text-[11px] max-w-[180px] mb-3">
+              Add or select a backend above to view its endpoints.
+            </p>
             <Button
               size="sm"
               onClick={onAddProjectClick}
