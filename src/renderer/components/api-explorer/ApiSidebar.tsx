@@ -353,18 +353,31 @@ function computeTreePaths(
 
     const leadEl = el.querySelector<HTMLElement>("[data-tree-lead]");
     const leadRect = leadEl ? leadEl.getBoundingClientRect() : elRect;
+    const leadType = leadEl?.dataset.treeLead;
 
     // Trunk X: exact horizontal center of the parent's leading icon/chevron relative to container
     const trunkX = Math.round((leadRect.left - containerRect.left + leadRect.width / 2) * 2) / 2;
 
-    // Start Y: right below the icon/chevron (1px clearance)
-    const startY = Math.round(leadRect.bottom - containerRect.top + 1);
+    // Start Y: right at the visible bottom tip of the glyph
+    let startY = Math.round(leadRect.bottom - containerRect.top);
+    if (leadType === "chevron-down") {
+      startY = Math.round(leadRect.top - containerRect.top + (15 / 24) * leadRect.height + 0.5);
+    } else if (leadType === "root-icon") {
+      startY = Math.round(leadRect.top - containerRect.top + (14 / 16) * leadRect.height + 0.5);
+    }
 
     // Row vertical center for horizontal branch landing
     const y = Math.round(elRect.top - containerRect.top + elRect.height / 2);
 
-    // Branch Target X: leading edge of the child's icon/badge (2px breathing gap)
-    const branchTargetX = Math.round(leadRect.left - containerRect.left - 2);
+    // Branch Target X: snaps directly to the visible stroke of the leading element
+    let branchTargetX = Math.round(leadRect.left - containerRect.left);
+    if (leadType === "chevron-down") {
+      branchTargetX = Math.round(leadRect.left - containerRect.left + (6 / 24) * leadRect.width);
+    } else if (leadType === "chevron-right") {
+      branchTargetX = Math.round(leadRect.left - containerRect.left + (9 / 24) * leadRect.width);
+    } else if (leadType === "badge") {
+      branchTargetX = Math.round(leadRect.left - containerRect.left - 2);
+    }
 
     return { trunkX, startY, y, branchTargetX };
   };
@@ -809,7 +822,7 @@ export function TreeNode({
           }
         }}
         className={cn(
-          "group flex items-center gap-1.5 py-1 pr-2 text-[12px] text-foreground/75 hover:text-foreground hover:bg-white/[0.04] rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
+          "group flex items-center gap-1 py-1 pr-2 text-[12px] text-foreground/75 hover:text-foreground hover:bg-white/[0.04] rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
           "hover:pr-8 data-[menu-open=true]:pr-8",
           dragOverPosition === "inside" && "bg-primary/10 border-primary/20 text-foreground"
         )}
@@ -829,9 +842,9 @@ export function TreeNode({
         )}
 
         {isOpen ? (
-          <ChevronDown data-tree-lead="chevron" size={13} className="text-muted-foreground shrink-0" />
+          <ChevronDown data-tree-lead="chevron-down" size={13} className="text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight data-tree-lead="chevron" size={13} className="text-muted-foreground shrink-0" />
+          <ChevronRight data-tree-lead="chevron-right" size={13} className="text-muted-foreground shrink-0" />
         )}
         {isOpen ? (
           /* Open Folder Outline - Smooth rounded corners */
