@@ -1337,15 +1337,64 @@ export function extractPythonRoutes(tree: Parser.Tree, filePath: string): OmniRo
 // -------------------------------------------------------------
 // 4. Go (Gin, Chi, Fiber, Echo) - Universal Invariant CST Visitor
 // -------------------------------------------------------------
-function getGoLiteralString(node: Parser.SyntaxNode | null | undefined): string | null {
+export function resolveGoExpressionString(
+  node: Parser.SyntaxNode | null | undefined,
+  scopeMap?: Map<string, string>
+): string | null {
   if (!node) return null;
+  if (node.type === "expression_list") {
+    if (node.namedChildCount > 0) {
+      return resolveGoExpressionString(node.namedChild(0), scopeMap);
+    }
+    if (node.childCount > 0) {
+      return resolveGoExpressionString(node.child(0), scopeMap);
+    }
+    return null;
+  }
+  if (node.type === "parenthesized_expression") {
+    for (let i = 0; i < node.childCount; i++) {
+      const c = node.child(i)!;
+      if (c.type !== "(" && c.type !== ")") {
+        return resolveGoExpressionString(c, scopeMap);
+      }
+    }
+  }
   if (node.type === "interpreted_string_literal" || node.type === "raw_string_literal") {
     const raw = node.text;
     if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
     if (raw.startsWith('`') && raw.endsWith('`')) return raw.slice(1, -1);
     return raw;
   }
+  if (node.type === "binary_expression") {
+    const op = node.children.find((c) => c.type === "+");
+    if (op) {
+      const leftNode = node.childForFieldName("left") || node.child(0);
+      const rightNode = node.childForFieldName("right") || (node.childCount > 2 ? node.child(2) : null);
+      const left = resolveGoExpressionString(leftNode, scopeMap);
+      const right = resolveGoExpressionString(rightNode, scopeMap);
+      if (left !== null && right !== null) return left + right;
+    }
+  }
+  if (node.type === "identifier") {
+    if (scopeMap && scopeMap.has(node.text.trim())) {
+      return scopeMap.get(node.text.trim())!;
+    }
+  }
+  if (node.type === "selector_expression") {
+    const txt = node.text.trim();
+    if (txt === "http.MethodGet") return "GET";
+    if (txt === "http.MethodPost") return "POST";
+    if (txt === "http.MethodPut") return "PUT";
+    if (txt === "http.MethodDelete") return "DELETE";
+    if (txt === "http.MethodPatch") return "PATCH";
+    if (txt === "http.MethodHead") return "HEAD";
+    if (txt === "http.MethodOptions") return "OPTIONS";
+  }
   return null;
+}
+
+function getGoLiteralString(node: Parser.SyntaxNode | null | undefined): string | null {
+  return resolveGoExpressionString(node);
 }
 
 const GO_HTTP_METHODS = new Set([
@@ -1353,10 +1402,116 @@ const GO_HTTP_METHODS = new Set([
   "Get", "Post", "Put", "Delete", "Patch", "Head", "Options",
 ]);
 
+const GO_STANDARD_METHODS = new Set([
+  "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS",
+]);
+
 const GO_NON_ROUTER_RECEIVERS = new Set([
   "header", "headers", "query", "url", "cookie", "cookies", "param", "params",
   "cache", "redis", "db", "memcache", "ret", "mock", "ctx", "context", "req", "res",
 ]);
+
+function extractGoHandlerMethods(
+  handlerNode: Parser.SyntaxNode,
+  rootNode: Parser.SyntaxNode,
+  scopeMap?: Map<string, string>
+): Method[] {
+  const methods = new Set<Method>();
+  let bodyNode: Parser.SyntaxNode | null = null;
+  let targetName = "";
+  if (handlerNode.type === "func_literal") {
+    bodyNode = handlerNode.childForFieldName("body") || handlerNode.children.find((c) => c.type === "block") || null;
+  } else if (handlerNode.type === "identifier") {
+    targetName = handlerNode.text.trim();
+  } else if (handlerNode.type === "selector_expression") {
+    const field = handlerNode.childForFieldName("field");
+    if (field) targetName = field.text.trim();
+  } else if (handlerNode.type === "call_expression") {
+    const args = handlerNode.childForFieldName("arguments");
+    if (args) {
+      for (const arg of args.namedChildren) {
+        if (arg.type === "func_literal" || arg.type === "identifier" || arg.type === "selector_expression") {
+          const nestedMethods = extractGoHandlerMethods(arg, rootNode, scopeMap);
+          if (nestedMethods.length > 0) {
+            return nestedMethods;
+          }
+        }
+      }
+    }
+  }
+
+  if (targetName) {
+    for (let i = 0; i < rootNode.childCount; i++) {
+      const child = rootNode.child(i);
+      if (child && (child.type === "function_declaration" || child.type === "method_declaration")) {
+        const fnName = child.childForFieldName("name");
+        if (fnName && fnName.text.trim() === targetName) {
+          bodyNode = child.childForFieldName("body") || child.children.find((c) => c.type === "block") || null;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!bodyNode) return [];
+
+  function inspectNode(n: Parser.SyntaxNode) {
+    if (n.type === "binary_expression") {
+      const op = n.children.find((c) => c.type === "==" || c.type === "!=");
+      if (op && (op.type === "==" || op.type === "!=")) {
+        const left = n.child(0);
+        const right = n.child(2);
+        const lText = left ? left.text : "";
+        const rText = right ? right.text : "";
+        if (lText.includes("Method") || rText.includes("Method")) {
+          const strNode = lText.includes("Method") ? right : left;
+          if (strNode) {
+            const val = resolveGoExpressionString(strNode, scopeMap);
+            if (val && GO_STANDARD_METHODS.has(val.toUpperCase())) {
+              methods.add(val.toUpperCase() as Method);
+            }
+          }
+        }
+      }
+    }
+
+    if (n.type === "expression_switch_statement" || n.type === "switch_statement") {
+      const condition = n.childForFieldName("value") || n.children.find((c) => c.text.includes("Method"));
+      if (condition && condition.text.includes("Method")) {
+        for (let i = 0; i < n.childCount; i++) {
+          const sc = n.child(i)!;
+          if (sc.type === "expression_case" || sc.type === "expression_case_clause") {
+            for (let j = 0; j < sc.childCount; j++) {
+              const caseItem = sc.child(j)!;
+              if (caseItem.type === ":") break;
+              if (caseItem.type === "case") continue;
+              if (caseItem.type === "expression_list") {
+                for (let k = 0; k < caseItem.namedChildCount; k++) {
+                  const val = resolveGoExpressionString(caseItem.namedChild(k), scopeMap);
+                  if (val && GO_STANDARD_METHODS.has(val.toUpperCase())) {
+                    methods.add(val.toUpperCase() as Method);
+                  }
+                }
+              } else {
+                const val = resolveGoExpressionString(caseItem, scopeMap);
+                if (val && GO_STANDARD_METHODS.has(val.toUpperCase())) {
+                  methods.add(val.toUpperCase() as Method);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < n.childCount; i++) {
+      inspectNode(n.child(i)!);
+    }
+  }
+
+  inspectNode(bodyNode);
+  return Array.from(methods);
+}
 
 export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[] {
   const routes: OmniRoute[] = [];
@@ -1368,6 +1523,42 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
   routerPrefixes.set("engine", "/");
   routerPrefixes.set("server", "/");
   routerPrefixes.set("api", "/");
+  routerPrefixes.set("mux", "/");
+  routerPrefixes.set("http", "/");
+
+  // Collect file-scope constants & variables for symbolic constant folding
+  const fileScopeConstants = new Map<string, string>();
+  function collectConstants(node: Parser.SyntaxNode) {
+    if (node.type === "const_spec" || node.type === "var_spec") {
+      const idNodes = node.children.filter((c) => c.type === "identifier");
+      const exprList = node.children.find((c) => c.type === "expression_list");
+      if (exprList && idNodes.length > 0) {
+        const valNodes = exprList.namedChildren.length > 0 ? exprList.namedChildren : exprList.children.filter((c) => c.type !== ",");
+        for (let i = 0; i < idNodes.length && i < valNodes.length; i++) {
+          const strVal = resolveGoExpressionString(valNodes[i], fileScopeConstants);
+          if (strVal !== null) {
+            fileScopeConstants.set(idNodes[i].text.trim(), strVal);
+          }
+        }
+      } else {
+        const nameNode = node.childForFieldName("name") || node.child(0);
+        const valNode = node.childForFieldName("value") || node.children[node.children.length - 1];
+        if (nameNode && valNode && nameNode !== valNode) {
+          const strVal = resolveGoExpressionString(valNode, fileScopeConstants);
+          if (strVal !== null) {
+            fileScopeConstants.set(nameNode.text.trim(), strVal);
+          }
+        }
+      }
+    }
+    for (let i = 0; i < node.childCount; i++) {
+      const c = node.child(i);
+      if (c && c.type !== "func_literal" && c.type !== "function_declaration") {
+        collectConstants(c);
+      }
+    }
+  }
+  collectConstants(tree.rootNode);
 
   function getReceiverPrefix(receiverText: string): string {
     const clean = receiverText.trim();
@@ -1375,11 +1566,76 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
     return "/";
   }
 
-  function walk(node: Parser.SyntaxNode) {
+  const routeHelperFunctions = new Map<string, { patternArgIndex: number; handlerArgIndex?: number }>();
+
+  function inspectAndRegisterHelper(helperName: string, fnNode: Parser.SyntaxNode) {
+    const params = fnNode.childForFieldName("parameters");
+    const body = fnNode.childForFieldName("body");
+    if (!params || !body) return;
+
+    const paramNames: string[] = [];
+    for (let i = 0; i < params.namedChildCount; i++) {
+      const p = params.namedChild(i)!;
+      const pId = p.childForFieldName("name") || p.children.find((c) => c.type === "identifier");
+      paramNames.push(pId ? pId.text.trim() : p.text.trim());
+    }
+
+    let foundRouterCall = false;
+    let patternArgIdx = 0;
+    let handlerArgIdx: number | undefined = undefined;
+
+    function scanHelperBody(bn: Parser.SyntaxNode) {
+      if (foundRouterCall) return;
+      if (bn.type === "call_expression") {
+        const cFn = bn.childForFieldName("function");
+        const cArgs = bn.childForFieldName("arguments");
+        if (cFn && cArgs && cArgs.namedChildren.length > 0) {
+          let isRouterCall = false;
+          if (cFn.type === "selector_expression") {
+            const f = cFn.childForFieldName("field");
+            if (f && (f.text === "Handle" || f.text === "HandleFunc")) {
+              isRouterCall = true;
+            }
+          } else if (cFn.type === "identifier" && routeHelperFunctions.has(cFn.text.trim())) {
+            isRouterCall = true;
+          }
+
+          if (isRouterCall) {
+            const firstArgText = cArgs.namedChildren[0].text.trim();
+            const pIdx = paramNames.indexOf(firstArgText);
+            if (pIdx !== -1) {
+              patternArgIdx = pIdx;
+              foundRouterCall = true;
+            }
+            for (let a = 1; a < cArgs.namedChildren.length; a++) {
+              const aText = cArgs.namedChildren[a].text.trim();
+              const hIdx = paramNames.indexOf(aText);
+              if (hIdx !== -1) {
+                handlerArgIdx = hIdx;
+                break;
+              }
+            }
+          }
+        }
+      }
+      for (let i = 0; i < bn.childCount; i++) {
+        scanHelperBody(bn.child(i)!);
+      }
+    }
+    scanHelperBody(body);
+
+    if (foundRouterCall) {
+      routeHelperFunctions.set(helperName, { patternArgIndex: patternArgIdx, handlerArgIndex: handlerArgIdx });
+    }
+  }
+
+  // PASS 1: Discover all router group assignments & sub-mux mounts before route extraction
+  function pass1CollectMounts(node: Parser.SyntaxNode) {
     if (!node) return;
 
-    // 1. Lexical Scope Tracking: Group assignments
-    // Example: v1 := r.Group("/api/v1") or accounts := v1.Group("/accounts")
+    // 1. Group assignments & Subrouters:
+    //    v1 := r.Group("/api/v1") or accounts := v1.Group("/accounts")
+    //    apiRouter := s.router.PathPrefix("/api/v1").Subrouter()
     if (node.type === "short_var_declaration" || node.type === "assignment_statement") {
       const left = node.childForFieldName("left") || node.children.find((c) => c.type === "expression_list");
       const right = node.childForFieldName("right") || node.children.filter((c) => c.type === "expression_list")[1];
@@ -1394,7 +1650,7 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
             if (field && (field.text === "Group" || field.text === "Party")) {
               const args = callExp.childForFieldName("arguments");
               if (args && args.namedChildren.length > 0) {
-                const prefixVal = getGoLiteralString(args.namedChildren[0]);
+                const prefixVal = resolveGoExpressionString(args.namedChildren[0], fileScopeConstants);
                 if (prefixVal !== null) {
                   const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
                   const newPrefix = joinUrl(parentPrefix, prefixVal);
@@ -1402,62 +1658,443 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
                   routerPrefixes.set(varName, newPrefix);
                 }
               }
+            } else if (field && field.text === "Subrouter") {
+              // Gorilla Mux: apiRouter := s.router.PathPrefix("/api/v1").Subrouter()
+              if (operand && operand.type === "call_expression") {
+                const innerFn = operand.childForFieldName("function");
+                if (innerFn && innerFn.type === "selector_expression") {
+                  const innerField = innerFn.childForFieldName("field");
+                  if (innerField && innerField.text === "PathPrefix") {
+                    const innerArgs = operand.childForFieldName("arguments");
+                    const prefixVal = innerArgs && innerArgs.namedChildren.length > 0
+                      ? resolveGoExpressionString(innerArgs.namedChildren[0], fileScopeConstants)
+                      : "";
+                    const innerOperand = innerFn.childForFieldName("operand");
+                    const parentPrefix = innerOperand ? getReceiverPrefix(innerOperand.text) : "/";
+                    const newPrefix = prefixVal ? joinUrl(parentPrefix, prefixVal) : parentPrefix;
+                    const varName = left.text.trim();
+                    routerPrefixes.set(varName, newPrefix);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Helper routing closures: addRoute := func(pattern string, ...) { ... }
+        const funcLit = right.type === "func_literal" ? right : right.children.find((c) => c.type === "func_literal");
+        if (funcLit) {
+          inspectAndRegisterHelper(left.text.trim(), funcLit);
+        }
+      }
+    }
+
+    if (node.type === "function_declaration") {
+      const fnNameNode = node.childForFieldName("name");
+      if (fnNameNode) {
+        inspectAndRegisterHelper(fnNameNode.text.trim(), node);
+      }
+    }
+
+    // 2. Sub-Mux mounts: rootMux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiMux))
+    //                   or rootMux.Handle("/api/v1/", apiMux)
+    if (node.type === "call_expression") {
+      const fn = node.childForFieldName("function");
+      if (fn && fn.type === "selector_expression") {
+        const operand = fn.childForFieldName("operand");
+        const field = fn.childForFieldName("field");
+        if (field && field.text === "Handle") {
+          const args = node.childForFieldName("arguments");
+          if (args && args.namedChildren.length >= 2) {
+            const patternNode = args.namedChildren[0];
+            const handlerNode = args.namedChildren[1];
+            const patternVal = resolveGoExpressionString(patternNode, fileScopeConstants);
+
+            if (patternVal !== null) {
+              let subMuxName: string | null = null;
+              if (handlerNode.type === "call_expression") {
+                const stripFn = handlerNode.childForFieldName("function");
+                if (stripFn && stripFn.text.includes("StripPrefix")) {
+                  const stripArgs = handlerNode.childForFieldName("arguments");
+                  if (stripArgs && stripArgs.namedChildren.length >= 2) {
+                    const subMuxArg = stripArgs.namedChildren[1];
+                    if (subMuxArg && subMuxArg.type === "identifier") {
+                      subMuxName = subMuxArg.text.trim();
+                    }
+                  }
+                }
+              } else if (handlerNode.type === "identifier") {
+                const name = handlerNode.text.trim();
+                if (name.toLowerCase().includes("mux") || name.toLowerCase().includes("router")) {
+                  subMuxName = name;
+                }
+              }
+
+              if (subMuxName) {
+                const mountPrefix = patternVal.endsWith("/") ? patternVal.slice(0, -1) : patternVal;
+                const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+                const fullPrefix = joinUrl(parentPrefix, mountPrefix);
+                routerPrefixes.set(subMuxName, fullPrefix);
+              }
             }
           }
         }
       }
     }
 
-    // 2. Chi sub-routers: r.Route("/articles", func(r chi.Router) { ... })
+    for (let i = 0; i < node.childCount; i++) {
+      pass1CollectMounts(node.child(i)!);
+    }
+  }
+
+  pass1CollectMounts(tree.rootNode);
+
+  function registerPatternRoute(
+    rawPattern: string,
+    handlerNode: Parser.SyntaxNode | undefined,
+    parentPrefix: string
+  ) {
+    let method: Method = "GET";
+    let rawPath = rawPattern.trim();
+    let hasExplicitMethod = false;
+
+    const firstSpace = rawPath.indexOf(" ");
+    if (firstSpace > 0) {
+      const candidateMethod = rawPath.slice(0, firstSpace).trim().toUpperCase();
+      if (GO_STANDARD_METHODS.has(candidateMethod)) {
+        method = candidateMethod as Method;
+        rawPath = rawPath.slice(firstSpace + 1).trim();
+        hasExplicitMethod = true;
+      }
+    }
+
+    // Strip host-based routing if present (e.g. "example.com/api/users" -> "/api/users")
+    const slashIdx = rawPath.indexOf("/");
+    if (slashIdx > 0 && !rawPath.startsWith("/")) {
+      rawPath = rawPath.slice(slashIdx);
+    }
+
+    // Clean Go 1.22 exact match wildcard {$}: "GET /{$}" -> "/" or "GET /users/{$}" -> "/users/"
+    if (rawPath.endsWith("{$}")) {
+      rawPath = rawPath.slice(0, -3);
+      if (rawPath.length === 0) rawPath = "/";
+    }
+
+    if (!rawPath.startsWith("/")) {
+      rawPath = "/" + rawPath;
+    }
+
+    let fullPath = joinUrl(parentPrefix, rawPath);
+    if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
+
+    if (hasExplicitMethod) {
+      routes.push({
+        id: stableId(filePath, method, fullPath),
+        framework: "go-http",
+        method,
+        path: fullPath,
+        file: filePath,
+        confidence: "high",
+        source: "tree_sitter",
+      });
+    } else if (handlerNode) {
+      // Classic Go: check for intra-handler method switching (r.Method == "POST" / switch r.Method)
+      const discoveredMethods = extractGoHandlerMethods(handlerNode, tree.rootNode, fileScopeConstants);
+      if (discoveredMethods.length > 0) {
+        for (const m of discoveredMethods) {
+          routes.push({
+            id: stableId(filePath, m, fullPath),
+            framework: "go-http",
+            method: m,
+            path: fullPath,
+            file: filePath,
+            confidence: "high",
+            source: "tree_sitter",
+          });
+        }
+      } else {
+        routes.push({
+          id: stableId(filePath, "GET", fullPath),
+          framework: "go-http",
+          method: "GET",
+          path: fullPath,
+          file: filePath,
+          confidence: "high",
+          source: "tree_sitter",
+        });
+      }
+    } else {
+      routes.push({
+        id: stableId(filePath, "GET", fullPath),
+        framework: "go-http",
+        method: "GET",
+        path: fullPath,
+        file: filePath,
+        confidence: "high",
+        source: "tree_sitter",
+      });
+    }
+  }
+
+  const handledCallNodeIds = new Set<number>();
+
+  // PASS 2: Extract all endpoints
+  function walk(node: Parser.SyntaxNode) {
+    if (!node) return;
+
     if (node.type === "call_expression") {
+      if (handledCallNodeIds.has(node.id)) {
+        return;
+      }
       const fn = node.childForFieldName("function");
+
+      // 1. Direct identifier calls to helper functions/closures (e.g. addRoute, addRouteWithMetrics)
+      if (fn && fn.type === "identifier") {
+        const fnName = fn.text.trim();
+        const helperInfo = routeHelperFunctions.get(fnName);
+        const isCandidate =
+          helperInfo ||
+          fnName.startsWith("addRoute") ||
+          fnName.startsWith("registerRoute") ||
+          fnName.startsWith("handleRoute");
+
+        if (isCandidate) {
+          const patternIdx = helperInfo ? helperInfo.patternArgIndex : 0;
+          const handlerIdx = helperInfo ? helperInfo.handlerArgIndex : (fnName.includes("Metric") ? 2 : 1);
+          const args = node.childForFieldName("arguments");
+          if (args && args.namedChildren.length > patternIdx) {
+            const patternNode = args.namedChildren[patternIdx];
+            const patternVal = resolveGoExpressionString(patternNode, fileScopeConstants);
+            if (
+              patternVal !== null &&
+              (patternVal.startsWith("/") ||
+                patternVal.startsWith("GET ") ||
+                patternVal.startsWith("POST ") ||
+                patternVal.startsWith("PUT ") ||
+                patternVal.startsWith("DELETE ") ||
+                patternVal.startsWith("PATCH "))
+            ) {
+              const handlerNode =
+                handlerIdx !== undefined && args.namedChildren.length > handlerIdx
+                  ? args.namedChildren[handlerIdx]
+                  : undefined;
+              registerPatternRoute(patternVal, handlerNode, "/");
+              return;
+            }
+          }
+        }
+      }
+
       if (fn && fn.type === "selector_expression") {
         const operand = fn.childForFieldName("operand");
         const field = fn.childForFieldName("field");
 
-        if (field && (field.text === "Route" || field.text === "Mount")) {
-          const args = node.childForFieldName("arguments");
-          if (args && args.namedChildren.length >= 2) {
-            const pathArg = getGoLiteralString(args.namedChildren[0]);
-            const secondArg = args.namedChildren[1];
+        // Docker / Moby Daemon route pattern: router.New<Method>Route(path, handler)
+        // e.g.: router.NewGetRoute("/containers/json", c.getContainersJSON)
+        //       router.NewPostRoute("/containers/create", c.postContainersCreate)
+        if (field && field.text.startsWith("New") && field.text.endsWith("Route") && field.text.length > 8) {
+          const rawMethod = field.text.slice(3, -5).toUpperCase();
+          if (GO_STANDARD_METHODS.has(rawMethod)) {
+            const args = node.childForFieldName("arguments");
+            if (args && args.namedChildren.length >= 2) {
+              const pathVal = resolveGoExpressionString(args.namedChildren[0], fileScopeConstants);
+              if (pathVal !== null) {
+                const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+                let fullPath = joinUrl(parentPrefix, pathVal);
+                if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
 
-            if (pathArg !== null) {
-              const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
-              const routePrefix = joinUrl(parentPrefix, pathArg);
-
-              // If second argument is a callback: func(r chi.Router) { ... }
-              if (secondArg && secondArg.type === "func_literal") {
-                const params = secondArg.childForFieldName("parameters");
-                let scopedVar = "r";
-                if (params && params.namedChildren.length > 0) {
-                  const firstParam = params.namedChildren[0];
-                  const paramId = firstParam.childForFieldName("name") || firstParam.children.find((c) => c.type === "identifier");
-                  if (paramId) scopedVar = paramId.text.trim();
-                }
-
-                const prevPrefix = routerPrefixes.get(scopedVar);
-                routerPrefixes.set(scopedVar, routePrefix);
-
-                // Traverse the closure body
-                const body = secondArg.childForFieldName("body");
-                if (body) {
-                  for (let i = 0; i < body.childCount; i++) {
-                    walk(body.child(i)!);
-                  }
-                }
-
-                if (prevPrefix !== undefined) {
-                  routerPrefixes.set(scopedVar, prevPrefix);
-                } else {
-                  routerPrefixes.delete(scopedVar);
-                }
+                routes.push({
+                  id: stableId(filePath, rawMethod as Method, fullPath),
+                  framework: "moby",
+                  method: rawMethod as Method,
+                  path: fullPath,
+                  file: filePath,
+                  confidence: "high",
+                  source: "tree_sitter",
+                });
                 return;
               }
             }
           }
         }
 
-        // 3. HTTP Route Registration: r.GET("/path", handler...)
+        // Fluent Call Chaining Unwrapper (Gorilla Mux, MinIO, Gitea Combo, Macaron):
+        // Handles arbitrary method chaining order, e.g.:
+        //   router.Methods(http.MethodHead).Path("/{object:.+}").HandlerFunc(...)
+        //   authRoutes.Handle("/articles", h).Methods("POST", "PUT")
+        //   m.Combo("/{secretname}").Put(...).Delete(...)
+        if (operand && operand.type === "call_expression") {
+          const chainCalls: Parser.SyntaxNode[] = [];
+          const chainMethods: Method[] = [];
+          let chainPath: string | null = null;
+          let chainQuerySubresource: string | null = null;
+          let baseOperand: Parser.SyntaxNode | null = null;
+          let curr: Parser.SyntaxNode | null = node;
+          let hasRouteChainingKeyword = false;
+
+          while (curr && curr.type === "call_expression") {
+            chainCalls.push(curr);
+            const currFn = curr.childForFieldName("function");
+            if (!currFn || currFn.type !== "selector_expression") break;
+            const currField = currFn.childForFieldName("field");
+            const currOperand = currFn.childForFieldName("operand");
+            const fieldText = currField?.text;
+            const args = curr.childForFieldName("arguments")?.namedChildren || [];
+
+            if (fieldText === "Path" || fieldText === "Combo") {
+              hasRouteChainingKeyword = true;
+              if (args.length >= 1 && chainPath === null) {
+                chainPath = resolveGoExpressionString(args[0], fileScopeConstants);
+              }
+            } else if (fieldText === "Methods") {
+              hasRouteChainingKeyword = true;
+              for (const arg of args) {
+                const m = resolveGoExpressionString(arg, fileScopeConstants);
+                if (m && GO_STANDARD_METHODS.has(m.toUpperCase())) {
+                  chainMethods.push(m.toUpperCase() as Method);
+                }
+              }
+            } else if (fieldText === "Queries") {
+              hasRouteChainingKeyword = true;
+              if (args.length >= 1 && chainQuerySubresource === null) {
+                const q = resolveGoExpressionString(args[0], fileScopeConstants);
+                if (q && q.length > 0) {
+                  chainQuerySubresource = q;
+                }
+              }
+            } else if (fieldText === "Handle" || fieldText === "HandleFunc") {
+              hasRouteChainingKeyword = true;
+              if (args.length >= 1 && chainPath === null) {
+                const p = resolveGoExpressionString(args[0], fileScopeConstants);
+                if (p && (p.startsWith("/") || p === "")) {
+                  chainPath = p;
+                }
+              }
+            } else if (fieldText && GO_HTTP_METHODS.has(fieldText)) {
+              hasRouteChainingKeyword = true;
+              chainMethods.push(fieldText.toUpperCase() as Method);
+            }
+
+            if (currOperand && currOperand.type === "call_expression") {
+              curr = currOperand;
+            } else {
+              baseOperand = currOperand || null;
+              break;
+            }
+          }
+
+          if (hasRouteChainingKeyword) {
+            const hasHandler = chainCalls.some((c) => {
+              const f = c.childForFieldName("function")?.childForFieldName("field")?.text;
+              return f === "HandlerFunc" || f === "Handler" || f === "Handle" || f === "HandleFunc";
+            });
+
+            if (chainPath === null && hasHandler) {
+              chainPath = "/";
+            }
+
+            // If a route has a handler & path but omitted .Methods(...),
+            // Gorilla Mux / standard router defaults to handling all HTTP methods (canonical GET)
+            if (chainMethods.length === 0 && hasHandler && chainPath !== null) {
+              chainMethods.push("GET");
+            }
+
+            if (chainMethods.length > 0 && chainPath !== null) {
+              for (const call of chainCalls) {
+                handledCallNodeIds.add(call.id);
+              }
+              const parentPrefix = baseOperand ? getReceiverPrefix(baseOperand.text) : "/";
+              let fullPath = joinUrl(parentPrefix, chainPath);
+              if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
+              if (chainQuerySubresource) {
+                fullPath = fullPath + (fullPath.includes("?") ? "&" : "?") + chainQuerySubresource;
+              }
+
+              for (const m of chainMethods) {
+                routes.push({
+                  id: stableId(filePath, m, fullPath),
+                  framework: "go-http",
+                  method: m,
+                  path: fullPath,
+                  file: filePath,
+                  confidence: "high",
+                  source: "tree_sitter",
+                });
+              }
+              return;
+            }
+          }
+        }
+
+        // Standard Handler(method, path, handler) pattern (e.g. httprouter / snippetbox)
+        if (field && (field.text === "Handler" || field.text === "HandlerFunc")) {
+          const args = node.childForFieldName("arguments");
+          if (args && args.namedChildren.length >= 2) {
+            const methodVal = resolveGoExpressionString(args.namedChildren[0], fileScopeConstants);
+            const pathVal = resolveGoExpressionString(args.namedChildren[1], fileScopeConstants);
+            if (methodVal && GO_STANDARD_METHODS.has(methodVal.toUpperCase()) && pathVal !== null) {
+              const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+              let fullPath = joinUrl(parentPrefix, pathVal);
+              if (!fullPath.startsWith("/")) fullPath = "/" + fullPath;
+
+              routes.push({
+                id: stableId(filePath, methodVal.toUpperCase() as Method, fullPath),
+                framework: "go-http",
+                method: methodVal.toUpperCase() as Method,
+                path: fullPath,
+                file: filePath,
+                confidence: "high",
+                source: "tree_sitter",
+              });
+              return;
+            }
+          }
+        }
+
+        // Native Go Standard Library (net/http & Go 1.22+ ServeMux):
+        // Examples:
+        //   http.HandleFunc("GET /users/{id}", getUser)
+        //   mux.HandleFunc("POST /users", createUser)
+        //   http.Handle("/metrics", promhttp.Handler())
+        if (field && (field.text === "HandleFunc" || field.text === "Handle")) {
+          const operandText = operand ? operand.text.trim() : "";
+          const isNativeRouter =
+            operandText === "http" ||
+            operandText === "mux" ||
+            operandText === "r" ||
+            operandText === "router" ||
+            operandText === "srv" ||
+            operandText === "server" ||
+            operandText.toLowerCase().includes("mux") ||
+            operandText.toLowerCase().includes("router") ||
+            routerPrefixes.has(operandText);
+
+          if (isNativeRouter) {
+            const args = node.childForFieldName("arguments");
+            if (args && args.namedChildren.length >= 2) {
+              const patternNode = args.namedChildren[0];
+              const handlerNode = args.namedChildren[1];
+
+              // Skip mount registrations (handled in Pass 1) so they don't produce false route endpoints
+              if (field.text === "Handle") {
+                const isStripPrefix = handlerNode.type === "call_expression" && handlerNode.text.includes("StripPrefix");
+                const isRouterIdentifier = handlerNode.type === "identifier" && routerPrefixes.has(handlerNode.text.trim()) && handlerNode.text.trim() !== operandText;
+                if (isStripPrefix || isRouterIdentifier) {
+                  return;
+                }
+              }
+
+              const patternVal = resolveGoExpressionString(patternNode, fileScopeConstants);
+              if (patternVal !== null) {
+                const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";
+                registerPatternRoute(patternVal, handlerNode, parentPrefix);
+                return;
+              }
+            }
+          }
+        }
+
+        // Framework HTTP Route Registration (Gin, Echo, Chi, Fiber): r.GET("/path", handler...)
         if (field && GO_HTTP_METHODS.has(field.text)) {
           const method = field.text.toUpperCase() as Method;
           const operandText = operand ? operand.text.trim().toLowerCase() : "";
@@ -1481,7 +2118,7 @@ export function extractGoRoutes(tree: Parser.Tree, filePath: string): OmniRoute[
               const namedArgs = args.namedChildren;
               // Universal invariant: Route registrations MUST have at least 2 arguments: (path, handler)
               if (namedArgs.length >= 2) {
-                const pathVal = getGoLiteralString(namedArgs[0]);
+                const pathVal = resolveGoExpressionString(namedArgs[0], fileScopeConstants);
                 // Universal invariant: First argument MUST be an interpreted or raw string literal
                 if (pathVal !== null) {
                   const parentPrefix = operand ? getReceiverPrefix(operand.text) : "/";

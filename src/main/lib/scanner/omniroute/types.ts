@@ -17,6 +17,7 @@ export type OmniFramework =
   | "aspnet"
   | "spring"
   | "laravel"
+  | "go-http"
   | "custom"
   | "unknown";
 

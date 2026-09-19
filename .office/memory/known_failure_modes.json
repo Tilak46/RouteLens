@@ -1,0 +1,30 @@
+{
+  "$schema": "https://routelens.internal/schemas/failure_modes.json",
+  "version": "1.0.0",
+  "taxonomy": [
+    {
+      "code": "FM-01",
+      "name": "Variable Indirection & Dynamic Paths",
+      "description": "Router methods invoked with variable identifiers rather than string literals (e.g., router.get(path, handler)).",
+      "mitigation": "Intra-procedural symbolic scope evaluation resolving identifier bindings, template literals, and binary concatenation."
+    },
+    {
+      "code": "FM-02",
+      "name": "Multi-Router Star Re-Export Collision",
+      "description": "Exporting multiple routers from index.ts causes sibling routers to cross-contaminate mount prefixes.",
+      "mitigation": "Track prefix bindings by exact router identifier `${filePath}:${varName}` in SymbolicMountLinker."
+    },
+    {
+      "code": "FM-03",
+      "name": "Native File-Based Routing Omission",
+      "description": "Assuming all frameworks use explicit router.method() calls, missing file-based dispatchers or native scripts.",
+      "mitigation": "Classifier detects native directory conventions or array dispatchers ($routes = [...])."
+    },
+    {
+      "code": "FM-04",
+      "name": "WASM Memory Leak on Early Exit",
+      "description": "Tree-sitter CST parser tree not deleted if function returns early or throws.",
+      "mitigation": "Mandatory try ... finally blocks wrapping tree.delete()."
+    }
+  ]
+}

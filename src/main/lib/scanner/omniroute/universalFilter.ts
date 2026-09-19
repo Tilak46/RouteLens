@@ -46,7 +46,6 @@ export const UNIVERSAL_IGNORED_DIRECTORIES = new Set([
   // Go / PHP / Ruby
   "vendor",
   ".bundle",
-  "pkg",
   // Build outputs & coverage
   "dist",
   "build",
@@ -270,8 +269,14 @@ export function isCandidateFilePath(filePath: string, rootPath: string): boolean
   const segments = rel.split("/");
 
   // Check if inside any ignored directory
-  for (const seg of segments) {
+  for (let i = 0; i < segments.length - 1; i++) {
+    const seg = segments[i];
     if (IGNORED_DIRECTORY_SEGMENTS.has(seg)) {
+      // Build output folders (dist, build, out) are only ignored at project/monorepo root.
+      // If a nested module is named "build" (e.g. router/build/build.go), it is a feature package.
+      if ((seg === "build" || seg === "dist" || seg === "out") && i > 1) {
+        continue;
+      }
       return false;
     }
   }
