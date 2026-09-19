@@ -1063,7 +1063,7 @@ function MethodBadge({ method }: { method: string }) {
     <span
       data-tree-lead="badge"
       className={cn(
-        "text-[9.5px] font-semibold min-w-[26px] shrink-0 text-right tracking-tight inline-block select-none",
+        "text-[9.5px] font-semibold w-7 shrink-0 text-center tracking-tight inline-block select-none",
         colors[raw] || colors[formatted] || "text-gray-400",
       )}
       title={raw}
