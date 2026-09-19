@@ -490,9 +490,15 @@ export function computeRouteDisplayName(args: {
  * - Dynamic parameters never become physical folders.
  * - Single-child passthrough wrappers are squashed.
  * - Standalone routes are categorized into their domain folder.
- * - Sibling name collisions are resolved deterministically.
+ * * Sibling name collisions are resolved deterministically.
  */
+import { synthesizeApiCollection } from "../main/lib/collectionEngine";
+
 export function buildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
+  return synthesizeApiCollection(routes);
+}
+
+export function legacyBuildTreeFromRoutePaths(routes: ApiRoute[]): ApiFolder[] {
   const root: ApiFolder = { id: "root", name: "root", children: [] };
 
   // Count true root routes (e.g. /, /api where segments.length === 0)

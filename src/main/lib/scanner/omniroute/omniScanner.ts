@@ -22,8 +22,13 @@ async function collectAllFiles(
       if (fileList.length >= 20000 || abortSignal?.aborted) break;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (UNIVERSAL_IGNORED_DIRECTORIES.has(entry.name.toLowerCase())) {
-          continue;
+        const dirName = entry.name.toLowerCase();
+        if (UNIVERSAL_IGNORED_DIRECTORIES.has(dirName)) {
+          if ((dirName === "build" || dirName === "dist" || dirName === "out") && depth > 1) {
+            // Nested feature folder (e.g. router/build/build.go), not a top-level build artifact
+          } else {
+            continue;
+          }
         }
         await collectAllFiles(fullPath, rootPath, fileList, depth + 1, abortSignal, onHeartbeat);
       } else if (entry.isFile()) {

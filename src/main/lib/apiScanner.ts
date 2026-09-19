@@ -2,7 +2,8 @@ import path from "node:path";
 import { ApiFolder, ApiRoute } from "../../types";
 import { scanOmniRoutes } from "./scanner/omniroute";
 import type { OmniRoute } from "./scanner/omniroute/types";
-import { buildTreeFromRoutePaths, computeRouteDisplayName } from "../../shared/apiTree";
+import { computeRouteDisplayName } from "../../shared/apiTree";
+import { synthesizeApiCollection } from "./collectionEngine";
 import { maybeApplyAiRouteNames } from "./apiExplorer/aiRouteNaming";
 
 function mapOmniToApiRoute(
@@ -102,7 +103,7 @@ export async function scanProjectForRoutes(
         projectPath,
       });
 
-      const tree = buildTreeFromRoutePaths(namedRoutes);
+      const tree = synthesizeApiCollection(namedRoutes, { repoRoot: projectPath });
 
       return { 
         tree, 

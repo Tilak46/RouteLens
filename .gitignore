@@ -42,6 +42,9 @@ win-unpacked/
 *_scan_results.json
 scan_results.json
 *_results.json
+*-results.json
+**/*_results.json
+**/*-results.json
 
 # Scratch files
 scratch/
