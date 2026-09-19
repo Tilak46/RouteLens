@@ -98,16 +98,13 @@ function SortableTab({
         onContextMenu(tab.id, e.clientX, e.clientY);
       }}
       className={cn(
-        "group h-7 px-2.5 rounded-md flex items-center gap-2 cursor-pointer transition-all duration-150 shrink-0 select-none text-xs font-medium relative",
+        "group h-8 px-3 rounded-t-md border-t border-l border-r flex items-center gap-2 cursor-pointer transition-all duration-150 shrink-0 select-none text-xs font-medium relative top-[1px]",
         isActive
-          ? "bg-white/[0.06] text-foreground"
-          : "text-muted-foreground/70 hover:text-foreground hover:bg-white/[0.03]",
-        isDragging && "opacity-75 scale-[0.98]"
+          ? "bg-[var(--bg-primary)] border-white/[0.08] text-foreground"
+          : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5",
+        isDragging && "shadow-md"
       )}
     >
-      {isActive && (
-        <span className="absolute top-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
-      )}
       <span
         className={cn("font-bold text-[9.5px] w-7 shrink-0 text-center tracking-tight inline-block select-none", colorClass)}
         title={tab.method}
@@ -260,7 +257,7 @@ export function WorkspaceTabs({
   }
 
   return (
-    <div className="h-10 bg-[var(--bg-secondary)] border-b border-white/[0.04] flex items-center justify-between px-2 shrink-0 select-none z-15 relative">
+    <div className="h-10 bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between px-2 shrink-0 select-none z-15 relative">
       {/* Scrollable Tabs List on Left */}
       <DndContext
         sensors={sensors}
@@ -270,7 +267,7 @@ export function WorkspaceTabs({
         <div
           ref={tabsContainerRef}
           onWheel={handleWheel}
-          className="flex-1 flex items-center overflow-x-auto overflow-y-hidden h-full gap-1 pr-2 tabs-scroll"
+          className="flex-1 flex items-center overflow-x-auto overflow-y-hidden h-full pt-1.5 pr-2 tabs-scroll"
         >
           <SortableContext
             items={tabs.map((t) => t.id)}

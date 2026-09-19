@@ -112,7 +112,7 @@ export function DashboardLayout({
         {/* TOP TITLEBAR STRIP */}
         <header
           style={{ height: "42px", WebkitAppRegion: "drag" } as React.CSSProperties}
-          className="w-full bg-[var(--bg-secondary)] border-b border-white/[0.04] flex items-center justify-between px-3 shrink-0 select-none z-50"
+          className="w-full bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between px-3 shrink-0 select-none z-50"
         >
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             <img src={logoImg} alt="RouteLens" className="w-3.5 h-3.5 object-contain rounded" />
@@ -147,7 +147,7 @@ export function DashboardLayout({
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* 1. LEFT NARROW ICON TOOLBAR */}
-          <div className="w-12 bg-[var(--bg-secondary)] border-r border-white/[0.04] flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
+          <div className="w-12 bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
             <div className="flex flex-col items-center gap-4 w-full">
             {/* Tabs */}
             <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
@@ -222,7 +222,7 @@ export function DashboardLayout({
         {/* 2. SECONDARY COLLAPSIBLE SIDEBAR */}
         <aside
           className={cn(
-            "bg-[var(--bg-secondary)] border-r border-white/[0.04] flex flex-col shrink-0 relative z-30 isolate transform-gpu",
+            "bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col shrink-0 relative z-30 isolate transform-gpu",
             isSidebarExpanded ? "" : "w-0 border-r-0 transition-all duration-300"
           )}
           style={isSidebarExpanded ? { width: `${sidebarWidth || 256}px`, transform: "translateZ(0)" } : undefined}
@@ -230,7 +230,7 @@ export function DashboardLayout({
           {isSidebarExpanded && (
             <div className="flex flex-col h-full overflow-hidden">
               {/* Sidebar Header: height h-10 and border-b matching request tabs bar */}
-              <div className="h-10 px-3 bg-[var(--bg-secondary)] border-b border-white/[0.04] flex items-center justify-between shrink-0 select-none">
+              <div className="h-10 px-3 bg-[var(--bg-secondary)] border-b border-white/[0.06] flex items-center justify-between shrink-0 select-none">
                 <div className="flex-1 min-w-0 pr-2">
                   {sidebarHeader || (
                     <span className="text-[12px] font-medium tracking-wide text-foreground/80">
@@ -271,7 +271,7 @@ export function DashboardLayout({
               <TooltipTrigger asChild>
                 <button
                   onClick={onToggleSidebar}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[#121214] border border-l-0 border-white/[0.05] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] h-14 w-3.5 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-[#121214] border border-l-0 border-white/[0.08] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] h-14 w-3.5 flex items-center justify-center rounded-r-md transition-all shadow-lg z-30 cursor-pointer group"
                 >
                   <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                 </button>

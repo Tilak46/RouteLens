@@ -2246,7 +2246,7 @@ function App() {
                   <div
                     onMouseDown={startRequestResize}
                     onDoubleClick={resetRequestSplit}
-                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-white/[0.04]"
+                    className="h-[6px] hover:bg-primary/50 active:bg-primary/70 cursor-row-resize transition-colors shrink-0 z-30 border-y border-white/[0.06]"
                     title="Drag to resize panels (Double-click to reset 50/50)"
                   />
 
