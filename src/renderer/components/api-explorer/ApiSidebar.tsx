@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, Edit2, Trash, MoreHorizontal, Plus, Home, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiFolder, ApiRoute, isRoute } from "../../../types";
@@ -72,8 +72,34 @@ export function Sidebar({
   onCloseProject,
   onRemoveProject,
 }: SidebarProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [treePaths, setTreePaths] = useState<{ id: string; d: string }[]>([]);
   const [isDragOverRoot, setIsDragOverRoot] = useState(false);
   const [deleteConfirmNode, setDeleteConfirmNode] = useState<{ id: string; name: string; isFolder: boolean } | null>(null);
+
+  const updatePaths = useCallback(() => {
+    if (!containerRef.current) return;
+    const computed = computeTreePaths(
+      containerRef.current,
+      tree,
+      rootProjectName,
+      expandedFolderIds
+    );
+    setTreePaths(computed);
+  }, [tree, rootProjectName, expandedFolderIds]);
+
+  useLayoutEffect(() => {
+    updatePaths();
+  }, [updatePaths]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(() => {
+      updatePaths();
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [updatePaths]);
 
   const renderedTree = tree.map((node) => (
     <TreeNode
@@ -107,6 +133,7 @@ export function Sidebar({
 
   return (
     <div
+      ref={containerRef}
       onDragOver={(e) => {
         e.preventDefault();
       }}
@@ -132,15 +159,34 @@ export function Sidebar({
         isDragOverRoot && "border-dashed border-primary/40 bg-primary/5"
       )}
     >
+      {/* Master Unified SVG Tree Overlay - One Single Piece */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible">
+        {treePaths.map((p) => (
+          <path
+            key={p.id}
+            d={p.d}
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            className="text-white/[0.08]"
+          />
+        ))}
+      </svg>
+
       {rootProjectName ? (
         <div className="space-y-0.5">
           {/* Permanent Non-collapsible Root Project Folder */}
           <div
-            className="group flex items-center justify-between py-1 px-1.5 text-[12px] text-foreground/90 font-medium rounded-md select-none hover:bg-white/[0.03] transition-colors relative"
+            data-tree-id="__root__"
+            className="group flex items-center justify-between py-1 text-[12px] text-foreground/90 font-medium rounded-md select-none hover:bg-white/[0.03] transition-colors relative"
+            style={{ paddingLeft: 2 }}
             title={`Root: ${rootProjectName}`}
           >
             <div className="flex items-center gap-1.5 min-w-0 pr-2">
               <svg
+                data-tree-lead="root-icon"
                 width="14"
                 height="14"
                 viewBox="0 0 16 16"
@@ -231,12 +277,7 @@ export function Sidebar({
           </div>
 
           {/* Root Children */}
-          <div className="relative space-y-0.5">
-            {/* Vertical Hierarchy Indent Guide Line from Root */}
-            <div
-              className="absolute top-0 bottom-2 w-[1px] bg-white/[0.04] group-hover/sidebar:bg-white/[0.08] pointer-events-none transition-colors duration-150"
-              style={{ left: "13px" }}
-            />
+          <div className="relative">
             {renderedTree}
           </div>
         </div>
@@ -286,6 +327,130 @@ export function Sidebar({
       </AlertDialog>
     </div>
   );
+}
+
+const TREE_INDENT = 16;
+const TREE_INDENT_OFFSET = 8.5;
+
+function computeTreePaths(
+  container: HTMLElement,
+  tree: (ApiFolder | ApiRoute)[],
+  rootProjectName?: string,
+  expandedFolderIds: string[] = []
+): { id: string; d: string }[] {
+  const containerRect = container.getBoundingClientRect();
+  const elements = container.querySelectorAll<HTMLElement>("[data-tree-id]");
+  const elementMap = new Map<string, HTMLElement>();
+  elements.forEach((el) => {
+    const id = el.dataset.treeId;
+    if (id) elementMap.set(id, el);
+  });
+
+  const getNodePos = (id: string) => {
+    const el = elementMap.get(id);
+    if (!el) return null;
+    const elRect = el.getBoundingClientRect();
+
+    const leadEl = el.querySelector<HTMLElement>("[data-tree-lead]");
+    const leadRect = leadEl ? leadEl.getBoundingClientRect() : elRect;
+    const leadType = leadEl?.dataset.treeLead;
+
+    // Trunk X: exact horizontal center of the parent's leading icon/chevron relative to container
+    const trunkX = Math.round((leadRect.left - containerRect.left + leadRect.width / 2) * 2) / 2;
+
+    // Start Y: right at the visible bottom tip of the glyph
+    let startY = Math.round(leadRect.bottom - containerRect.top);
+    if (leadType === "chevron-down") {
+      startY = Math.round(leadRect.top - containerRect.top + (15 / 24) * leadRect.height + 0.5);
+    } else if (leadType === "root-icon") {
+      startY = Math.round(leadRect.top - containerRect.top + (14 / 16) * leadRect.height + 0.5);
+    }
+
+    // Row vertical center for horizontal branch landing
+    const y = Math.round(elRect.top - containerRect.top + elRect.height / 2);
+
+    // Branch Target X: snaps directly to the visible stroke of the leading element
+    let branchTargetX = Math.round(leadRect.left - containerRect.left);
+    if (leadType === "chevron-down") {
+      branchTargetX = Math.round(leadRect.left - containerRect.left + (6 / 24) * leadRect.width);
+    } else if (leadType === "chevron-right") {
+      branchTargetX = Math.round(leadRect.left - containerRect.left + (9 / 24) * leadRect.width);
+    } else if (leadType === "badge") {
+      branchTargetX = Math.round(leadRect.left - containerRect.left - 2);
+    }
+
+    return { trunkX, startY, y, branchTargetX };
+  };
+
+  const R = 7;
+  const paths: { id: string; d: string }[] = [];
+
+  const buildBranchPath = (parentId: string, children: (ApiFolder | ApiRoute)[]) => {
+    const parentPos = getNodePos(parentId);
+    if (!parentPos) return null;
+
+    const validChildren: { trunkX: number; startY: number; y: number; branchTargetX: number }[] = [];
+    for (const child of children) {
+      const pos = getNodePos(child.id);
+      if (pos) validChildren.push(pos);
+    }
+
+    if (validChildren.length === 0) return null;
+
+    const trunkX = parentPos.trunkX;
+    const startY = parentPos.startY;
+    const lastChild = validChildren[validChildren.length - 1];
+
+    const maxR_last = Math.min(
+      R,
+      Math.max(2, lastChild.branchTargetX - trunkX),
+      Math.max(2, (lastChild.y - startY) / 2)
+    );
+
+    // Continuous trunk running straight from start down to last child with smooth curve termination
+    let d = `M ${trunkX} ${startY} L ${trunkX} ${lastChild.y - maxR_last} Q ${trunkX} ${lastChild.y} ${trunkX + maxR_last} ${lastChild.y} L ${lastChild.branchTargetX} ${lastChild.y} `;
+
+    // Seamless curved branches for each intermediate child branching off the vertical trunk
+    for (let i = 0; i < validChildren.length - 1; i++) {
+      const c = validChildren[i];
+      const branchR = Math.min(
+        R,
+        Math.max(2, c.branchTargetX - trunkX),
+        Math.max(2, (c.y - startY) / 2)
+      );
+      d += `M ${trunkX} ${c.y - branchR} Q ${trunkX} ${c.y} ${trunkX + branchR} ${c.y} L ${c.branchTargetX} ${c.y} `;
+    }
+
+    return d;
+  };
+
+  // 1. Root project connection
+  if (rootProjectName && tree.length > 0) {
+    const d = buildBranchPath("__root__", tree);
+    if (d) {
+      paths.push({ id: "__root__", d });
+    }
+  }
+
+  // 2. Recursive traversal for open folders
+  const traverse = (nodes: (ApiFolder | ApiRoute)[]) => {
+    for (const node of nodes) {
+      if (!isRoute(node) && Array.isArray(node.children)) {
+        const isOpen = expandedFolderIds.includes(node.id);
+        if (isOpen && node.children.length > 0) {
+          const d = buildBranchPath(node.id, node.children);
+          if (d) {
+            paths.push({ id: node.id, d });
+          }
+          traverse(node.children);
+        }
+      }
+    }
+  };
+
+  traverse(tree);
+
+  return paths;
 }
 
 type TreeNodeProps = {
@@ -358,12 +523,13 @@ export function TreeNode({
     }
   }, [isRenaming]);
   
-  const paddingLeft = level * 14 + 2; // Tightened indent
+  const paddingLeft = level * TREE_INDENT + 2;
 
   if (isRoute(node)) {
     const isSelected = selectedKey === node.id || selectedKey === toRouteKey(node);
     return (
       <div
+        data-tree-id={node.id}
         draggable={!isRenaming}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", node.id);
@@ -590,6 +756,7 @@ export function TreeNode({
   return (
     <div className="group/node relative">
       <div
+        data-tree-id={node.id}
         draggable={!isRenaming}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", node.id);
@@ -655,7 +822,7 @@ export function TreeNode({
           }
         }}
         className={cn(
-          "group flex items-center gap-1.5 py-1 pr-2 text-[12px] text-foreground/75 hover:text-foreground hover:bg-white/[0.04] rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
+          "group flex items-center gap-1 py-1 pr-2 text-[12px] text-foreground/75 hover:text-foreground hover:bg-white/[0.04] rounded-md cursor-pointer select-none relative border border-transparent transition-all duration-150",
           "hover:pr-8 data-[menu-open=true]:pr-8",
           dragOverPosition === "inside" && "bg-primary/10 border-primary/20 text-foreground"
         )}
@@ -675,9 +842,9 @@ export function TreeNode({
         )}
 
         {isOpen ? (
-          <ChevronDown size={13} className="text-muted-foreground shrink-0" />
+          <ChevronDown data-tree-lead="chevron-down" size={13} className="text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight size={13} className="text-muted-foreground shrink-0" />
+          <ChevronRight data-tree-lead="chevron-right" size={13} className="text-muted-foreground shrink-0" />
         )}
         {isOpen ? (
           /* Open Folder Outline - Smooth rounded corners */
@@ -839,11 +1006,6 @@ export function TreeNode({
       </div>
       {isOpen && (
         <div className="relative">
-          {/* Vertical Hierarchy Indent Guide Line */}
-          <div
-            className="absolute top-0 bottom-3 w-[1px] bg-white/[0.04] group-hover/sidebar:bg-white/[0.08] group-hover/node:!bg-white/15 pointer-events-none transition-colors duration-150"
-            style={{ left: `${level * 14 + 8}px` }}
-          />
           {node.children.map((child) => (
             <TreeNode
               key={child.id}
@@ -899,6 +1061,7 @@ function MethodBadge({ method }: { method: string }) {
 
   return (
     <span
+      data-tree-lead="badge"
       className={cn(
         "text-[9.5px] font-semibold min-w-[26px] shrink-0 text-right tracking-tight inline-block select-none",
         colors[raw] || colors[formatted] || "text-gray-400",

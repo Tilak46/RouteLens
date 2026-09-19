@@ -195,7 +195,7 @@ export function EnvironmentEditorView({
   }, [environment.variables, q]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background overflow-hidden select-none">
+    <div className="flex-1 flex flex-col h-full bg-[var(--bg-primary)] overflow-hidden select-none">
       {/* 1. TOP HEADER & METADATA */}
       <div className="px-6 py-4 border-b border-border/80 shrink-0 bg-card/10 space-y-3">
         <div className="flex items-center justify-between">
