@@ -2,10 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { OmniRoute, OmniScanResult, FileCandidate } from "./types";
+import type { ScanProgressUpdate } from "../../../../types";
 import { isCandidateFilePath, analyzeRouteCandidate, UNIVERSAL_IGNORED_DIRECTORIES } from "./universalFilter";
 import { extractRoutesWithTreeSitter } from "./treeSitterEngine";
 import { SymbolicMountLinker } from "./mountLinker";
 import { isLocalAiAvailable, extractRoutesWithAI } from "./localAiEngine";
+import { PolyglotFactoryRouteResolver } from "./factoryRouteResolver";
 
 async function collectAllFiles(
   dir: string,
@@ -39,7 +41,7 @@ async function collectAllFiles(
     }
     onHeartbeat?.();
   } catch {
-    // Ignore read errors
+    // Ignore permissions / inaccessible directory errors cleanly
   }
   return fileList;
 }
@@ -51,6 +53,7 @@ export interface OmniScanOptions {
   mode?: "hybrid" | "ast" | "ai";
   abortSignal?: AbortSignal;
   onHeartbeat?: () => void;
+  onProgress?: (progress: ScanProgressUpdate) => void;
   perFileTimeoutMs?: number;
 }
 
@@ -63,24 +66,59 @@ export async function scanOmniRoutes(
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
 
+  let lastProgressTime = 0;
+  const emitProgress = (
+    phase: ScanProgressUpdate["phase"],
+    percent: number,
+    message: string,
+    current: number,
+    total: number,
+    routesFound: number,
+    currentFile?: string,
+    force = false,
+  ) => {
+    const now = Date.now();
+    if (force || now - lastProgressTime >= 80) {
+      lastProgressTime = now;
+      options.onProgress?.({
+        projectPath,
+        phase,
+        percent,
+        message,
+        current,
+        total,
+        routesFound,
+        currentFile,
+      });
+    }
+  };
+
   const mode = options.mode || (options.enableAi === false ? "ast" : "hybrid");
   const enableAi = mode === "ai" || (mode === "hybrid" && options.enableAi !== false);
   const maxAiRescues = options.maxAiRescues || 10;
   const includeTests = options.includeTests === true;
 
   log(`[OmniRoute] Initiating universal scan (mode: ${mode}) on: ${rootPath}`);
+  emitProgress("discovering", 2, "Indexing project source files...", 0, 0, 0, undefined, true);
 
   // Step 1: Collect and read all candidate code files
+  const tCollect = performance.now();
   const filePaths = await collectAllFiles(rootPath, rootPath, [], 0, options.abortSignal, options.onHeartbeat);
-  log(`[OmniRoute] Found ${filePaths.length} supported source files.`);
+  log(`[OmniRoute] Found ${filePaths.length} supported source files in ${Math.round(performance.now() - tCollect)}ms.`);
 
   const fileCodeMap = new Map<string, string>();
   const candidateFiles: FileCandidate[] = [];
 
+  const tRead = performance.now();
+  let readFileCount = 0;
   for (const f of filePaths) {
     if (options.abortSignal?.aborted) {
       log(`[OmniRoute] Scan cancelled by user during file collection.`);
       break;
+    }
+    readFileCount++;
+    if (readFileCount % 50 === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
     }
     try {
       const content = await fs.promises.readFile(f, "utf-8");
@@ -94,13 +132,25 @@ export async function scanOmniRoutes(
       // Ignore read errors
     }
     options.onHeartbeat?.();
+    const pct = Math.min(25, Math.round((readFileCount / Math.max(1, filePaths.length)) * 25));
+    emitProgress(
+      "discovering",
+      pct,
+      `Scanning source files (${readFileCount}/${filePaths.length})...`,
+      readFileCount,
+      filePaths.length,
+      0,
+      path.relative(rootPath, f).replace(/\\/g, "/"),
+    );
   }
-
-  log(`[OmniRoute] Identified ${candidateFiles.length} backend candidate route files via universal invariant filter.`);
+  log(`[OmniRoute] Read ${filePaths.length} files & identified ${candidateFiles.length} candidate files in ${Math.round(performance.now() - tRead)}ms.`);
 
   // Step 2: Build Symbolic Mount Table across the project
+  emitProgress("linking", 30, "Mapping controller mount hierarchy...", candidateFiles.length, candidateFiles.length, 0, undefined, true);
+  const tMount = performance.now();
   const mountLinker = new SymbolicMountLinker();
   await mountLinker.buildMountTable(fileCodeMap, projectPath);
+  log(`[OmniRoute] Mount table built in ${Math.round(performance.now() - tMount)}ms.`);
 
   const allRoutes: OmniRoute[] = [];
   const rescueCandidates: FileCandidate[] = [];
@@ -150,10 +200,17 @@ export async function scanOmniRoutes(
     }
   } else {
     // Mode A (AST) or Hybrid: Run Tree-sitter Universal AST with Per-File Isolation
+    const tExtract = performance.now();
+    let extractCount = 0;
     for (const candidate of candidateFiles) {
       if (options.abortSignal?.aborted) {
         log(`[OmniRoute] Scan cancelled by user.`);
         break;
+      }
+
+      extractCount++;
+      if (extractCount % 5 === 0) {
+        await new Promise((resolve) => setImmediate(resolve));
       }
 
       try {
@@ -168,10 +225,34 @@ export async function scanOmniRoutes(
         log(`[OmniRoute] Skipped candidate file ${candidate.relativePath}: ${err?.message || err}`);
       } finally {
         options.onHeartbeat?.();
+        const pct = Math.min(85, 35 + Math.round((extractCount / Math.max(1, candidateFiles.length)) * 50));
+        emitProgress(
+          "parsing",
+          pct,
+          `Parsing endpoints in ${candidate.relativePath} (${extractCount}/${candidateFiles.length})...`,
+          extractCount,
+          candidateFiles.length,
+          allRoutes.length,
+          candidate.relativePath,
+        );
       }
     }
 
-    log(`[OmniRoute AST] Tree-sitter AST discovered ${astMatchedCount} routes across syntax trees.`);
+    log(`[OmniRoute AST] Tree-sitter AST discovered ${astMatchedCount} routes across syntax trees in ${Math.round(performance.now() - tExtract)}ms.`);
+
+    // Step 4: Layer 2 - Polyglot Factory Route Resolution
+    emitProgress("factory", 90, "Synthesizing dynamic factory routes...", candidateFiles.length, candidateFiles.length, allRoutes.length, undefined, true);
+    const tFactory = performance.now();
+    try {
+      const factoryResolver = new PolyglotFactoryRouteResolver();
+      const factoryRoutes = await factoryResolver.resolveAll(candidateFiles, fileCodeMap, rootPath);
+      if (factoryRoutes.length > 0) {
+        log(`[OmniRoute Factory] Layer 2 synthesized ${factoryRoutes.length} factory-generated routes in ${Math.round(performance.now() - tFactory)}ms.`);
+        allRoutes.push(...factoryRoutes);
+      }
+    } catch (err: any) {
+      log(`[OmniRoute Factory] Layer 2 resolution error: ${err?.message || err}`);
+    }
 
     // If hybrid, rescue ambiguous files
     if (mode === "hybrid" && enableAi && rescueCandidates.length > 0) {
@@ -211,8 +292,11 @@ export async function scanOmniRoutes(
     }
   }
 
+  emitProgress("finalizing", 98, "Organizing endpoint hierarchy...", candidateFiles.length, candidateFiles.length, uniqueRoutes.length, undefined, true);
+
   const durationMs = Math.round(performance.now() - startTime);
   log(`[OmniRoute] Scan complete in ${durationMs}ms: ${uniqueRoutes.length} total unique routes found (${astMatchedCount} AST, ${aiRescuedCount} AI rescued).`);
+  emitProgress("done", 100, `Complete: ${uniqueRoutes.length} routes detected`, candidateFiles.length, candidateFiles.length, uniqueRoutes.length, undefined, true);
 
   return {
     routes: uniqueRoutes,

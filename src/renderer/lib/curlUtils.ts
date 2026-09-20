@@ -28,17 +28,25 @@ export function buildFullUrl(
     cleanUrl = `http://${cleanUrl}`;
   }
 
-  // Substitute path variables (:id, {id})
+  // Substitute path variables (:id, {id}, <id>, [id])
   if (Array.isArray(pathVariables)) {
     for (const pv of pathVariables) {
       if (!pv || pv.enabled === false) continue;
       const key = String(pv.key || "").trim();
-      if (!key) continue;
-      const val = pv.value !== undefined && pv.value !== "" ? encodeURIComponent(String(pv.value)) : "";
+      const rawVal = String(pv.value);
+      const val = pv.value !== undefined && pv.value !== ""
+        ? rawVal.split("/").map(encodeURIComponent).join("/")
+        : "";
       if (val) {
         const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         cleanUrl = cleanUrl.replace(new RegExp(`:${escapedKey}(?=[/?#]|$)`, "g"), val);
-        cleanUrl = cleanUrl.replace(new RegExp(`\\{${escapedKey}\\}`, "g"), val);
+        cleanUrl = cleanUrl.replace(new RegExp(`\\{${escapedKey}(\\:[^}]+)?\\}`, "g"), val);
+        cleanUrl = cleanUrl.replace(new RegExp(`<([^>]+:)?${escapedKey}>`, "g"), val);
+        cleanUrl = cleanUrl.replace(new RegExp(`\\[+(\\.\\.\\.)?${escapedKey}\\]+`, "g"), val);
+        if (pv.rawToken) {
+          const escapedRaw = pv.rawToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          cleanUrl = cleanUrl.replace(new RegExp(escapedRaw, "g"), val);
+        }
       }
     }
   }

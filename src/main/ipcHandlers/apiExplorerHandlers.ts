@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, BrowserWindow } from "electron";
 import { scanProjectForRoutes } from "../lib/apiScanner";
 import {
   ApiFolder,
@@ -33,7 +33,18 @@ export function registerApiExplorerHandlers() {
       activeScanControllers.set(projectPath, controller);
 
       try {
-        const result = await scanProjectForRoutes(projectPath, controller.signal);
+        const result = await scanProjectForRoutes(
+          projectPath,
+          controller.signal,
+          (progress) => {
+            const windows = BrowserWindow.getAllWindows();
+            for (const win of windows) {
+              if (!win.isDestroyed()) {
+                win.webContents.send("api-explorer:scan-progress", progress);
+              }
+            }
+          },
+        );
         return result;
       } catch (err) {
         console.error("Scan failed", err);
@@ -145,6 +156,22 @@ export function registerApiExplorerHandlers() {
       }
       return null;
     },
+  );
+
+  const activeRequests = new Map<string, AbortController>();
+
+  ipcMain.handle(
+    "api-explorer:cancel-request",
+    async (_, requestId: string): Promise<boolean> => {
+      if (!requestId) return false;
+      const controller = activeRequests.get(requestId);
+      if (controller) {
+        controller.abort();
+        activeRequests.delete(requestId);
+        return true;
+      }
+      return false;
+    }
   );
 
   ipcMain.handle(
@@ -366,7 +393,11 @@ export function registerApiExplorerHandlers() {
           }
         }
 
+        const requestId = request.requestId;
         const controller = new AbortController();
+        if (requestId) {
+          activeRequests.set(requestId, controller);
+        }
         const timeoutMs =
           typeof request.timeoutMs === "number" && request.timeoutMs > 0
             ? request.timeoutMs
@@ -383,6 +414,9 @@ export function registerApiExplorerHandlers() {
           } as any);
         } finally {
           clearTimeout(timer);
+          if (requestId) {
+            activeRequests.delete(requestId);
+          }
         }
 
         const bodyText = await res.text();
@@ -431,6 +465,18 @@ export function registerApiExplorerHandlers() {
         };
       } catch (err: any) {
         const ended = performance.now();
+        if (err?.name === "AbortError" || err?.message?.toLowerCase().includes("aborted")) {
+          return {
+            ok: false,
+            status: 0,
+            statusText: "Cancelled",
+            timeMs: Math.round(ended - started),
+            sizeBytes: 0,
+            headers: {},
+            bodyText: "",
+            error: "Request was cancelled",
+          };
+        }
         let errorDetail = "";
         if (err?.cause) {
           const cause = err.cause;

@@ -3,6 +3,9 @@
   $schema: "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   appId: "com.routelens.app",
   asar: true,
+  asarUnpack: [
+    "out/main/**/*",
+  ],
   productName: "RouteLens",
   directories: {
     output: "release/${version}",

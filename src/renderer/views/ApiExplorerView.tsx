@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import apiClient from "@/lib/apiClient";
 import { Sidebar } from "../components/api-explorer/ApiSidebar";
@@ -15,7 +15,7 @@ import {
   Search,
   FolderCode,
 } from "lucide-react";
-import { ApiRoute, ApiFolder, Project, isRoute } from "../../types";
+import { ApiRoute, ApiFolder, Project, isRoute, ScanProgressUpdate } from "../../types";
 
 export type ApiExplorerScanCacheEntry = {
   tree: ApiFolder[];
@@ -303,6 +303,91 @@ export function mergeTrees(userTree: ApiFolder[], scannedTree: ApiFolder[]): Api
 }
 
 // Local storage sync removed. Replaced by generic Electron Store getters/setters.
+
+const SidebarScanProgressCard = React.memo(function SidebarScanProgressCard({
+  projectPath,
+  onCancel,
+}: {
+  projectPath?: string;
+  onCancel?: () => void;
+}) {
+  const [progress, setProgress] = useState<ScanProgressUpdate | null>(null);
+
+  useEffect(() => {
+    const unsub = apiClient.onScanProgress?.((update) => {
+      if (!projectPath || update.projectPath === projectPath) {
+        setProgress(update);
+      }
+    });
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, [projectPath]);
+
+  const percent = Math.min(100, Math.max(progress ? progress.percent : 6, 0));
+
+  return (
+    <div className="mx-1 my-2 p-3 bg-[#12151E] border border-white/[0.08] rounded-xl shadow-lg space-y-2.5 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-300 truncate">
+          <RefreshCw size={11} className="animate-spin text-cyan-400 shrink-0" />
+          <span className="truncate">
+            {progress?.phase === "discovering"
+              ? "Indexing files..."
+              : progress?.phase === "linking"
+              ? "Mapping mounts..."
+              : progress?.phase === "parsing"
+              ? "Analyzing AST..."
+              : progress?.phase === "factory"
+              ? "Resolving factories..."
+              : progress?.phase === "finalizing"
+              ? "Building tree..."
+              : "Scanning endpoints..."}
+          </span>
+        </div>
+        <span className="text-[11px] font-mono font-bold text-cyan-400 tabular-nums">
+          {percent}%
+        </span>
+      </div>
+
+      {/* Progress Bar Track */}
+      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/[0.06] relative">
+        <div
+          className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300 ease-out relative shadow-sm shadow-cyan-400/40"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      {/* Live File & Route Stats */}
+      <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono pt-0.5">
+        <span>
+          {progress && progress.total > 0
+            ? `${progress.current}/${progress.total} files`
+            : "indexing..."}
+        </span>
+        <span className="text-cyan-300 font-semibold">
+          {progress ? `${progress.routesFound} routes` : "0 routes"}
+        </span>
+      </div>
+
+      {progress?.currentFile && (
+        <div className="text-[9.5px] font-mono text-zinc-500 truncate bg-black/30 px-2 py-1 rounded border border-white/[0.04]">
+          {progress.currentFile}
+        </div>
+      )}
+
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="w-full py-1 mt-1 text-[10px] font-medium text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 border border-white/[0.06] hover:border-rose-500/20 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+        >
+          <X size={10} />
+          <span>Cancel Scan</span>
+        </button>
+      )}
+    </div>
+  );
+});
 
 export function ApiExplorerSidebarPanel({
   projects,
@@ -830,9 +915,14 @@ export function ApiExplorerSidebarPanel({
               style={{ transform: "translateZ(0)", willChange: "scroll-position" }}
             >
               {isScanning && scanningProjectId === activeProject?.id ? (
-                <div className="p-4 text-xs text-cyan-400 flex items-center justify-center gap-2">
-                  <RefreshCw size={12} className="animate-spin" /> Scanning endpoints...
-                </div>
+                <SidebarScanProgressCard
+                  projectPath={activeProject?.path}
+                  onCancel={
+                    onCancelScanProject && activeProject
+                      ? () => onCancelScanProject(activeProject)
+                      : undefined
+                  }
+                />
               ) : filteredTree.length > 0 ? (
                 <Sidebar
                   tree={filteredTree}

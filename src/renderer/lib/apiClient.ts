@@ -13,6 +13,7 @@ import type {
   ApiHttpRequest,
   ApiHttpResponse,
   CookieItem,
+  ScanProgressUpdate,
 } from "@/../types"; // Corrected path alias
 
 type GitExecResult = { code: number; stdout: string; stderr: string };
@@ -92,7 +93,9 @@ interface ElectronApi {
     path: string,
   ) => Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number; cancelled?: boolean }>; // API Explorer
   cancelScanProject: (path: string) => Promise<boolean>;
+  onScanProgress?: (callback: (progress: ScanProgressUpdate) => void) => (() => void) | void;
   runApiRequest: (request: ApiHttpRequest) => Promise<ApiHttpResponse>; // API Explorer
+  cancelApiRequest: (requestId: string) => Promise<boolean>;
   detectProjectPort: (path: string) => Promise<number | null>;
 
   // Cookie Management
@@ -309,6 +312,7 @@ const fallbackApi: ElectronApi = {
     console.warn("API not ready");
     return false;
   },
+  onScanProgress: () => () => {},
   runApiRequest: async () => {
     console.warn("API not ready");
     return {
@@ -321,6 +325,10 @@ const fallbackApi: ElectronApi = {
       bodyText: "",
       error: "API not ready (restart the app to load updated preload)",
     };
+  },
+  cancelApiRequest: async () => {
+    console.warn("API not ready");
+    return false;
   },
   detectProjectPort: async () => {
     console.warn("API not ready");
@@ -491,7 +499,7 @@ const fallbackApi: ElectronApi = {
 
 const apiClient: ElectronApi = {
   ...fallbackApi,
-  ...(((window as any).api as Partial<ElectronApi>) ?? {}),
+  ...(typeof window !== "undefined" ? (((window as any).api as Partial<ElectronApi>) ?? {}) : {}),
 } as ElectronApi;
 
 export default apiClient;

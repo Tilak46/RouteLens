@@ -140,8 +140,8 @@ export function initUpdateService(getMainWindow: () => BrowserWindow | null): vo
   const broadcast = (channel: string, ...args: any[]) => {
     try {
       const win = getMainWindow();
-      if (win && !win.isDestroyed()) {
-        win.webContents.send(channel, ...args);
+      if (win && typeof win.isDestroyed === "function" && !win.isDestroyed()) {
+        win.webContents?.send(channel, ...args);
       }
     } catch (e) {
       console.warn(`[UpdateService] Failed to broadcast ${channel}:`, e);

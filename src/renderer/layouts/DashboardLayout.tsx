@@ -15,6 +15,7 @@ import {
   Terminal,
   Lock,
   Ghost,
+  Power,
   SlidersHorizontal,
   Minus,
   Square,
@@ -42,7 +43,59 @@ type DashboardLayoutProps = {
   appVersion?: string;
   updateBanner?: React.ReactNode;
   hasUpdatePending?: boolean;
+  isScanning?: boolean;
 };
+
+type ToolbarButtonProps = {
+  tabId: SidebarTab;
+  icon: React.ElementType;
+  label: string;
+  isActive: boolean;
+  isSidebarExpanded: boolean;
+  onToggleSidebar: () => void;
+  onTabChange: (tab: SidebarTab) => void;
+};
+
+const ToolbarButton = React.memo(function ToolbarButton({
+  tabId,
+  icon: Icon,
+  label,
+  isActive,
+  isSidebarExpanded,
+  onToggleSidebar,
+  onTabChange,
+}: ToolbarButtonProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={() => {
+            if (!isSidebarExpanded) {
+              onToggleSidebar();
+            }
+            onTabChange(tabId);
+          }}
+          className={cn(
+            "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-150 cursor-pointer",
+            isActive
+              ? "bg-white/[0.08] text-foreground"
+              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          )}
+        >
+          <Icon
+            className={cn(
+              "h-4 w-4 transition-transform duration-150",
+              isActive ? "scale-105" : "group-hover:scale-105"
+            )}
+          />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+});
 
 export function DashboardLayout({
   children,
@@ -61,49 +114,8 @@ export function DashboardLayout({
   appVersion,
   updateBanner,
   hasUpdatePending,
+  isScanning,
 }: DashboardLayoutProps) {
-  // Helper for leftmost toolbar icons
-  const ToolbarButton = ({
-    tabId,
-    icon: Icon,
-    label,
-  }: {
-    tabId: SidebarTab;
-    icon: React.ElementType;
-    label: string;
-  }) => {
-    const isActive = activeTab === tabId;
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={() => {
-              if (!isSidebarExpanded) {
-                onToggleSidebar();
-              }
-              onTabChange(tabId);
-            }}
-            className={cn(
-              "group relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-150 cursor-pointer",
-              isActive
-                ? "bg-white/[0.08] text-foreground"
-                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-            )}
-          >
-            <Icon
-              className={cn(
-                "h-4 w-4 transition-transform duration-150",
-                isActive ? "scale-105" : "group-hover:scale-105"
-              )}
-            />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
-          {label}
-        </TooltipContent>
-      </Tooltip>
-    );
-  };
 
   return (
     <TooltipProvider>
@@ -150,8 +162,32 @@ export function DashboardLayout({
           <div className="w-12 bg-[var(--bg-secondary)] border-r border-white/[0.06] flex flex-col justify-between items-center py-3.5 shrink-0 z-30">
             <div className="flex flex-col items-center gap-4 w-full">
             {/* Tabs */}
-            <ToolbarButton tabId="explorer" icon={Compass} label="Backends & APIs" />
-            <ToolbarButton tabId="environments" icon={SlidersHorizontal} label="Environments" />
+            <div className="relative">
+              <ToolbarButton
+                tabId="explorer"
+                icon={Compass}
+                label="Backends & APIs"
+                isActive={activeTab === "explorer"}
+                isSidebarExpanded={isSidebarExpanded}
+                onToggleSidebar={onToggleSidebar}
+                onTabChange={onTabChange}
+              />
+              {isScanning && (
+                <span className="absolute top-1 right-1 flex h-2 w-2 pointer-events-none">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                </span>
+              )}
+            </div>
+            <ToolbarButton
+              tabId="environments"
+              icon={SlidersHorizontal}
+              label="Environments"
+              isActive={activeTab === "environments"}
+              isSidebarExpanded={isSidebarExpanded}
+              onToggleSidebar={onToggleSidebar}
+              onTabChange={onTabChange}
+            />
           </div>
 
           <div className="flex flex-col items-center gap-3 w-full">
@@ -207,10 +243,36 @@ export function DashboardLayout({
               </Tooltip>
             )}
 
+            {/* Dev: Restart App / Power (Development Only) */}
+            {import.meta.env.DEV && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => window.api?.restartApp?.()}
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-200 cursor-pointer group"
+                    title="Dev: Restart App"
+                  >
+                    <Power size={15} className="group-hover:scale-110 transition-transform duration-200" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-amber-300 text-[11px] font-medium shadow-xl px-2 py-1 rounded">
+                  Dev: Restart App
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Settings (Development Only) */}
             {import.meta.env.DEV && (
               <div className="relative">
-                <ToolbarButton tabId="settings" icon={Settings} label="Settings (Dev Only)" />
+                <ToolbarButton
+                  tabId="settings"
+                  icon={Settings}
+                  label="Settings (Dev Only)"
+                  isActive={activeTab === "settings"}
+                  isSidebarExpanded={isSidebarExpanded}
+                  onToggleSidebar={onToggleSidebar}
+                  onTabChange={onTabChange}
+                />
                 {hasUpdatePending && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-background animate-pulse" />
                 )}
