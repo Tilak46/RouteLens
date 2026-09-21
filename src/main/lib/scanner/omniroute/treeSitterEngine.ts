@@ -3,7 +3,7 @@ import fs from "node:fs";
 import Parser from "web-tree-sitter";
 import type { Method } from "../../../types";
 import type { OmniRoute, OmniFramework, FileCandidate } from "./types";
-import { joinUrl, SymbolicMountLinker } from "./mountLinker";
+import { joinUrl, cleanPath, SymbolicMountLinker } from "./mountLinker";
 
 let isParserInitialized = false;
 let initPromise: Promise<void> | null = null;
@@ -11,17 +11,38 @@ const languageCache = new Map<string, Parser.Language>();
 const parserCache = new Map<string, Parser>();
 
 function getTreeSitterWasmPath(): string {
-  const possiblePaths = [
-    // 1. Next to bundled out/main/index.js
-    path.resolve(__dirname, "tree-sitter.wasm"),
-    // 2. In project node_modules from process.cwd()
-    path.resolve(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
-    // 3. In relative paths from out/main or src/main
-    path.resolve(__dirname, "..", "..", "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
-    path.resolve(__dirname, "..", "..", "..", "..", "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+  const dir = __dirname;
+  const unpackedDir = dir.replace("app.asar", "app.asar.unpacked");
+
+  const candidates: string[] = [
+    // 1. Direct in current directory (e.g. out/main or out/main/chunks)
+    path.resolve(dir, "tree-sitter.wasm"),
+    path.resolve(unpackedDir, "tree-sitter.wasm"),
+    // 2. Parent directory (crucial when bundled inside out/main/chunks)
+    path.resolve(dir, "..", "tree-sitter.wasm"),
+    path.resolve(unpackedDir, "..", "tree-sitter.wasm"),
+    // 3. Grandparent directory
+    path.resolve(dir, "..", "..", "tree-sitter.wasm"),
+    path.resolve(unpackedDir, "..", "..", "tree-sitter.wasm"),
   ];
 
-  for (const p of possiblePaths) {
+  if ((process as any).resourcesPath) {
+    const resPath = (process as any).resourcesPath;
+    candidates.push(
+      path.join(resPath, "app.asar.unpacked", "out", "main", "tree-sitter.wasm"),
+      path.join(resPath, "app.asar.unpacked", "out", "main", "chunks", "tree-sitter.wasm"),
+      path.join(resPath, "out", "main", "tree-sitter.wasm"),
+    );
+  }
+
+  // 4. Project node_modules fallbacks (for development or CLI test scripts)
+  candidates.push(
+    path.resolve(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+    path.resolve(dir, "..", "..", "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+    path.resolve(dir, "..", "..", "..", "..", "node_modules", "web-tree-sitter", "tree-sitter.wasm"),
+  );
+
+  for (const p of candidates) {
     if (fs.existsSync(p)) return p;
   }
 
@@ -31,21 +52,42 @@ function getTreeSitterWasmPath(): string {
     if (fs.existsSync(p)) return p;
   } catch {}
 
-  return "tree-sitter.wasm";
+  return path.resolve(unpackedDir, "..", "tree-sitter.wasm");
 }
 
 function getWasmDirectory(): string {
-  const possiblePaths = [
-    // 1. Next to bundled out/main/index.js
-    path.resolve(__dirname, "tree-sitter-wasms"),
-    // 2. In project node_modules from process.cwd()
-    path.resolve(process.cwd(), "node_modules", "tree-sitter-wasms", "out"),
-    // 3. In relative paths from out/main or src/main
-    path.resolve(__dirname, "..", "..", "node_modules", "tree-sitter-wasms", "out"),
-    path.resolve(__dirname, "..", "..", "..", "..", "node_modules", "tree-sitter-wasms", "out"),
+  const dir = __dirname;
+  const unpackedDir = dir.replace("app.asar", "app.asar.unpacked");
+
+  const candidates: string[] = [
+    // 1. Direct in current directory (e.g. out/main or out/main/chunks)
+    path.resolve(dir, "tree-sitter-wasms"),
+    path.resolve(unpackedDir, "tree-sitter-wasms"),
+    // 2. Parent directory (crucial when bundled inside out/main/chunks)
+    path.resolve(dir, "..", "tree-sitter-wasms"),
+    path.resolve(unpackedDir, "..", "tree-sitter-wasms"),
+    // 3. Grandparent directory
+    path.resolve(dir, "..", "..", "tree-sitter-wasms"),
+    path.resolve(unpackedDir, "..", "..", "tree-sitter-wasms"),
   ];
 
-  for (const p of possiblePaths) {
+  if ((process as any).resourcesPath) {
+    const resPath = (process as any).resourcesPath;
+    candidates.push(
+      path.join(resPath, "app.asar.unpacked", "out", "main", "tree-sitter-wasms"),
+      path.join(resPath, "app.asar.unpacked", "out", "main", "chunks", "tree-sitter-wasms"),
+      path.join(resPath, "out", "main", "tree-sitter-wasms"),
+    );
+  }
+
+  // 4. Project node_modules fallbacks (for development or CLI test scripts)
+  candidates.push(
+    path.resolve(process.cwd(), "node_modules", "tree-sitter-wasms", "out"),
+    path.resolve(dir, "..", "..", "node_modules", "tree-sitter-wasms", "out"),
+    path.resolve(dir, "..", "..", "..", "..", "node_modules", "tree-sitter-wasms", "out"),
+  );
+
+  for (const p of candidates) {
     if (fs.existsSync(p)) return p;
   }
 
@@ -55,7 +97,7 @@ function getWasmDirectory(): string {
     if (fs.existsSync(p)) return p;
   } catch {}
 
-  return path.resolve(process.cwd(), "node_modules", "tree-sitter-wasms", "out");
+  return path.resolve(unpackedDir, "..", "tree-sitter-wasms");
 }
 
 function patchTreeSitterCtype(): void {
@@ -406,7 +448,87 @@ export function extractCSharpRoutes(tree: Parser.Tree, filePath: string): OmniRo
 // -------------------------------------------------------------
 // 2. TypeScript & JavaScript (Express, NestJS, Fastify, Hono)
 // -------------------------------------------------------------
-function findChainedBasePath(node: Parser.SyntaxNode | null): { basePath: string; routerVar: string } | null {
+function evaluatePathExpression(
+  node: Parser.SyntaxNode | null | undefined,
+  scopeConstants?: Map<string, string>,
+): string | null {
+  if (!node) return null;
+
+  // 1. Literal string: '/users'
+  if (node.type === "string" || node.type === "string_fragment") {
+    return node.text.replace(/^['"`]|['"`]$/g, "");
+  }
+
+  // 2. Template string: `/users/${id}`
+  if (node.type === "template_string") {
+    let result = "";
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i)!;
+      if (child.type === "string_fragment") {
+        result += child.text;
+      } else if (child.type === "template_substitution") {
+        const expr = child.namedChild(0);
+        if (expr) {
+          const val = evaluatePathExpression(expr, scopeConstants);
+          if (val !== null) {
+            result += val;
+          } else {
+            result += `:${expr.text}`;
+          }
+        }
+      }
+    }
+    if (result && !result.startsWith("/") && result.includes("/")) {
+      result = "/" + result;
+    }
+    return result && result.includes("/") ? result : null;
+  }
+
+  // 3. Binary expression: A + B (string concatenation)
+  if (node.type === "binary_expression") {
+    const op = node.child(1)?.text;
+    if (op === "+") {
+      const leftNode = node.child(0);
+      const rightNode = node.child(2);
+      const leftVal = leftNode ? evaluatePathExpression(leftNode, scopeConstants) : null;
+      const rightVal = rightNode ? evaluatePathExpression(rightNode, scopeConstants) : null;
+
+      if (leftVal !== null && rightVal !== null) {
+        return cleanPath(leftVal + rightVal);
+      }
+      if (rightVal !== null && (rightVal.startsWith("/") || !leftVal)) {
+        return cleanPath(rightVal);
+      }
+      if (leftVal !== null && (leftVal.startsWith("/") || !rightVal)) {
+        return cleanPath(leftVal);
+      }
+    }
+  }
+
+  // 4. Ternary / conditional expression: cond ? consequence : alternative
+  if (node.type === "ternary_expression" || node.type === "conditional_expression") {
+    const consequence = node.childForFieldName("consequence") || node.child(2);
+    const alternative = node.childForFieldName("alternative") || node.child(4);
+    return (
+      evaluatePathExpression(consequence, scopeConstants) ||
+      evaluatePathExpression(alternative, scopeConstants)
+    );
+  }
+
+  // 5. Identifier in local scope constants: const API = '/api'
+  if (node.type === "identifier") {
+    if (scopeConstants && scopeConstants.has(node.text)) {
+      return scopeConstants.get(node.text)!;
+    }
+  }
+
+  return null;
+}
+
+function findChainedBasePath(
+  node: Parser.SyntaxNode | null,
+  scopeConstants?: Map<string, string>,
+): { basePath: string; routerVar: string } | null {
   let curr: Parser.SyntaxNode | null = node;
   while (curr && curr.type === "call_expression") {
     const fn = curr.childForFieldName("function");
@@ -418,9 +540,10 @@ function findChainedBasePath(node: Parser.SyntaxNode | null): { basePath: string
         if (args && args.childCount > 0) {
           for (let i = 0; i < args.childCount; i++) {
             const arg = args.child(i)!;
-            if (arg.type === "string" || arg.type === "template_string") {
+            const pathVal = evaluatePathExpression(arg, scopeConstants);
+            if (pathVal) {
               return {
-                basePath: arg.text.replace(/^['"`]|['"`]$/g, ""),
+                basePath: pathVal.startsWith("/") ? pathVal : "/" + pathVal,
                 routerVar: obj ? obj.text : "router",
               };
             }
@@ -494,6 +617,211 @@ export function resolveNextJsRoutePath(filePath: string): { routePath: string; f
   return null;
 }
 
+const VALID_HTTP_METHODS = new Set<Method>(["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]);
+
+function extractNextPagesMethods(tree: Parser.Tree): Method[] {
+  const detected = new Set<Method>();
+
+  walkTree(tree.rootNode, (node) => {
+    // 1. switch_statement on req.method or method
+    if (node.type === "switch_statement") {
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i)!;
+        if (child.type === "switch_body") {
+          for (let j = 0; j < child.childCount; j++) {
+            const caseNode = child.child(j)!;
+            if (caseNode.type === "switch_case") {
+              const valNode = caseNode.childForFieldName("value");
+              if (valNode) {
+                const valText = valNode.text.replace(/^['"`]|['"`]$/g, "").toUpperCase();
+                if (VALID_HTTP_METHODS.has(valText as Method)) {
+                  detected.add(valText as Method);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. binary_expression: (method === 'POST' or req.method === 'POST' or method !== 'POST')
+    if (node.type === "binary_expression") {
+      const op = node.child(1)?.text;
+      const left = node.child(0);
+      const right = node.child(2);
+      if (left && right && (op === "===" || op === "==" || op === "!==" || op === "!=")) {
+        const leftText = left.text;
+        const rightText = right.text.replace(/^['"`]|['"`]$/g, "").toUpperCase();
+        const leftIsVar = leftText === "method" || leftText.endsWith(".method") || leftText === "req.method";
+        const rightIsVar = rightText === "method" || rightText.endsWith(".method") || rightText === "req.method";
+
+        if (leftIsVar && VALID_HTTP_METHODS.has(rightText as Method)) {
+          detected.add(rightText as Method);
+        } else if (rightIsVar) {
+          const lVal = leftText.replace(/^['"`]|['"`]$/g, "").toUpperCase();
+          if (VALID_HTTP_METHODS.has(lVal as Method)) {
+            detected.add(lVal as Method);
+          }
+        }
+      }
+    }
+
+    // 3. call_expression:
+    // a) res.setHeader('Allow', ['GET', 'POST']) or res.setHeader('Allow', 'GET, POST')
+    // b) router chaining (next-connect / createRouter): .get(...), .post(...), .delete(...)
+    // c) array inclusion: ['GET', 'POST'].includes(req.method)
+    if (node.type === "call_expression") {
+      const fn = node.childForFieldName("function") || node.child(0);
+      if (fn && fn.type === "member_expression") {
+        const prop = fn.childForFieldName("property") || fn.child(2);
+        const propName = prop?.text || "";
+
+        // a) res.setHeader('Allow', ...)
+        if (propName === "setHeader") {
+          const args = node.childForFieldName("arguments") || node.child(1);
+          if (args) {
+            const firstArg = args.namedChild(0);
+            const secondArg = args.namedChild(1);
+            if (firstArg && firstArg.text.replace(/^['"`]|['"`]$/g, "").toLowerCase() === "allow" && secondArg) {
+              if (secondArg.type === "array") {
+                for (let k = 0; k < secondArg.namedChildCount; k++) {
+                  const item = secondArg.namedChild(k)!;
+                  const mStr = item.text.replace(/^['"`]|['"`]$/g, "").toUpperCase();
+                  if (VALID_HTTP_METHODS.has(mStr as Method)) {
+                    detected.add(mStr as Method);
+                  }
+                }
+              } else if (secondArg.type === "string") {
+                const sVal = secondArg.text.replace(/^['"`]|['"`]$/g, "");
+                const parts = sVal.split(/[,\s]+/).map((p) => p.trim().toUpperCase());
+                for (const p of parts) {
+                  if (VALID_HTTP_METHODS.has(p as Method)) detected.add(p as Method);
+                }
+              }
+            }
+          }
+        }
+
+        // b) router chaining: .get(...), .post(...), .delete(...)
+        const upperProp = propName.toUpperCase();
+        if (VALID_HTTP_METHODS.has(upperProp as Method)) {
+          const obj = fn.childForFieldName("object") || fn.child(0);
+          const objText = obj?.text || "";
+          if (
+            !objText.startsWith("axios") &&
+            !objText.startsWith("http") &&
+            !objText.startsWith("fetch") &&
+            !objText.startsWith("apiClient") &&
+            !objText.startsWith("client")
+          ) {
+            detected.add(upperProp as Method);
+          }
+        }
+
+        // c) ['GET', 'POST'].includes(req.method)
+        if (propName === "includes") {
+          const obj = fn.childForFieldName("object") || fn.child(0);
+          if (obj && obj.type === "array") {
+            for (let k = 0; k < obj.namedChildCount; k++) {
+              const item = obj.namedChild(k)!;
+              const mStr = item.text.replace(/^['"`]|['"`]$/g, "").toUpperCase();
+              if (VALID_HTTP_METHODS.has(mStr as Method)) {
+                detected.add(mStr as Method);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. object dispatch map: { GET: handleGet, POST: handlePost }
+    if (node.type === "object") {
+      for (let i = 0; i < node.childCount; i++) {
+        const pair = node.child(i)!;
+        if (pair.type === "pair") {
+          const keyNode = pair.childForFieldName("key") || pair.child(0);
+          if (keyNode) {
+            const keyText = keyNode.text.replace(/^['"`]|['"`]$/g, "").toUpperCase();
+            if (VALID_HTTP_METHODS.has(keyText as Method)) {
+              detected.add(keyText as Method);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (detected.size > 0) {
+    return Array.from(detected);
+  }
+
+  // Fallback: In Next.js Pages router, single-handler endpoints default to GET.
+  const fullText = tree.rootNode.text;
+  if (fullText.includes("req.body") && !fullText.includes("req.query")) {
+    return ["POST"];
+  }
+
+  return ["GET"];
+}
+
+function parseNestDecorator(decNode: Parser.SyntaxNode): { name: string; paths: string[] } | null {
+  if (decNode.type !== "decorator") return null;
+
+  let fnName = "";
+  const paths: string[] = [];
+
+  for (let i = 0; i < decNode.childCount; i++) {
+    const child = decNode.child(i)!;
+    if (child.type === "identifier") {
+      fnName = child.text;
+    } else if (child.type === "call_expression") {
+      const fn = child.childForFieldName("function") || child.child(0);
+      if (fn) fnName = fn.text;
+
+      const argsNode = child.childForFieldName("arguments") || child.child(1);
+      if (argsNode) {
+        for (let j = 0; j < argsNode.namedChildCount; j++) {
+          const arg = argsNode.namedChild(j)!;
+          if (arg.type === "string") {
+            paths.push(arg.text.replace(/^['"`]|['"`]$/g, ""));
+          } else if (arg.type === "array") {
+            for (let k = 0; k < arg.namedChildCount; k++) {
+              const el = arg.namedChild(k)!;
+              if (el.type === "string") {
+                paths.push(el.text.replace(/^['"`]|['"`]$/g, ""));
+              }
+            }
+          } else if (arg.type === "object") {
+            for (let k = 0; k < arg.namedChildCount; k++) {
+              const pair = arg.namedChild(k)!;
+              if (pair.type === "pair") {
+                const key = pair.childForFieldName("key")?.text.replace(/^['"`]|['"`]$/g, "");
+                const val = pair.childForFieldName("value");
+                if (key === "path" && val) {
+                  if (val.type === "string") {
+                    paths.push(val.text.replace(/^['"`]|['"`]$/g, ""));
+                  } else if (val.type === "array") {
+                    for (let l = 0; l < val.namedChildCount; l++) {
+                      const item = val.namedChild(l)!;
+                      if (item.type === "string") {
+                        paths.push(item.text.replace(/^['"`]|['"`]$/g, ""));
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!fnName) return null;
+  return { name: fnName, paths };
+}
+
+
 export function extractTsJsRoutes(
   tree: Parser.Tree,
   filePath: string,
@@ -502,6 +830,21 @@ export function extractTsJsRoutes(
   const routes: OmniRoute[] = [];
   const validMethods = new Set(["get", "post", "put", "delete", "patch", "options", "head"]);
 
+  // Collect local scope constant declarations (e.g. const API = "/api")
+  const scopeConstants = new Map<string, string>();
+  walkTree(tree.rootNode, (n) => {
+    if (n.type === "variable_declarator") {
+      const idNode = n.child(0);
+      const initNode = n.child(2);
+      if (idNode && initNode && idNode.type === "identifier") {
+        const val = evaluatePathExpression(initNode, scopeConstants);
+        if (val && (val.startsWith("/") || val.includes("/"))) {
+          scopeConstants.set(idNode.text, val.startsWith("/") ? val : "/" + val);
+        }
+      }
+    }
+  });
+
   // 0. Next.js File-System Routing (App Router & Pages Router)
   const nextRouteInfo = resolveNextJsRoutePath(filePath);
   if (nextRouteInfo) {
@@ -509,7 +852,6 @@ export function extractTsJsRoutes(
 
     if (framework === "next-app") {
       const exportedMethods = new Set<Method>();
-      const VALID_HTTP_METHODS = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"]);
 
       walkTree(tree.rootNode, (node) => {
         if (node.type === "export_statement") {
@@ -567,14 +909,7 @@ export function extractTsJsRoutes(
 
       if (routes.length > 0) return routes;
     } else if (framework === "next-pages") {
-      const pageMethods = new Set<Method>();
-      walkTree(tree.rootNode, (node) => {
-        const text = node.text;
-        const m = text.match(/req\.method\s*===?\s*['"](GET|POST|PUT|DELETE|PATCH)['"]/i);
-        if (m) pageMethods.add(m[1].toUpperCase() as Method);
-      });
-
-      const finalMethods = pageMethods.size > 0 ? Array.from(pageMethods) : (["ALL"] as Method[]);
+      const finalMethods = extractNextPagesMethods(tree);
       for (const m of finalMethods) {
         routes.push({
           id: stableId(filePath, m, routePath),
@@ -592,37 +927,28 @@ export function extractTsJsRoutes(
   }
 
   walkTree(tree.rootNode, (node) => {
+    // Track sequential variable declarations for local path constant evaluation
+    if (node.type === "variable_declarator") {
+      const idNode = node.child(0);
+      const initNode = node.child(2);
+      if (idNode && initNode && idNode.type === "identifier") {
+        const val = evaluatePathExpression(initNode, scopeConstants);
+        if (val && (val.startsWith("/") || val.includes("/"))) {
+          scopeConstants.set(idNode.text, val.startsWith("/") ? val : "/" + val);
+        }
+      }
+    }
+
     // A. NestJS Decorator Pattern: @Controller() on class + @Get() on methods
-    // A. NestJS Decorators
     if (
       node.type === "class_declaration" ||
       (node.type === "export_statement" && node.text.includes("class "))
     ) {
       let classPrefixes: string[] = [""];
       const checkDecorator = (c: Parser.SyntaxNode) => {
-        if (c.type === "decorator") {
-          const decText = c.text;
-          if (/@Controller\b/i.test(decText)) {
-            const prefixes: string[] = [];
-            const inner = decText.replace(/^@Controller\s*\(/i, "").replace(/\)$/, "").trim();
-            if (inner) {
-              if (inner.includes("path:")) {
-                const pathPart = inner.match(/path\s*:\s*(\[[^\]]*\]|['"`][^'"`]*['"`])/);
-                if (pathPart) {
-                  for (const sm of pathPart[1].matchAll(/['"`]([^'"`]*)['"`]/g)) {
-                    prefixes.push(sm[1]);
-                  }
-                }
-              } else {
-                for (const sm of inner.matchAll(/['"`]([^'"`]*)['"`]/g)) {
-                  prefixes.push(sm[1]);
-                }
-              }
-            }
-            if (prefixes.length > 0) {
-              classPrefixes = prefixes;
-            }
-          }
+        const parsed = parseNestDecorator(c);
+        if (parsed && parsed.name === "Controller") {
+          classPrefixes = parsed.paths.length > 0 ? parsed.paths : [""];
         }
       };
 
@@ -634,6 +960,17 @@ export function extractTsJsRoutes(
         checkDecorator(sib);
         sib = sib.previousNamedSibling;
       }
+
+      const NEST_HTTP_VERBS: Record<string, Method> = {
+        Get: "GET",
+        Post: "POST",
+        Put: "PUT",
+        Delete: "DELETE",
+        Patch: "PATCH",
+        Options: "GET",
+        Head: "GET",
+        All: "ALL",
+      };
 
       walkTree(node, (child) => {
         if (child.type === "method_definition") {
@@ -653,41 +990,29 @@ export function extractTsJsRoutes(
           }
 
           for (const dec of methodDecorators) {
-            const m = dec.text.match(/@(Get|Post|Put|Delete|Patch|Options|Head|All)\s*(?:\(([\s\S]*?)\))?/i);
-            if (m) {
-              const rawVerb = m[1].toUpperCase();
-              const method: Method = rawVerb === "HEAD" || rawVerb === "OPTIONS" ? "GET" : (rawVerb as Method);
-              const argsContent = m[2] ? m[2].trim() : "";
+            const parsed = parseNestDecorator(dec);
+            if (!parsed) continue;
+            const method = NEST_HTTP_VERBS[parsed.name];
+            if (!method) continue;
 
-              let subPaths: string[] = [""];
-              if (argsContent) {
-                const subMatches: string[] = [];
-                for (const sm of argsContent.matchAll(/['"`]([^'"`]*)['"`]/g)) {
-                  subMatches.push(sm[1]);
-                }
-                if (subMatches.length > 0) {
-                  subPaths = subMatches;
-                }
-              }
+            const subPaths = parsed.paths.length > 0 ? parsed.paths : [""];
+            for (const classPrefix of classPrefixes) {
+              for (const subPath of subPaths) {
+                const fullPath = "/" + [classPrefix, subPath]
+                  .filter(Boolean)
+                  .join("/")
+                  .replace(/\/+/g, "/")
+                  .replace(/^\//, "");
 
-              for (const classPrefix of classPrefixes) {
-                for (const subPath of subPaths) {
-                  const fullPath = "/" + [classPrefix, subPath]
-                    .filter(Boolean)
-                    .join("/")
-                    .replace(/\/+/g, "/")
-                    .replace(/^\//, "");
-
-                  routes.push({
-                    id: stableId(filePath, method, fullPath),
-                    framework: "nest",
-                    method,
-                    path: fullPath || "/",
-                    file: filePath,
-                    confidence: "high",
-                    source: "tree_sitter",
-                  });
-                }
+                routes.push({
+                  id: stableId(filePath, method, fullPath),
+                  framework: "nest",
+                  method,
+                  path: fullPath || "/",
+                  file: filePath,
+                  confidence: "high",
+                  source: "tree_sitter",
+                });
               }
             }
           }
@@ -704,6 +1029,19 @@ export function extractTsJsRoutes(
 
         if (propNode && objNode) {
           const propName = propNode.text.toLowerCase();
+          const objText = objNode.text;
+
+          // Outbound HTTP client calls are never server route registrations
+          if (
+            objText === "https" ||
+            objText === "http" ||
+            objText === "axios" ||
+            objText.startsWith("axios.") ||
+            objText === "apiClient" ||
+            objText === "client"
+          ) {
+            return;
+          }
 
           // Detect JS/TS framework flavor for this file
           const fileText = tree.rootNode.text;
@@ -718,24 +1056,32 @@ export function extractTsJsRoutes(
           }
 
           if (validMethods.has(propName)) {
+            // Outbound HTTP client invocations are awaited expressions; server route registrations are never awaited
+            if (node.parent?.type === "await_expression") return;
+
             const argsNode = node.childForFieldName("arguments");
             let foundDirectPath: string | null = null;
 
             if (argsNode && argsNode.childCount > 0) {
               for (let a = 0; a < argsNode.childCount; a++) {
                 const arg = argsNode.child(a)!;
-                if (arg.type === "string" || arg.type === "template_string") {
-                  const rawPath = arg.text.replace(/^['"`]|['"`]$/g, "");
-                  if (rawPath.startsWith("/")) {
-                    foundDirectPath = rawPath;
+                if (arg.type !== "(" && arg.type !== ")" && arg.type !== ",") {
+                  const evalPath = evaluatePathExpression(arg, scopeConstants);
+                  if (evalPath && evalPath.startsWith("/")) {
+                    foundDirectPath = evalPath;
                     break;
                   }
                 }
               }
             }
 
-            if (foundDirectPath) {
-              // Direct call: router.get<T>('/path', handler)
+            if (foundDirectPath && argsNode && argsNode.namedChildCount >= 2) {
+              // Direct route registration: router.get('/path', ...handlers)
+              // Server routes require at least one handler callback in addition to the path.
+              // Outbound HTTP client calls end with an options object (e.g. client.get('/path', { headers }))
+              const lastArg = argsNode.namedChild(argsNode.namedChildCount - 1)!;
+              if (lastArg.type === "object") return;
+
               const method = propName.toUpperCase() as Method;
               const routerVar = objNode.text;
 
@@ -755,26 +1101,29 @@ export function extractTsJsRoutes(
                   source: "tree_sitter",
                 });
               }
-            } else {
-              // Check if part of a chained call: router.route('/path').get(handler)
-              const chain = findChainedBasePath(objNode);
-              if (chain) {
-                const method = propName.toUpperCase() as Method;
-                const prefixes = mountLinker
-                  ? mountLinker.getPrefixesForRouter(filePath, chain.routerVar)
-                  : new Set(["/"]);
+            } else if (argsNode && argsNode.namedChildCount >= 1) {
+              // Chained route registration: router.route('/path').get(handler)
+              const lastArg = argsNode.namedChild(argsNode.namedChildCount - 1)!;
+              if (lastArg.type !== "object") {
+                const chain = findChainedBasePath(objNode, scopeConstants);
+                if (chain) {
+                  const method = propName.toUpperCase() as Method;
+                  const prefixes = mountLinker
+                    ? mountLinker.getPrefixesForRouter(filePath, chain.routerVar)
+                    : new Set(["/"]);
 
-                for (const pfx of prefixes) {
-                  const fullPath = joinUrl(pfx, chain.basePath);
-                  routes.push({
-                    id: stableId(filePath, method, fullPath),
-                    framework: jsFramework,
-                    method,
-                    path: fullPath,
-                    file: filePath,
-                    confidence: "high",
-                    source: "tree_sitter",
-                  });
+                  for (const pfx of prefixes) {
+                    const fullPath = joinUrl(pfx, chain.basePath);
+                    routes.push({
+                      id: stableId(filePath, method, fullPath),
+                      framework: jsFramework,
+                      method,
+                      path: fullPath,
+                      file: filePath,
+                      confidence: "high",
+                      source: "tree_sitter",
+                    });
+                  }
                 }
               }
             }
@@ -840,15 +1189,7 @@ export function extractTsJsRoutes(
                             }
                           }
                         } else if (keyName === "path" || keyName === "url") {
-                          if (vNode.type === "string" || vNode.type === "template_string") {
-                            extractedPath = vNode.text.replace(/^['"`]|['"`]$/g, "");
-                          } else if (vNode.type === "binary_expression") {
-                            walkTree(vNode, (binChild) => {
-                              if ((binChild.type === "string" || binChild.type === "template_string") && !extractedPath) {
-                                extractedPath = binChild.text.replace(/^['"`]|['"`]$/g, "");
-                              }
-                            });
-                          }
+                          extractedPath = evaluatePathExpression(vNode, scopeConstants);
                         }
                       }
                     }
@@ -904,10 +1245,7 @@ export function extractTsJsRoutes(
                   }
                 }
               }
-              let pathVal: string | null = null;
-              if (pArg && (pArg.type === "string" || pArg.type === "template_string")) {
-                pathVal = pArg.text.replace(/^['"`]|['"`]$/g, "");
-              }
+              let pathVal = evaluatePathExpression(pArg, scopeConstants);
               if (methods.length > 0 && pathVal) {
                 if (!pathVal.startsWith("/")) pathVal = "/" + pathVal;
                 const prefixes = mountLinker
@@ -934,103 +1272,6 @@ export function extractTsJsRoutes(
       }
     }
 
-    // C. Declarative route definition objects (Gateways, Controllers, Route tables, Mock servers)
-    if (node.type === "object") {
-      let mStr: Method | null = null;
-      let pStr: string | null = null;
-      let hasRouteTarget = false;
-
-      for (let i = 0; i < node.childCount; i++) {
-        const c = node.child(i)!;
-        if (c.type === "pair") {
-          const k = c.childForFieldName("key");
-          const v = c.childForFieldName("value");
-          if (k && v) {
-            const keyText = k.text.replace(/['"`]/g, "").toLowerCase();
-            if (keyText === "method" && v.type === "string") {
-              const val = v.text.replace(/['"`]/g, "").toUpperCase();
-              if (["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(val)) {
-                mStr = val as Method;
-              }
-            } else if ((keyText === "url" || keyText === "path") && (v.type === "string" || v.type === "template_string")) {
-              const val = v.text.replace(/^['"`]|['"`]$/g, "");
-              if (val.startsWith("/")) {
-                pStr = val;
-              }
-            } else if (
-              keyText === "handler" ||
-              keyText === "action" ||
-              keyText === "controller" ||
-              keyText === "resolve" ||
-              keyText === "fn" ||
-              keyText === "target" ||
-              keyText === "service" ||
-              keyText === "upstream" ||
-              keyText === "proxy" ||
-              keyText === "redirect" ||
-              keyText === "rewrite" ||
-              keyText === "variants" ||
-              keyText === "response" ||
-              keyText === "reply" ||
-              keyText === "middleware" ||
-              keyText === "middlewares" ||
-              keyText === "prehandler"
-            ) {
-              hasRouteTarget = true;
-            }
-          }
-        }
-      }
-
-      if (mStr && pStr) {
-        // Prevent duplicate if parent is server.route({ ... }) which was already handled
-        const parent = node.parent;
-        const isAlreadyHandledByCall = parent && parent.type === "arguments" && parent.parent?.type === "call_expression";
-        if (!isAlreadyHandledByCall) {
-          // Architectural boundary:
-          // An object literal represents a server route if:
-          // 1. It defines an execution, proxy, or response target (hasRouteTarget), OR
-          // 2. The file is a dedicated route/controller/gateway module
-          const lowerPath = filePath.replace(/\\/g, "/").toLowerCase();
-          const baseName = path.basename(lowerPath);
-          const isDedicatedRouteModule =
-            lowerPath.includes("/routes/") ||
-            lowerPath.includes("/router/") ||
-            lowerPath.includes("/controllers/") ||
-            lowerPath.includes("/endpoints/") ||
-            lowerPath.includes("/gateway/") ||
-            lowerPath.includes("/gateways/") ||
-            lowerPath.includes("/proxies/") ||
-            baseName.includes("route.") ||
-            baseName.includes("routes.") ||
-            baseName.includes("router.") ||
-            baseName.includes("controller.") ||
-            baseName.includes("endpoint.") ||
-            baseName.includes("gateway.") ||
-            baseName.includes("proxy.");
-
-          if (hasRouteTarget || isDedicatedRouteModule) {
-            const fileText = tree.rootNode.text;
-            let jsFramework: OmniFramework = "express";
-            if (fileText.includes("hono") || fileText.includes("new Hono")) {
-              jsFramework = "hono";
-            } else if (fileText.includes("fastify") || fileText.includes("fastify-plugin")) {
-              jsFramework = "fastify";
-            }
-
-            routes.push({
-              id: stableId(filePath, mStr, pStr),
-              framework: jsFramework,
-              method: mStr,
-              path: pStr,
-              file: filePath,
-              confidence: "high",
-              source: "tree_sitter",
-            });
-          }
-        }
-      }
-    }
   });
 
   return routes;
@@ -2216,12 +2457,25 @@ function extractJavaAnnotationData(annoNode: Parser.SyntaxNode): {
           if (key === "value" || key === "path") {
             paths.push(...extractJavaPathsFromNode(valNode));
           } else if (key === "method") {
-            const mText = valNode.text;
-            const matches = mText.match(/(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)/gi);
-            if (matches) {
-              for (const m of matches) {
-                methods.push(m.toUpperCase() as Method);
+            const addSpringMethod = (n: Parser.SyntaxNode) => {
+              let verbStr = "";
+              if (n.type === "field_access") {
+                const f = n.childForFieldName("field") || n.child(2);
+                if (f) verbStr = f.text.toUpperCase();
+              } else if (n.type === "identifier") {
+                verbStr = n.text.toUpperCase();
               }
+              if (verbStr && VALID_HTTP_METHODS.has(verbStr as Method)) {
+                methods.push(verbStr as Method);
+              }
+            };
+
+            if (valNode.type === "element_value_array_initializer") {
+              for (let j = 0; j < valNode.childCount; j++) {
+                addSpringMethod(valNode.child(j)!);
+              }
+            } else {
+              addSpringMethod(valNode);
             }
           }
         }
@@ -2375,10 +2629,25 @@ function parseSymfonyRouteAttr(attrNode: Parser.SyntaxNode): { path: string; met
   if (pathVal === null) return null;
 
   let methods: Method[] = ["GET"];
-  const methodArg = args.find((a) => a.text.startsWith("methods:"));
+  const methodArg = args.find((a) => {
+    const name = a.childForFieldName("name")?.text || a.child(0)?.text;
+    return name === "methods" || a.text.startsWith("methods:");
+  });
   if (methodArg) {
-    const matches = methodArg.text.match(/(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)/gi);
-    if (matches) methods = matches.map((m) => m.toUpperCase() as Method);
+    const foundMethods: Method[] = [];
+    const walkArray = (n: Parser.SyntaxNode) => {
+      if (n.type === "string") {
+        const s = getPhpStringLiteral(n);
+        if (s && LARAVEL_HTTP_METHODS.has(s.toLowerCase())) {
+          foundMethods.push(s.toUpperCase() as Method);
+        }
+      }
+      for (let i = 0; i < n.childCount; i++) {
+        walkArray(n.child(i)!);
+      }
+    };
+    walkArray(methodArg);
+    if (foundMethods.length > 0) methods = foundMethods;
   }
 
   return { path: pathVal, methods };

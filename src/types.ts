@@ -221,6 +221,8 @@ export type ApiKeyValueRow = {
   value: string;
   description?: string;
   type?: "text" | "file";
+  rawToken?: string;
+  typeHint?: string;
 };
 
 export type ApiBody =
@@ -235,6 +237,7 @@ export type ApiBody =
   | { mode: "binary"; filePath: string };
 
 export type ApiHttpRequest = {
+  requestId?: string;
   method: Method;
   url: string;
   query: ApiKeyValueRow[];
@@ -304,3 +307,15 @@ export interface RequestTab {
   pathVariables?: any[];
   splitPercent?: number;
 }
+
+export interface ScanProgressUpdate {
+  projectPath: string;
+  phase: "discovering" | "linking" | "parsing" | "factory" | "finalizing" | "done";
+  message: string;
+  percent: number;
+  current: number;
+  total: number;
+  routesFound: number;
+  currentFile?: string;
+}
+

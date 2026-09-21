@@ -8,26 +8,30 @@ function copyWasmAssetsPlugin() {
     name: "copy-tree-sitter-wasms",
     closeBundle() {
       const outMain = resolve(__dirname, "out/main");
-      if (!fs.existsSync(outMain)) {
-        fs.mkdirSync(outMain, { recursive: true });
-      }
+      const outChunks = resolve(outMain, "chunks");
 
-      // Copy tree-sitter.wasm
-      const webTreeSitterWasm = resolve(__dirname, "node_modules/web-tree-sitter/tree-sitter.wasm");
-      if (fs.existsSync(webTreeSitterWasm)) {
-        fs.copyFileSync(webTreeSitterWasm, resolve(outMain, "tree-sitter.wasm"));
-      }
-
-      // Copy tree-sitter-wasms
-      const wasmsOutDir = resolve(__dirname, "node_modules/tree-sitter-wasms/out");
-      const targetWasmsDir = resolve(outMain, "tree-sitter-wasms");
-      if (fs.existsSync(wasmsOutDir)) {
-        if (!fs.existsSync(targetWasmsDir)) {
-          fs.mkdirSync(targetWasmsDir, { recursive: true });
+      for (const target of [outMain, outChunks]) {
+        if (!fs.existsSync(target)) {
+          fs.mkdirSync(target, { recursive: true });
         }
-        for (const file of fs.readdirSync(wasmsOutDir)) {
-          if (file.endsWith(".wasm")) {
-            fs.copyFileSync(resolve(wasmsOutDir, file), resolve(targetWasmsDir, file));
+
+        // Copy tree-sitter.wasm
+        const webTreeSitterWasm = resolve(__dirname, "node_modules/web-tree-sitter/tree-sitter.wasm");
+        if (fs.existsSync(webTreeSitterWasm)) {
+          fs.copyFileSync(webTreeSitterWasm, resolve(target, "tree-sitter.wasm"));
+        }
+
+        // Copy tree-sitter-wasms
+        const wasmsOutDir = resolve(__dirname, "node_modules/tree-sitter-wasms/out");
+        const targetWasmsDir = resolve(target, "tree-sitter-wasms");
+        if (fs.existsSync(wasmsOutDir)) {
+          if (!fs.existsSync(targetWasmsDir)) {
+            fs.mkdirSync(targetWasmsDir, { recursive: true });
+          }
+          for (const file of fs.readdirSync(wasmsOutDir)) {
+            if (file.endsWith(".wasm")) {
+              fs.copyFileSync(resolve(wasmsOutDir, file), resolve(targetWasmsDir, file));
+            }
           }
         }
       }
@@ -40,6 +44,10 @@ export default defineConfig({
     plugins: [copyWasmAssetsPlugin()],
     build: {
       rollupOptions: {
+        input: {
+          index: resolve(__dirname, "src/main/index.ts"),
+          scannerWorker: resolve(__dirname, "src/main/scannerWorker.ts"),
+        },
         external: ["node-llama-cpp", /^@node-llama-cpp\/.*/],
       },
     },

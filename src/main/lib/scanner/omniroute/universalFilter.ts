@@ -57,7 +57,6 @@ export const UNIVERSAL_IGNORED_DIRECTORIES = new Set([
   ".svelte-kit",
   ".docusaurus",
   "coverage",
-  "public",
   "tmp",
   "temp",
   // Version Control & IDEs
@@ -160,7 +159,8 @@ export function isClientUiPath(filePath: string, rootPath: string): boolean {
     ext === ".cs" ||
     ext === ".rs" ||
     ext === ".php" ||
-    ext === ".rb";
+    ext === ".rb" ||
+    ext === ".py";
 
   if (isPureBackendCode) {
     return false;
@@ -281,8 +281,57 @@ export function isCandidateFilePath(filePath: string, rootPath: string): boolean
     }
   }
 
+  const lowerFile = path.basename(filePath).toLowerCase();
+  // 1. Exclude TypeScript type definitions and minified bundles by name
+  if (
+    lowerFile.endsWith(".d.ts") ||
+    lowerFile.endsWith(".gen.ts") ||
+    lowerFile.endsWith(".generated.ts") ||
+    lowerFile.endsWith(".min.js") ||
+    lowerFile.endsWith(".min.mjs") ||
+    lowerFile.endsWith(".min.cjs")
+  ) {
+    return false;
+  }
+
+  // 2. Exclude common build tool, linter, and bundler configuration files
+  if (
+    lowerFile.includes(".config.") ||
+    lowerFile.startsWith("eslint.") ||
+    lowerFile.startsWith("prettier.") ||
+    lowerFile.startsWith("tailwind.") ||
+    lowerFile.startsWith("postcss.") ||
+    lowerFile.startsWith("vite.") ||
+    lowerFile.startsWith("webpack.") ||
+    lowerFile.startsWith("babel.") ||
+    lowerFile.startsWith("jest.") ||
+    lowerFile.startsWith("vitest.") ||
+    lowerFile.startsWith("turbo.")
+  ) {
+    return false;
+  }
+
   const ext = path.extname(filePath).toLowerCase();
   return SUPPORTED_EXTENSIONS.has(ext);
+}
+
+/**
+ * Detects whether a file is a machine-compiled or minified bundle.
+ * 
+ * Architectural Standard (GitHub Linguist / Prettier):
+ * Human-written source code across all polyglot backend languages (JS, TS, Python, Go, Rust, Java, C#)
+ * adheres to line-wrapping formatting standards (PEP8, Prettier, gofmt, rustfmt) where lines are ~80-120 chars.
+ * Machine-minified bundles (e.g. Webpack, esbuild, SWC, WASM runtimes) concatenate thousands of statements
+ * into single lines exceeding 3,000 to 100,000+ characters. Parsing them in WebAssembly Tree-sitter chokes
+ * CPU execution without yielding genuine human route definitions.
+ */
+export function isMinifiedOrBundleContent(content: string): boolean {
+  if (content.length < 10000) return false;
+  const sample = content.slice(0, 50000).split(/\r?\n/);
+  for (const line of sample) {
+    if (line.length > 3000) return true;
+  }
+  return false;
 }
 
 /**
@@ -303,6 +352,7 @@ export function analyzeRouteCandidate(
   const language = getFileLanguage(filePath);
   const isClient = isClientUiPath(filePath, rootPath);
   const isTest = isTestFilePath(filePath, rootPath);
+  const isBundle = isMinifiedOrBundleContent(content);
 
   // Files in route-specific folders are high-probability candidates
   const isNamedRouteLocation =
@@ -325,10 +375,9 @@ export function analyzeRouteCandidate(
     lowerRel.endsWith("/route.js") ||
     lowerRel.endsWith("/route.ts");
 
-  // Invariant: Pure Tree-sitter CST execution.
-  // We do NOT use fragile regex bouncers to gatekeep files.
-  // Every backend source file (not client UI, not test) is directly parsed by Tree-sitter.
-  const hasRouteSignals = !isClient && !isTest;
+  // Invariant: Pure Tree-sitter CST execution on genuine human-written backend code.
+  // We exclude client UI, test files, and machine-minified / compiled bundles.
+  const hasRouteSignals = !isClient && !isTest && !isBundle;
   const routeScore = isNamedRouteLocation ? 5 : 1;
 
   return {

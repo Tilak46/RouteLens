@@ -14,6 +14,7 @@ import type {
   ApiHttpRequest,
   ApiHttpResponse,
   CookieItem,
+  ScanProgressUpdate,
 } from "../types"; // Use WorkspaceSettings
 
 export const api = {
@@ -91,6 +92,9 @@ export const api = {
   },
   closeWindow: () => {
     ipcRenderer.send("window:close");
+  },
+  restartApp: (): Promise<void> => {
+    return ipcRenderer.invoke("app:relaunch");
   },
 
   // --- Log Management ---
@@ -205,8 +209,20 @@ export const api = {
     return ipcRenderer.invoke("api-explorer:cancel-scan", path);
   },
 
+  onScanProgress: (callback: (progress: ScanProgressUpdate) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: ScanProgressUpdate) => callback(progress);
+    ipcRenderer.on("api-explorer:scan-progress", handler);
+    return () => {
+      ipcRenderer.removeListener("api-explorer:scan-progress", handler);
+    };
+  },
+
   runApiRequest: (request: ApiHttpRequest): Promise<ApiHttpResponse> => {
     return ipcRenderer.invoke("api-explorer:run-request", request);
+  },
+
+  cancelApiRequest: (requestId: string): Promise<boolean> => {
+    return ipcRenderer.invoke("api-explorer:cancel-request", requestId);
   },
 
   detectProjectPort: (path: string): Promise<number | null> => {

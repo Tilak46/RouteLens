@@ -8,6 +8,7 @@ app.commandLine.appendSwitch("background-color", "#090A0F");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 import fs from "node:fs";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
+import "./devReload";
 import icon from "../../resources/icon.png?asset";
 import Store from "electron-store";
 import type { Project, Group, StoreType } from "../types";
@@ -182,7 +183,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     frame: false,
     backgroundColor: "#100f0f",
-    icon,
+    icon: process.platform === "win32" ? undefined : icon,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
@@ -283,6 +284,18 @@ function createWindow(): void {
 
   // 3. REMOVED incorrect webContents.on listeners for workspace updates
 
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.warn(`[Window] Failed to load ${validatedURL}: ${errorDescription} (${errorCode})`);
+    if (is.dev && process.env["ELECTRON_RENDERER_URL"] && validatedURL.startsWith("http")) {
+      console.log("[Window] Retrying connection to dev server in 500ms...");
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]!);
+        }
+      }, 500);
+    }
+  });
+
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
     mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
@@ -313,7 +326,7 @@ function createGhostWindow(): void {
     alwaysOnTop: true,
     resizable: false,
     backgroundColor: "#00000000",
-    icon,
+    icon: process.platform === "win32" ? undefined : icon,
     // skipTaskbar: true, // User requested taskbar item
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),

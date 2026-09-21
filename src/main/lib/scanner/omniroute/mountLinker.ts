@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import type Parser from "web-tree-sitter";
 import { getLanguageParser } from "./treeSitterEngine";
+import { isClientUiPath, isTestFilePath, isMinifiedOrBundleContent } from "./universalFilter";
 export type MountInfo = {
   parentRouter: string;
   mountPath: string;
@@ -26,7 +27,11 @@ export function joinUrl(base: string, sub: string): string {
   return cleanPath(base + "/" + sub);
 }
 
-export function resolveLocalImport(fromFile: string, importSrc: string): string | null {
+export function resolveLocalImport(
+  fromFile: string,
+  importSrc: string,
+  knownFiles?: Set<string>,
+): string | null {
   if (!importSrc.startsWith(".")) return null;
   const dir = path.dirname(fromFile);
   const strippedJs = importSrc.replace(/\.jsx?$/, "");
@@ -49,6 +54,17 @@ export function resolveLocalImport(fromFile: string, importSrc: string): string 
     path.resolve(dir, importSrc, "index.tsx"),
     path.resolve(dir, importSrc, "index.jsx"),
   ];
+
+  // 1. Fast In-Memory RAM Lookup (0.0001ms, avoids Windows NTFS disk stall)
+  if (knownFiles && knownFiles.size > 0) {
+    for (const c of candidates) {
+      if (knownFiles.has(c) || knownFiles.has(normalizeFilePath(c))) {
+        return c;
+      }
+    }
+  }
+
+  // 2. Physical disk fallback only when not present in memory
   for (const c of candidates) {
     try {
       if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
@@ -56,6 +72,7 @@ export function resolveLocalImport(fromFile: string, importSrc: string): string 
   }
   return null;
 }
+
 
 function getStringLiteralValue(node: Parser.SyntaxNode | null | undefined): string | null {
   if (!node) return null;
@@ -73,17 +90,60 @@ function getStringLiteralValue(node: Parser.SyntaxNode | null | undefined): stri
 function extractChildTarget(
   argNode: Parser.SyntaxNode,
   knownImports?: Set<string>,
+  importsMap?: Map<string, { filePath: string; localName: string }>,
+  currentFilePath?: string,
+  knownFiles?: Set<string>,
 ): { targetName: string; isFactory: boolean } | null {
   if (!argNode) return null;
 
+  // Unwrap parentheses and await expressions
+  let unwrapped = argNode;
+  while (unwrapped.type === "parenthesized_expression" || unwrapped.type === "await_expression") {
+    const inner = unwrapped.child(1) || unwrapped.namedChild(0);
+    if (!inner) break;
+    unwrapped = inner;
+  }
+
+  // Handle member_expression e.g. (await import('./routes')).default
+  if (unwrapped.type === "member_expression") {
+    const obj = unwrapped.child(0);
+    if (obj) {
+      const childRes = extractChildTarget(obj, knownImports, importsMap, currentFilePath, knownFiles);
+      if (childRes) return childRes;
+    }
+  }
+
+  // Handle ECMAScript dynamic import: import("./routes/auth.js")
+  if (unwrapped.type === "call_expression") {
+    const fn = unwrapped.child(0);
+    if (fn && (fn.type === "import" || fn.text === "import")) {
+      const args = unwrapped.childForFieldName("arguments") || unwrapped.children.find((c) => c.type === "arguments");
+      if (args && args.namedChildCount > 0) {
+        const specNode = args.namedChild(0);
+        const specVal = getStringLiteralValue(specNode);
+        if (specVal && currentFilePath) {
+          const resolved = resolveLocalImport(currentFilePath, specVal, knownFiles);
+          if (resolved) {
+            const autoId = `__dyn_import_${Buffer.from(resolved).toString("base64url")}`;
+            if (importsMap) {
+              importsMap.set(autoId, { filePath: resolved, localName: "default" });
+            }
+            knownImports?.add(autoId);
+            return { targetName: autoId, isFactory: false };
+          }
+        }
+      }
+    }
+  }
+
   // 1. Bare identifier: app.use('/path', childRouter)
-  if (argNode.type === "identifier") {
-    return { targetName: argNode.text, isFactory: false };
+  if (unwrapped.type === "identifier") {
+    return { targetName: unwrapped.text, isFactory: false };
   }
 
   // 2. Direct factory invocation: app.use('/path', createAuditRoutes(store))
-  if (argNode.type === "call_expression") {
-    const fn = argNode.child(0);
+  if (unwrapped.type === "call_expression") {
+    const fn = unwrapped.child(0);
     if (fn) {
       if (fn.type === "identifier") {
         return { targetName: fn.text, isFactory: true };
@@ -164,16 +224,48 @@ function normalizeFilePath(p: string): string {
 
 export class SymbolicMountLinker {
   private routerPrefixes = new Map<string, Set<string>>(); // `${normalizedPath}:${varName}` -> Set<prefix>
+  private knownFiles = new Set<string>();
 
   public async buildMountTable(fileCodeMap: Map<string, string>, rootPath: string): Promise<void> {
     const lp = await getLanguageParser("typescript");
     if (!lp) return;
 
+    this.knownFiles.clear();
+    for (const p of fileCodeMap.keys()) {
+      this.knownFiles.add(p);
+      this.knownFiles.add(normalizeFilePath(p));
+    }
+
     const fileSymbolsMap = new Map<string, AstFileSymbols>();
+    let processedCount = 0;
 
     for (const [filePath, code] of fileCodeMap.entries()) {
+      processedCount++;
+      if (processedCount % 8 === 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
       const ext = path.extname(filePath).toLowerCase();
       if (![".ts", ".js", ".tsx", ".jsx", ".mjs", ".cjs"].includes(ext)) continue;
+      if (filePath.endsWith(".d.ts")) continue;
+
+      // Architectural role boundary: Client UI views, test files, and machine-compiled bundles never mount backend server routers
+      if (isClientUiPath(filePath, rootPath) || isTestFilePath(filePath, rootPath) || isMinifiedOrBundleContent(code)) continue;
+
+      // Architectural signal check: A file cannot participate in router mounting
+      // if it contains zero router creation, mount methods, or routing framework references.
+      const hasMountSignal =
+        code.includes(".use(") ||
+        code.includes(".register(") ||
+        code.includes(".mount(") ||
+        code.includes(".route(") ||
+        code.includes("Router") ||
+        code.includes("router") ||
+        code.includes("express") ||
+        code.includes("fastify") ||
+        code.includes("koa") ||
+        code.includes("hono");
+      if (!hasMountSignal) continue;
 
       let tree: Parser.Tree;
       try {
@@ -216,6 +308,7 @@ export class SymbolicMountLinker {
       if (isTopLevelEntrypoint) {
         this.setPrefix(normPath, "app", "/");
         this.setPrefix(normPath, "server", "/");
+        this.setPrefix(normPath, "fastify", "/");
         this.setPrefix(normPath, "router", "/");
       }
 
@@ -237,7 +330,7 @@ export class SymbolicMountLinker {
           const parentKey = `${normPath}:${mount.parentRouter}`;
           const parentPrefixSet =
             this.routerPrefixes.get(parentKey) ||
-            (mount.parentRouter === "app" || mount.parentRouter === "server"
+            (mount.parentRouter === "app" || mount.parentRouter === "server" || mount.parentRouter === "fastify"
               ? new Set(["/"])
               : new Set());
 
@@ -359,6 +452,7 @@ export class SymbolicMountLinker {
   }
 
   private parseFileSymbols(tree: Parser.Tree, filePath: string): AstFileSymbols {
+    const knownFiles = this.knownFiles;
     const imports = new Map<string, TargetExport>();
     const exports = new Map<string, string>();
     const starReExports: string[] = [];
@@ -376,7 +470,7 @@ export class SymbolicMountLinker {
         const srcNode = node.children.find((c) => c.type === "string");
         const srcVal = getStringLiteralValue(srcNode);
         if (srcVal) {
-          const resolved = resolveLocalImport(filePath, srcVal);
+          const resolved = resolveLocalImport(filePath, srcVal, knownFiles);
           if (resolved) {
             const clause = node.children.find((c) => c.type === "import_clause");
             if (clause) {
@@ -422,7 +516,7 @@ export class SymbolicMountLinker {
             const firstArg = args?.children.find((c) => c.type === "string");
             const srcVal = getStringLiteralValue(firstArg);
             if (srcVal) {
-              const resolved = resolveLocalImport(filePath, srcVal);
+              const resolved = resolveLocalImport(filePath, srcVal, knownFiles);
               if (resolved) {
                 const idNode = node.child(0);
                 if (idNode) {
@@ -458,7 +552,7 @@ export class SymbolicMountLinker {
         const srcVal = getStringLiteralValue(srcNode);
 
         if (srcVal) {
-          const resolved = resolveLocalImport(filePath, srcVal);
+          const resolved = resolveLocalImport(filePath, srcVal, knownFiles);
           if (resolved) {
             if (node.children.some((c) => c.type === "*")) {
               starReExports.push(resolved);
@@ -561,13 +655,13 @@ export class SymbolicMountLinker {
         if (idNode && init) {
           const idName = idNode.text;
           if (init.type === "call_expression") {
-            const fn = init.child(0)?.text;
-            if (fn === "express" || fn === "fastify" || fn === "express.default") {
+            const fn = init.child(0)?.text?.toLowerCase();
+            if (fn === "express" || fn === "fastify" || fn === "express.default" || fn === "fastify.default") {
               appRoots.add(idName);
             }
           } else if (init.type === "new_expression") {
-            const constr = init.child(1)?.text;
-            if (constr === "Hono" || constr === "Koa") {
+            const constr = init.child(1)?.text?.toLowerCase();
+            if (constr === "hono" || constr === "koa" || constr === "fastify" || constr === "express") {
               appRoots.add(idName);
             }
           }
@@ -595,7 +689,7 @@ export class SymbolicMountLinker {
               if (rawArgs.length > 0) {
                 if (method === "register") {
                   const childArg = rawArgs[0];
-                  const childTarget = extractChildTarget(childArg, knownImportNames);
+                  const childTarget = extractChildTarget(childArg, knownImportNames, imports, filePath, knownFiles);
                   let mountPath = "/";
                   if (rawArgs.length > 1) {
                     const optArg = rawArgs[1];
@@ -631,7 +725,7 @@ export class SymbolicMountLinker {
                   }
 
                   for (let a = rawArgs.length - 1; a >= argStartIndex; a--) {
-                    const target = extractChildTarget(rawArgs[a], knownImportNames);
+                    const target = extractChildTarget(rawArgs[a], knownImportNames, imports, filePath, knownFiles);
                     if (target) {
                       mounts.push({
                         parentRouter: parentObj,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Project,
   Group,
@@ -102,6 +102,47 @@ function formatScanDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s (${ms}ms)`;
 }
 
+const ScanBenchmarkTimerBadge = React.memo(function ScanBenchmarkTimerBadge({
+  startTime,
+  isScanning,
+}: {
+  startTime: number | null;
+  isScanning: boolean;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!startTime) {
+      setElapsedMs(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setElapsedMs(Date.now() - startTime);
+    }, 50);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  if (!startTime) return null;
+
+  return (
+    <div
+      className={cn(
+        "fixed top-5 z-[9999] flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10121A]/95 border border-primary/50 shadow-xl shadow-primary/15 text-xs font-mono select-none backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200 pointer-events-none transition-all",
+        isScanning ? "right-56" : "right-6"
+      )}
+    >
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+      </span>
+      <span className="text-zinc-400 text-[10px] font-semibold tracking-wider uppercase">Scan Timer</span>
+      <span className="font-bold text-primary tabular-nums text-xs">
+        {(elapsedMs / 1000).toFixed(1)}s
+      </span>
+    </div>
+  );
+});
+
 function App() {
   const [testForceExpired, setTestForceExpired] = useState(false);
   const isBetaExpired = (Date.now() > new Date(BETA_EXPIRY_DATE_STR).getTime()) || testForceExpired;
@@ -133,19 +174,6 @@ function App() {
   const [scanningProjectId, setScanningProjectId] = useState<string | null>(null);
   // Development scan benchmark stopwatch
   const [scanStartTime, setScanStartTime] = useState<number | null>(null);
-  const [scanElapsedMs, setScanElapsedMs] = useState<number>(0);
-
-  // Live stopwatch ticker for development scan timer
-  useEffect(() => {
-    if (!scanStartTime) {
-      setScanElapsedMs(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      setScanElapsedMs(Date.now() - scanStartTime);
-    }, 50);
-    return () => clearInterval(interval);
-  }, [scanStartTime]);
 
   const scanGameContainerRef = useRef<HTMLDivElement>(null);
   const [isTabsRestored, setIsTabsRestored] = useState(false);
@@ -815,7 +843,16 @@ function App() {
   }, [activeTabId, tabs, activeProjectId, projects]);
 
   const handleChangeTab = (updatedTab: RequestTab) => {
-    setTabs((prev) => prev.map((t) => (t.id === updatedTab.id ? updatedTab : t)));
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== updatedTab.id) return t;
+        return {
+          ...updatedTab,
+          response: t.response,
+          lastCompletedAt: t.lastCompletedAt,
+        };
+      })
+    );
 
     const targetId = updatedTab.routeId || updatedTab.id;
     if (!targetId) return;
@@ -1318,7 +1355,6 @@ function App() {
     const scanStartMs = Date.now();
     setScanningProjectId(project.id);
     setScanStartTime(scanStartMs);
-    setScanElapsedMs(0);
 
     // Mock Demo project rescan handler (preserves routes and simulates realistic scan)
     if (project.path.startsWith("mock://") || project.id === "proj_demo_store") {
@@ -1529,7 +1565,6 @@ function App() {
     const startMs = Date.now();
     setScanningProjectId(targetProject.id);
     setScanStartTime(startMs);
-    setScanElapsedMs(0);
     toast.info("Scanning backend routes...");
 
     if (!targetProject.path.startsWith("mock://")) {
@@ -2006,22 +2041,11 @@ function App() {
       <Toaster position="top-right" richColors closeButton theme="dark" />
 
       {/* Development Diagnostic Tool: Live Top-Right Scan Stopwatch */}
-      {showDevScanTimer && scanStartTime !== null && (
-        <div
-          className={cn(
-            "fixed top-5 z-[9999] flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10121A]/95 border border-primary/50 shadow-xl shadow-primary/15 text-xs font-mono select-none backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200 pointer-events-none transition-all",
-            Boolean(scanningProjectId) ? "right-56" : "right-6"
-          )}
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-          </span>
-          <span className="text-zinc-400 text-[10px] font-semibold tracking-wider uppercase">Scan Timer</span>
-          <span className="font-bold text-primary tabular-nums text-xs">
-            {(scanElapsedMs / 1000).toFixed(1)}s
-          </span>
-        </div>
+      {showDevScanTimer && (
+        <ScanBenchmarkTimerBadge
+          startTime={scanStartTime}
+          isScanning={Boolean(scanningProjectId)}
+        />
       )}
       {/* Updating & Auto-Relaunch Screen */}
       {isApplyingUpdate && (
@@ -2079,22 +2103,41 @@ function App() {
           activeTab={activeSidebarTab}
           onTabChange={setActiveSidebarTab}
           sidebarContent={sidebarContent}
-          sidebarHeader={
-            activeSidebarTab === "environments" ? (
-              <span className="text-[12px] font-medium tracking-wide text-foreground/90">
-                Environments
-              </span>
-            ) : (
-              <BackendSelectorDropdown
-                projects={projects}
-                activeProject={projects.find((p) => p.id === activeProjectId)}
-                onSelectProject={(id) => setActiveProjectId(id)}
-                onAddProjectClick={handleAddBackendFolder}
-                onCloseBackend={() => setActiveProjectId(null)}
-                onRemoveProject={handleRemoveProject}
-              />
-            )
-          }
+          sidebarHeader={(() => {
+            switch (activeSidebarTab) {
+              case "environments":
+                return (
+                  <span className="text-[12px] font-medium tracking-wide text-foreground/90">
+                    Environments
+                  </span>
+                );
+              case "automations":
+                return (
+                  <span className="text-[12px] font-medium tracking-wide text-foreground/90">
+                    Automations
+                  </span>
+                );
+              case "settings":
+                return (
+                  <span className="text-[12px] font-medium tracking-wide text-foreground/90">
+                    Settings
+                  </span>
+                );
+              case "explorer":
+              default:
+                return (
+                  <BackendSelectorDropdown
+                    projects={projects}
+                    activeProject={projects.find((p) => p.id === activeProjectId)}
+                    onSelectProject={(id) => setActiveProjectId(id)}
+                    onAddProjectClick={handleAddBackendFolder}
+                    onCloseBackend={() => setActiveProjectId(null)}
+                    onRemoveProject={handleRemoveProject}
+                  />
+                );
+            }
+          })()}
+          isScanning={Boolean(scanningProjectId)}
           isSidebarExpanded={isSidebarExpanded}
           onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
           sidebarWidth={sidebarWidth}
@@ -2158,49 +2201,92 @@ function App() {
             treeCache={treeCache}
           />
 
-          {/* Center Workspace Area: If scanning, cleanly display ScanningFactsOverlay as the primary center view */}
-          {Boolean(scanningProjectId) ? (
-            <ErrorBoundary fallback={null}>
-              <ScanningFactsOverlay
-                projectName={projects.find((p) => p.id === scanningProjectId)?.name}
-                onDismiss={() => setScanningProjectId(null)}
-              />
-            </ErrorBoundary>
-          ) : activeSidebarTab === "environments" ? (
-            <EnvironmentEditorView
-              environment={currentSelectedEnv}
-              project={projects.find((p) => p.id === currentSelectedEnv.projectId)}
-              isActiveForProject={
-                Boolean(
-                  currentSelectedEnv.projectId &&
-                    activeBackendEnvMap[currentSelectedEnv.projectId] === currentSelectedEnv.id
-                )
-              }
-              onUpdateEnvironment={handleUpdateEnvironment}
-              onToggleActive={() => {
-                if (currentSelectedEnv.projectId) {
-                  const currentActive = activeBackendEnvMap[currentSelectedEnv.projectId];
-                  handleSetActiveBackendEnv(
-                    currentSelectedEnv.projectId,
-                    currentActive === currentSelectedEnv.id ? null : currentSelectedEnv.id
+          {/* Center Workspace Area: Delegated cleanly and dynamically by activeSidebarTab */}
+          {(() => {
+            switch (activeSidebarTab) {
+              case "environments":
+                return (
+                  <EnvironmentEditorView
+                    environment={currentSelectedEnv}
+                    project={projects.find((p) => p.id === currentSelectedEnv.projectId)}
+                    isActiveForProject={
+                      Boolean(
+                        currentSelectedEnv.projectId &&
+                          activeBackendEnvMap[currentSelectedEnv.projectId] === currentSelectedEnv.id
+                      )
+                    }
+                    onUpdateEnvironment={handleUpdateEnvironment}
+                    onToggleActive={() => {
+                      if (currentSelectedEnv.projectId) {
+                        const currentActive = activeBackendEnvMap[currentSelectedEnv.projectId];
+                        handleSetActiveBackendEnv(
+                          currentSelectedEnv.projectId,
+                          currentActive === currentSelectedEnv.id ? null : currentSelectedEnv.id
+                        );
+                      }
+                    }}
+                    onOpenCopyModal={(id) => setCopyModalSourceEnvId(id)}
+                    onDuplicateEnvironment={handleDuplicateEnvironment}
+                    onExportEnvironment={handleExportEnvironment}
+                  />
+                );
+
+              case "automations":
+                return (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 select-none text-muted-foreground">
+                    <p className="text-sm">Select or create an automation workspace from the sidebar.</p>
+                  </div>
+                );
+
+              case "settings":
+                return (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 select-none text-muted-foreground">
+                    <p className="text-sm">Configure application settings and preferences from the sidebar.</p>
+                  </div>
+                );
+
+              case "explorer":
+              default: {
+                // If the active project is actively scanning in the background, show ScanningFactsOverlay
+                const isCurrentProjectScanning = Boolean(
+                  scanningProjectId &&
+                  (scanningProjectId === activeProjectId || !activeProjectId)
+                );
+
+                const scanningProject = projects.find((p) => p.id === scanningProjectId);
+                if (isCurrentProjectScanning) {
+                  return (
+                    <ErrorBoundary fallback={null}>
+                      <ScanningFactsOverlay
+                        projectName={scanningProject?.name}
+                        projectPath={scanningProject?.path}
+                        onDismiss={() => setScanningProjectId(null)}
+                        onCancel={
+                          scanningProject
+                            ? () => handleCancelScan(scanningProject)
+                            : undefined
+                        }
+                      />
+                    </ErrorBoundary>
                   );
                 }
-              }}
-              onOpenCopyModal={(id) => setCopyModalSourceEnvId(id)}
-              onDuplicateEnvironment={handleDuplicateEnvironment}
-              onExportEnvironment={handleExportEnvironment}
-            />
-          ) : isProjectsLoaded && isTabsRestored && (projects.length === 0 || !activeProjectId) && tabs.length === 0 ? (
-            <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
-              <OnboardingView
-                onOpenFolder={handleAddBackendFolder}
-                onQuickRequest={handleQuickRequest}
-                onLoadDemo={handleLoadDemoProject}
-                onOpenManualModal={handleAddBackendFolder}
-                appVersion={appVersion}
-              />
-            </div>
-          ) : (
+
+            // 3. Default Workspace Area (Explorer tabs / Onboarding / Future tabs)
+            if (isProjectsLoaded && isTabsRestored && (projects.length === 0 || !activeProjectId) && tabs.length === 0) {
+              return (
+                <div className="flex-grow flex flex-col items-center justify-center p-8 select-none overflow-y-auto">
+                  <OnboardingView
+                    onOpenFolder={handleAddBackendFolder}
+                    onQuickRequest={handleQuickRequest}
+                    onLoadDemo={handleLoadDemoProject}
+                    onOpenManualModal={handleAddBackendFolder}
+                    appVersion={appVersion}
+                  />
+                </div>
+              );
+            }
+
+            return (
             <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] overflow-hidden">
               {/* Request Tabs Row */}
               <WorkspaceTabs
@@ -2311,8 +2397,11 @@ function App() {
                 </div>
               )}
             </div>
-          )}
-        </DashboardLayout>
+          );
+        }
+      }
+    })()}
+      </DashboardLayout>
       </ErrorBoundary>
       )}
 

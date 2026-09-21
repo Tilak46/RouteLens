@@ -18,6 +18,9 @@ export type OmniFramework =
   | "spring"
   | "laravel"
   | "go-http"
+  | "axum"
+  | "actix"
+  | "ktor"
   | "custom"
   | "unknown";
 

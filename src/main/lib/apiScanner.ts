@@ -29,9 +29,31 @@ function mapOmniToApiRoute(
   };
 }
 
+import fs from "node:fs";
+import { Worker } from "node:worker_threads";
+import type { OmniScanResult } from "./scanner/omniroute/types";
+import type { ScanProgressUpdate } from "../../types";
+
+function getScannerWorkerPath(): string | null {
+  const candidates = [
+    path.join(__dirname, "scannerWorker.js"),
+    path.join(__dirname, "../scannerWorker.js"),
+    path.resolve(process.cwd(), "out/main/scannerWorker.js"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      const unpacked = c.replace("app.asar", "app.asar.unpacked");
+      if (fs.existsSync(unpacked)) return unpacked;
+      return c;
+    }
+  }
+  return null;
+}
+
 export async function scanProjectForRoutes(
   projectPath: string,
   abortSignal?: AbortSignal,
+  onProgress?: (progress: ScanProgressUpdate) => void,
 ): Promise<{ tree: ApiFolder[]; logs: string[]; potentialRoutesCount: number; detectedRoutesCount: number; cancelled?: boolean }> {
   const logs: string[] = [];
   const log = (msg: string) => logs.push(msg);
@@ -72,47 +94,169 @@ export async function scanProjectForRoutes(
 
   try {
     const t0 = performance.now();
-    const scanPromise = (async () => {
-      const result = await scanOmniRoutes(projectPath, {
-        mode: "ast",
-        abortSignal,
-        onHeartbeat: heartbeat,
-      });
-      const durationMs = Math.round(performance.now() - t0);
+    const workerPath = getScannerWorkerPath();
 
-      if (abortSignal?.aborted) {
-        log(`[OmniRoute Engine] Scan was cancelled by user after ${durationMs}ms.`);
-        return {
-          tree: [],
-          logs,
-          potentialRoutesCount: 0,
-          detectedRoutesCount: 0,
-          cancelled: true,
+    let scanPromise: Promise<{
+      tree: ApiFolder[];
+      logs: string[];
+      potentialRoutesCount: number;
+      detectedRoutesCount: number;
+      cancelled?: boolean;
+    }>;
+
+    if (workerPath) {
+      log(`[OmniRoute Engine] Offloading scan to background worker thread: ${workerPath}`);
+      scanPromise = new Promise((resolve, reject) => {
+        const worker = new Worker(workerPath);
+
+        const cleanup = () => {
+          worker.removeAllListeners();
         };
-      }
 
-      log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
+        if (abortSignal) {
+          const onAbort = () => {
+            log(`[OmniRoute Engine] Abort signal received. Terminating worker thread immediately.`);
+            cleanup();
+            worker.terminate().finally(() => {
+              resolve({
+                tree: [],
+                logs,
+                potentialRoutesCount: 0,
+                detectedRoutesCount: 0,
+                cancelled: true,
+              });
+            });
+          };
 
-      const apiRoutes = result.routes.map((r) =>
-        mapOmniToApiRoute(projectPath, r),
-      );
+          if (abortSignal.aborted) {
+            onAbort();
+            return;
+          }
+          abortSignal.addEventListener("abort", onAbort, { once: true });
+        }
 
-      // AI route naming is bypassed by default so the UI gets instantaneous speed (<1s)
-      const namedRoutes = await maybeApplyAiRouteNames(apiRoutes, {
-        logs,
-        projectPath,
+        worker.on("message", async (msg) => {
+          if (msg.type === "heartbeat") {
+            heartbeat();
+          } else if (msg.type === "progress") {
+            heartbeat();
+            if (onProgress && msg.progress) {
+              try {
+                onProgress(msg.progress);
+              } catch {
+                // ignore
+              }
+            }
+          } else if (msg.type === "done") {
+            cleanup();
+            worker.terminate();
+            const result: OmniScanResult = msg.result;
+            const durationMs = Math.round(performance.now() - t0);
+
+            if (abortSignal?.aborted) {
+              log(`[OmniRoute Engine] Scan was cancelled by user after ${durationMs}ms.`);
+              resolve({
+                tree: [],
+                logs,
+                potentialRoutesCount: 0,
+                detectedRoutesCount: 0,
+                cancelled: true,
+              });
+              return;
+            }
+
+            log(`[OmniRoute Engine] Background worker scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
+
+            const apiRoutes = result.routes.map((r) =>
+              mapOmniToApiRoute(projectPath, r),
+            );
+
+            const namedRoutes = await maybeApplyAiRouteNames(apiRoutes, {
+              logs,
+              projectPath,
+            });
+
+            const tree = synthesizeApiCollection(namedRoutes, { repoRoot: projectPath });
+
+            resolve({
+              tree,
+              logs,
+              potentialRoutesCount: apiRoutes.length,
+              detectedRoutesCount: apiRoutes.length,
+              cancelled: false,
+            });
+          } else if (msg.type === "error") {
+            cleanup();
+            worker.terminate();
+            reject(new Error(msg.error));
+          }
+        });
+
+        worker.on("error", (err) => {
+          cleanup();
+          reject(err);
+        });
+
+        worker.on("exit", (code) => {
+          if (code !== 0 && !abortSignal?.aborted) {
+            cleanup();
+            reject(new Error(`Scanner worker exited unexpectedly with code ${code}`));
+          }
+        });
+
+        worker.postMessage({
+          type: "start-scan",
+          projectPath,
+          options: {
+            mode: "ast",
+          },
+        });
       });
+    } else {
+      // In-process fallback when running in scripts/dev without bundled worker
+      log(`[OmniRoute Engine] Running in-process AST scan fallback.`);
+      scanPromise = (async () => {
+        const result = await scanOmniRoutes(projectPath, {
+          mode: "ast",
+          abortSignal,
+          onProgress,
+          onHeartbeat: heartbeat,
+        });
+        const durationMs = Math.round(performance.now() - t0);
 
-      const tree = synthesizeApiCollection(namedRoutes, { repoRoot: projectPath });
+        if (abortSignal?.aborted) {
+          log(`[OmniRoute Engine] Scan was cancelled by user after ${durationMs}ms.`);
+          return {
+            tree: [],
+            logs,
+            potentialRoutesCount: 0,
+            detectedRoutesCount: 0,
+            cancelled: true,
+          };
+        }
 
-      return { 
-        tree, 
-        logs,
-        potentialRoutesCount: apiRoutes.length,
-        detectedRoutesCount: apiRoutes.length,
-        cancelled: false,
-      };
-    })();
+        log(`[OmniRoute Engine] Scan completed in ${durationMs} ms. Found ${result.routes.length} routes across ${result.candidateFilesCount} candidate files.`);
+
+        const apiRoutes = result.routes.map((r) =>
+          mapOmniToApiRoute(projectPath, r),
+        );
+
+        const namedRoutes = await maybeApplyAiRouteNames(apiRoutes, {
+          logs,
+          projectPath,
+        });
+
+        const tree = synthesizeApiCollection(namedRoutes, { repoRoot: projectPath });
+
+        return {
+          tree,
+          logs,
+          potentialRoutesCount: apiRoutes.length,
+          detectedRoutesCount: apiRoutes.length,
+          cancelled: false,
+        };
+      })();
+    }
 
     return await Promise.race([scanPromise, watchdogPromise]);
   } catch (error: any) {

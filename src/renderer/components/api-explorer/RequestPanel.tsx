@@ -33,7 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequestTab } from "./WorkspaceTabs";
 import { ApiVariable } from "../../types/environments";
 import { interpolate, ScopedVariable } from "@/lib/interpolationEngine";
-import { RichUrlInput } from "./RichUrlInput";
+import { RichUrlInput, parsePathVariableToken } from "./RichUrlInput";
 import { extractRoutePath } from "@/views/ApiExplorerView";
 import { toast } from "sonner";
 import {
@@ -56,23 +56,30 @@ type RequestPanelProps = {
   onSaveAsTab?: (tab: RequestTab) => void;
 };
 
+export interface PathParamInfo {
+  key: string;
+  raw: string;
+  typeHint?: string;
+}
 
-
-const getPathParamsFromUrl = (urlStr: string): string[] => {
+export const getPathParamsFromUrl = (urlStr: string): PathParamInfo[] => {
   if (!urlStr) return [];
   try {
-    const pathPart = urlStr.replace(/^https?:\/\/[^\/]+/, "");
-    const segments = pathPart.split("/");
-    const params: string[] = [];
-    segments.forEach((seg) => {
-      if (seg.startsWith(":") && seg.length > 1) {
-        const paramName = seg.slice(1).split("?")[0].replace(/[^a-zA-Z0-9_-]/g, "");
-        if (paramName && !params.includes(paramName)) {
-          params.push(paramName);
-        }
+    const cleanUrl = urlStr.split("?")[0].split("#")[0];
+    const withoutEnvVars = cleanUrl.replace(/\{\{[^{}]+\}\}/g, "");
+    const tokenRegex = /(?<=\/)(:[a-zA-Z0-9_-]+|\{(?!\{)[^{}/]+\}|<[^<>/]+>|\[[^\[\]/]+\])/g;
+    const matches = withoutEnvVars.match(tokenRegex) || [];
+    const result: PathParamInfo[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const token of matches) {
+      const parsed = parsePathVariableToken(token);
+      if (parsed && parsed.key && !seenKeys.has(parsed.key)) {
+        seenKeys.add(parsed.key);
+        result.push(parsed);
       }
-    });
-    return params;
+    }
+    return result;
   } catch (e) {
     return [];
   }
@@ -503,27 +510,140 @@ export function RequestPanel({
   }, []);
 
   useEffect(() => {
-    const updated = urlPathParams.map((pName) => {
-      const existing = pathVariables.find((v) => v.key === pName);
-      if (existing) return existing;
+    const updated = urlPathParams.map((param) => {
+      const existing = pathVariables.find((v) => v.key === param.key);
+      if (existing) {
+        return {
+          ...existing,
+          rawToken: param.raw,
+          typeHint: param.typeHint,
+        };
+      }
       return {
-        id: pName,
+        id: param.key,
         enabled: true,
-        key: pName,
+        key: param.key,
         value: "",
-        description: `Path parameter :${pName}`,
+        description: `Path parameter ${param.raw}`,
+        rawToken: param.raw,
+        typeHint: param.typeHint,
       };
     });
 
-    const keysMatch =
+    const isMatch =
       updated.length === pathVariables.length &&
-      updated.every((item, idx) => pathVariables[idx] && pathVariables[idx].key === item.key);
+      updated.every((item, idx) => {
+        const curr = pathVariables[idx];
+        return (
+          curr &&
+          curr.key === item.key &&
+          curr.rawToken === item.rawToken &&
+          curr.typeHint === item.typeHint
+        );
+      });
 
-    if (!keysMatch) {
+    if (!isMatch) {
       setPathVariables(updated);
       updateParentTab({ pathVariables: updated });
     }
   }, [urlPathParams]);
+
+  const handleFillSamplePathVariables = () => {
+    const updated = pathVariables.map((pv) => {
+      if (pv.value && pv.value.trim()) return pv;
+      const keyLower = (pv.key || "").toLowerCase();
+      const typeLower = (pv.typeHint || "").toLowerCase();
+      let sample = "1";
+
+      if (typeLower === "uuid" || keyLower.includes("uuid") || keyLower.includes("guid")) {
+        sample = "123e4567-e89b-12d3-a456-426614174000";
+      } else if (
+        typeLower === "int" ||
+        typeLower === "integer" ||
+        typeLower === "number" ||
+        keyLower.endsWith("id") ||
+        keyLower === "id" ||
+        keyLower.includes("count") ||
+        keyLower.includes("num")
+      ) {
+        sample = "1";
+      } else if (typeLower === "bool" || typeLower === "boolean") {
+        sample = "true";
+      } else if (
+        typeLower === "catch-all" ||
+        typeLower === "path" ||
+        keyLower.includes("path") ||
+        keyLower.includes("slug")
+      ) {
+        sample = "sample-item";
+      } else if (keyLower.includes("user") || keyLower.includes("username")) {
+        sample = "john_doe";
+      } else if (keyLower.includes("email")) {
+        sample = "user@example.com";
+      } else if (keyLower.includes("name")) {
+        sample = "sample-name";
+      } else {
+        sample = "test";
+      }
+
+      return {
+        ...pv,
+        value: sample,
+      };
+    });
+
+    setPathVariables(updated);
+    updateParentTab({ pathVariables: updated });
+    toast.success("Filled sample values for path variables");
+  };
+
+  const activeRequestIdRef = useRef<string | null>(null);
+
+  const handleCancelRequest = async () => {
+    if (activeRequestIdRef.current) {
+      try {
+        await apiClient.cancelApiRequest(activeRequestIdRef.current);
+      } catch (e) {
+        // ignore
+      }
+      activeRequestIdRef.current = null;
+    }
+    setLoading(false);
+    onRun({
+      ok: false,
+      status: 0,
+      statusText: "Cancelled",
+      timeMs: 0,
+      sizeBytes: 0,
+      headers: {},
+      bodyText: "",
+      error: "Request was cancelled",
+    });
+    toast.info("Request cancelled");
+  };
+
+  const resolvedUrl = useMemo(() => {
+    if (!url) return "";
+    let res = url;
+    pathVariables.forEach((pv) => {
+      if (pv.key) {
+        const val = interpolate(pv.value || "", activeVariables || []);
+        const cleanKey = pv.key;
+        const escapedClean = cleanKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (pv.rawToken) {
+          const escapedRaw = pv.rawToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          res = res.replace(new RegExp(escapedRaw, "g"), val || pv.rawToken);
+        }
+        res = res
+          .replace(new RegExp(`:${escapedClean}(?=[/?&#]|$)`, "g"), val || `:${cleanKey}`)
+          .replace(new RegExp(`\\{${escapedClean}(?::[^}]+)?\\}`, "g"), val || `{${cleanKey}}`)
+          .replace(new RegExp(`<([^>]+:)?${escapedClean}>`, "g"), val || `<${cleanKey}>`)
+          .replace(new RegExp(`\\[(\\.\\.\\.)?${escapedClean}\\]`, "g"), val || `[${cleanKey}]`);
+      }
+    });
+    res = interpolate(res, activeVariables || []);
+    return res;
+  }, [url, pathVariables, activeVariables]);
 
   const warningBanner = null;
 
@@ -606,9 +726,10 @@ export function RequestPanel({
 
   // Propagate local state changes back to parent tab state
   const updateParentTab = (patch: Partial<RequestTab>) => {
+    const { response, lastCompletedAt, ...restPatch } = patch;
     onChangeTab({
       ...tab,
-      ...patch,
+      ...restPatch,
     });
   };
 
@@ -763,15 +884,43 @@ export function RequestPanel({
       }
     }
 
-    // Substitute Path Variables (:id and {id})
+    // Check for empty path variables and warn user
+    const emptyPathVars = pathVariables.filter((pv) => !pv.value || !pv.value.trim());
+    if (emptyPathVars.length > 0) {
+      toast.warning(
+        `Path variable ${emptyPathVars.map((p) => p.rawToken || `:${p.key}`).join(", ")} is empty. The request may fail.`,
+        {
+          action: {
+            label: "Fill Samples",
+            onClick: () => handleFillSamplePathVariables(),
+          },
+        }
+      );
+    }
+
+    // Substitute Path Variables (:id, {id}, {id:int}, <int:id>, [id], [...slug])
     pathVariables.forEach((pv) => {
       if (pv.enabled && pv.key) {
         const evaluatedValue = interpolate(pv.value || "", localVars);
-        const escapedKey = pv.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const colonRegex = new RegExp(`:${escapedKey}(?=[/?&#]|$)`, "g");
-        const braceRegex = new RegExp(`\\{${escapedKey}\\}`, "g");
+        const cleanKey = pv.key;
+        const escapedClean = cleanKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        
+        if (pv.rawToken) {
+          const escapedRaw = pv.rawToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          currentUrl = currentUrl.replace(new RegExp(escapedRaw, "g"), evaluatedValue || pv.rawToken);
+        }
+
+        const colonRegex = new RegExp(`:${escapedClean}(?=[/?&#]|$)`, "g");
+        const braceRegex = new RegExp(`\\{${escapedClean}(?::[^}]+)?\\}`, "g");
+        const angleRegex = new RegExp(`<([^>]+:)?${escapedClean}>`, "g");
+        const squareRegex = new RegExp(`\\[(\\.\\.\\.)?${escapedClean}\\]`, "g");
+
         const replacement = evaluatedValue || `:${pv.key}`;
-        currentUrl = currentUrl.replace(colonRegex, replacement).replace(braceRegex, replacement);
+        currentUrl = currentUrl
+          .replace(colonRegex, replacement)
+          .replace(braceRegex, replacement)
+          .replace(angleRegex, replacement)
+          .replace(squareRegex, replacement);
       }
     });
 
@@ -865,7 +1014,11 @@ export function RequestPanel({
         return auth;
       })();
 
+      const reqId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      activeRequestIdRef.current = reqId;
+
       const req: ApiHttpRequest = {
+        requestId: reqId,
         method,
         url: interpolatedUrl,
         query: finalParams,
@@ -943,6 +1096,7 @@ export function RequestPanel({
         error: String(err?.message || err),
       });
     } finally {
+      activeRequestIdRef.current = null;
       setLoading(false);
     }
   };
@@ -1364,22 +1518,56 @@ export function RequestPanel({
         )}
 
         <Button
-          onClick={handleSend}
-          disabled={loading}
-          title="Send Request (Ctrl+Enter)"
-          className="bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground px-4 h-[34px] rounded font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs min-w-[95px] cursor-pointer select-none"
+          onClick={loading ? handleCancelRequest : handleSend}
+          title={loading ? "Cancel Request" : "Send Request (Ctrl+Enter)"}
+          className={cn(
+            "px-4 h-[34px] rounded font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs min-w-[95px] cursor-pointer select-none active:scale-[0.98]",
+            loading
+              ? "bg-rose-600 hover:bg-rose-700 text-white"
+              : "bg-primary hover:bg-primary/90 text-primary-foreground"
+          )}
         >
           {loading ? (
-            <Loader2 size={13} className="animate-spin" />
+            <>
+              <Loader2 size={13} className="animate-spin" />
+              <span>Cancel</span>
+            </>
           ) : (
-            <Play size={11} fill="currentColor" />
+            <>
+              <Play size={11} fill="currentColor" />
+              <span>Send</span>
+              <kbd className="hidden sm:inline-flex items-center text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground/90 px-1 py-0.5 rounded font-normal ml-0.5 tracking-tighter">
+                ↵
+              </kbd>
+            </>
           )}
-          <span>Send</span>
-          <kbd className="hidden sm:inline-flex items-center text-[10px] font-mono bg-primary-foreground/20 text-primary-foreground/90 px-1 py-0.5 rounded font-normal ml-0.5 tracking-tighter">
-            ↵
-          </kbd>
         </Button>
       </div>
+
+      {/* Real-time Resolved URL Preview */}
+      {resolvedUrl && resolvedUrl !== url && (
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-md bg-muted/25 border border-border/40 text-[11px] font-mono text-muted-foreground animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 font-sans shrink-0">
+              Resolved:
+            </span>
+            <span className="truncate text-foreground/90 select-all font-mono" title={resolvedUrl}>
+              {resolvedUrl}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(resolvedUrl);
+              toast.success("Resolved URL copied to clipboard");
+            }}
+            className="shrink-0 p-1 rounded hover:bg-muted/50 hover:text-foreground text-muted-foreground transition-colors"
+            title="Copy Resolved URL"
+          >
+            <Copy size={12} />
+          </button>
+        </div>
+      )}
 
       {warningBanner && (
         <div className="flex items-center justify-between gap-3 p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-md mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -1476,73 +1664,98 @@ export function RequestPanel({
 
           {pathVariables.length > 0 && (
             <div>
-              <div className="text-[10px] font-bold text-muted-foreground mb-2 tracking-wider uppercase mt-4">
-                Path Variables
+              <div className="flex items-center justify-between mb-2 mt-4">
+                <div className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase flex items-center gap-2">
+                  <span>Path Variables</span>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground">
+                    {pathVariables.length}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleFillSamplePathVariables}
+                  className="h-6 text-[11px] px-2.5 py-0 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center gap-1.5 cursor-pointer shadow-none"
+                  title="Auto-fill sample values for all path variables"
+                >
+                  <Sparkles size={11} className="text-primary" />
+                  <span>Fill Sample Values</span>
+                </Button>
               </div>
               <div className="border border-border/60 rounded-md overflow-hidden bg-card/5 mt-2">
                 {/* Header */}
                 <div className="flex bg-muted/20 border-b border-border/40 select-none text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  <div className="w-9 shrink-0 flex items-center justify-center border-r border-border/40 py-1.5" />
-                  <div className="flex-1 min-w-0 px-3 py-1.5 border-r border-border/40">Key</div>
+                  <div className="w-16 shrink-0 flex items-center justify-center border-r border-border/40 py-1.5 text-center">
+                    Status
+                  </div>
+                  <div className="w-48 shrink-0 px-3 py-1.5 border-r border-border/40">Variable</div>
                   <div className="flex-1 min-w-0 px-3 py-1.5 border-r border-border/40">Value</div>
-                  <div className="flex-1 min-w-0 px-3 py-1.5 border-r border-border/40">Description</div>
-                  <div className="w-9 shrink-0 py-1.5" />
+                  <div className="flex-1 min-w-0 px-3 py-1.5">Description</div>
                 </div>
                 {/* Body */}
                 <div className="divide-y divide-border/40">
-                  {pathVariables.map((row) => (
-                    <div key={row.id} className="flex items-center group bg-card/5 hover:bg-muted/5 transition-colors">
-                      {/* Checkbox wrapper */}
-                      <div className="w-9 h-8 shrink-0 flex items-center justify-center border-r border-border/40">
-                        <Checkbox
-                          checked={row.enabled}
-                          onCheckedChange={(v) => {
-                            const updated = pathVariables.map((r) => r.id === row.id ? { ...r, enabled: v === true } : r);
-                            setPathVariables(updated);
-                            updateParentTab({ pathVariables: updated });
-                          }}
-                          className="border-border/85"
-                        />
+                  {pathVariables.map((row) => {
+                    const isFilled = Boolean(row.value && row.value.trim());
+                    return (
+                      <div key={row.id} className="flex items-center group bg-card/5 hover:bg-muted/5 transition-colors">
+                        {/* Status badge */}
+                        <div className="w-16 h-8 shrink-0 flex items-center justify-center border-r border-border/40 select-none">
+                          {isFilled ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wider bg-emerald-500/15 text-emerald-500 dark:text-emerald-400">
+                              SET
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wider bg-amber-500/15 text-amber-500 dark:text-amber-400">
+                              EMPTY
+                            </span>
+                          )}
+                        </div>
+                        {/* Variable key and type hint */}
+                        <div className="w-48 shrink-0 border-r border-border/40 h-8 flex items-center px-3 text-xs text-foreground font-mono select-none overflow-hidden text-ellipsis whitespace-nowrap gap-1.5">
+                          <span className="text-primary font-semibold truncate">
+                            {row.rawToken || `:${row.key}`}
+                          </span>
+                          {row.typeHint && (
+                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] bg-muted/70 text-muted-foreground font-sans border border-border/40">
+                              {row.typeHint}
+                            </span>
+                          )}
+                        </div>
+                        {/* Value field */}
+                        <div className="flex-1 min-w-0 border-r border-border/40 h-8 flex items-center">
+                          <RichUrlInput
+                            value={row.value || ""}
+                            onChange={(val) => {
+                              const updated = pathVariables.map((r) => r.id === row.id ? { ...r, value: val } : r);
+                              setPathVariables(updated);
+                              updateParentTab({ pathVariables: updated });
+                            }}
+                            placeholder="Value"
+                            activeVariables={activeVariables}
+                            activeEnvName={activeEnvName}
+                            onAddOrUpdateVariable={onAddOrUpdateVariable}
+                            borderless={true}
+                            className="h-full w-full"
+                            pathVariables={pathVariables}
+                          />
+                        </div>
+                        {/* Description field */}
+                        <div className="flex-1 min-w-0 h-8 flex items-center">
+                          <Input
+                            value={row.description || ""}
+                            onChange={(e) => {
+                              const updated = pathVariables.map((r) => r.id === row.id ? { ...r, description: e.target.value } : r);
+                              setPathVariables(updated);
+                              updateParentTab({ pathVariables: updated });
+                            }}
+                            placeholder="Description"
+                            className="h-full w-full bg-transparent border-0 rounded-none text-xs text-foreground px-3 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/35"
+                          />
+                        </div>
                       </div>
-                      {/* Key field (read-only) */}
-                      <div className="flex-1 min-w-0 border-r border-border/40 h-8 flex items-center px-3 text-xs text-muted-foreground font-mono select-none">
-                        :{row.key}
-                      </div>
-                      {/* Value field */}
-                      <div className="flex-1 min-w-0 border-r border-border/40 h-8 flex items-center">
-                        <RichUrlInput
-                          value={row.value || ""}
-                          onChange={(val) => {
-                            const updated = pathVariables.map((r) => r.id === row.id ? { ...r, value: val } : r);
-                            setPathVariables(updated);
-                            updateParentTab({ pathVariables: updated });
-                          }}
-                          placeholder="Value"
-                          activeVariables={activeVariables}
-                          activeEnvName={activeEnvName}
-                          onAddOrUpdateVariable={onAddOrUpdateVariable}
-                          borderless={true}
-                          className="h-full w-full"
-                          pathVariables={pathVariables}
-                        />
-                      </div>
-                      {/* Description field */}
-                      <div className="flex-1 min-w-0 border-r border-border/40 h-8 flex items-center">
-                        <Input
-                          value={row.description || ""}
-                          onChange={(e) => {
-                            const updated = pathVariables.map((r) => r.id === row.id ? { ...r, description: e.target.value } : r);
-                            setPathVariables(updated);
-                            updateParentTab({ pathVariables: updated });
-                          }}
-                          placeholder="Description"
-                          className="h-full w-full bg-transparent border-0 rounded-none text-xs text-foreground px-3 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/35"
-                        />
-                      </div>
-                      {/* Empty Trash space for alignment */}
-                      <div className="w-9 h-8 shrink-0" />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

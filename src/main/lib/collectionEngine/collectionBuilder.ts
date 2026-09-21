@@ -11,14 +11,14 @@ export interface CollectionSynthesisOptions {
    * Minimum route count required to create a sub-entity folder.
    * If a sub-entity has fewer routes than this threshold, it is absorbed
    * directly into the parent domain collection to eliminate 1-route folder noise.
-   * Defaults to 2.
+   * Defaults to 2 (the < 2 mass guard rule).
    */
   minSubEntityClusterSize?: number;
 
   /**
    * Minimum route count required for a standalone top-level root collection.
    * Isolated singletons with fewer routes are absorbed into "General" or "System & Health".
-   * Defaults to 2.
+   * Defaults to 1.
    */
   minRootClusterSize?: number;
 
@@ -29,15 +29,32 @@ export interface CollectionSynthesisOptions {
 }
 
 /**
+ * Universal blocklist of HTTP verbs, operations, and state modifiers
+ * that must NEVER become directory folders in an API collection.
+ */
+export const ACTION_MODIFIER_BLOCKLIST = new Set([
+  "active", "rank", "rules", "rule", "toggle", "toggle-active", "status", "verify", "check", "download",
+  "upload", "presign", "search", "filter", "all", "details", "info", "overview", "count", "batch",
+  "sync", "bulk", "export", "import"
+]);
+
+/**
  * Builds a deterministic, adaptive Postman/Swagger-style API collection
  * from any list of scanned routes across any programming language.
+ *
+ * Implements an N-level recursive prefix Trie with:
+ * 1. Sub-Resource Mass Guard (minClusterSize >= 2): absorbs isolated 1-route singletons into parent.
+ * 2. Dynamic Hierarchy: recursively constructs subfolders as deep as routes naturally warrant.
+ * 3. Action Modifier Blocklist: prevents verbs and state flags from becoming spurious folders.
+ * 4. Redundant Single-Child Unwrapper: collapses 0-route single parents.
+ * 5. Deterministic Hierarchical & Method Sorting.
  */
 export function synthesizeApiCollection(
   routes: ApiRoute[],
   options?: CollectionSynthesisOptions
 ): ApiFolder[] {
   const minSubCluster = options?.minSubEntityClusterSize ?? 2;
-  const minRootCluster = options?.minRootClusterSize ?? 2;
+  const minRootCluster = options?.minRootClusterSize ?? 1;
   const analyzed = routes.map((r) => analyzeRouteConsensus(r, routes, options?.repoRoot));
 
   // 1. Group by Primary Domain
@@ -52,25 +69,24 @@ export function synthesizeApiCollection(
   const absorbedHealth: AnalyzedRoute[] = [];
 
   for (const [domainName, domainRoutes] of domainMap.entries()) {
-    // Check if domain is a dedicated System & Health domain
+    // Dedicated System & Health domain check
     if (domainName === "System & Health") {
       for (const r of domainRoutes) absorbedHealth.push(r);
       continue;
     }
 
-    // 2. Sub-Entity clustering inside domain
-    const subGroups = new Map<string, AnalyzedRoute[]>();
-    const rootDirect: AnalyzedRoute[] = [];
-
-    for (const r of domainRoutes) {
-      if (r.subFolders.length > 0 && r.subFolders[0].toLowerCase() !== domainName.toLowerCase()) {
-        const primarySub = r.subFolders[0];
-        if (!subGroups.has(primarySub)) subGroups.set(primarySub, []);
-        subGroups.get(primarySub)!.push(r);
-      } else {
-        rootDirect.push(r);
-      }
-    }
+    // 2. Prepare routes with sanitized subfolder segments
+    // Filter out blacklisted verbs/modifiers and self-referential domain names
+    const sanitizedRoutes = domainRoutes.map((r) => {
+      const cleanSub = (r.subFolders || []).filter((s) => {
+        const lower = s.toLowerCase();
+        return !ACTION_MODIFIER_BLOCKLIST.has(lower) && lower !== domainName.toLowerCase();
+      });
+      return {
+        ...r,
+        cleanSub,
+      };
+    });
 
     const domainFolder: ApiFolder = {
       id: crypto.createHash("sha256").update(domainName).digest("hex").slice(0, 12),
@@ -78,98 +94,92 @@ export function synthesizeApiCollection(
       children: [],
     };
 
-    // 3. Sub-Entity Absorption Rule:
-    // Only create a subfolder if it has >= minSubCluster routes!
-    for (const [subName, subRoutes] of subGroups.entries()) {
-      if (subRoutes.length >= minSubCluster) {
-        // Check for 3rd level sub-clusters (e.g. GMB -> Rank Tracker -> Keywords)
-        const deepGroups = new Map<string, AnalyzedRoute[]>();
-        const subDirect: AnalyzedRoute[] = [];
+    /**
+     * Recursive N-Level Trie Builder with Sub-Resource Mass Guard
+     */
+    function buildRecursiveLevel(
+      items: typeof sanitizedRoutes,
+      depth: number,
+      pathPrefix: string
+    ): (ApiFolder | ApiRoute)[] {
+      const groups = new Map<string, typeof sanitizedRoutes>();
+      const direct: typeof sanitizedRoutes = [];
 
-        for (const sr of subRoutes) {
-          if (sr.subFolders.length > 1 && sr.subFolders[1].toLowerCase() !== subName.toLowerCase()) {
-            const secondarySub = sr.subFolders[1];
-            if (!deepGroups.has(secondarySub)) deepGroups.set(secondarySub, []);
-            deepGroups.get(secondarySub)!.push(sr);
-          } else {
-            subDirect.push(sr);
-          }
-        }
-
-        const subFolder: ApiFolder = {
-          id: crypto.createHash("sha256").update(`${domainName}/${subName}`).digest("hex").slice(0, 12),
-          name: subName,
-          children: [],
-        };
-
-        const validDeepFolders: ApiFolder[] = [];
-        for (const [deepName, deepRoutes] of deepGroups.entries()) {
-          if (deepRoutes.length >= minSubCluster) {
-            const deepFolder: ApiFolder = {
-              id: crypto.createHash("sha256").update(`${domainName}/${subName}/${deepName}`).digest("hex").slice(0, 12),
-              name: deepName,
-              children: deepRoutes.map(dr => ({
-                ...dr.raw,
-                name: dr.operationName,
-              })),
-            };
-            validDeepFolders.push(deepFolder);
-          } else {
-            for (const dr of deepRoutes) subDirect.push(dr);
-          }
-        }
-
-        // If subDirect is empty and there is only 1 deep folder, collapse redundant intermediate chain!
-        // e.g. Support -> Tickets becomes "Support Tickets" directly under parent
-        if (subDirect.length === 0 && validDeepFolders.length === 1) {
-          const singleDeep = validDeepFolders[0];
-          const collapsedName = subName.toLowerCase().includes(singleDeep.name.toLowerCase())
-            ? singleDeep.name
-            : `${subName} ${singleDeep.name}`;
-          domainFolder.children.push({
-            id: crypto.createHash("sha256").update(`${domainName}/${collapsedName}`).digest("hex").slice(0, 12),
-            name: collapsedName,
-            children: singleDeep.children,
-          });
+      for (const item of items) {
+        if (depth < item.cleanSub.length) {
+          const seg = item.cleanSub[depth];
+          if (!groups.has(seg)) groups.set(seg, []);
+          groups.get(seg)!.push(item);
         } else {
-          for (const df of validDeepFolders) {
-            subFolder.children.push(df);
-          }
-          for (const dr of subDirect) {
-            subFolder.children.push({
-              ...dr.raw,
-              name: dr.operationName,
-            });
-          }
-          domainFolder.children.push(subFolder);
+          direct.push(item);
         }
-      } else {
-        // Absorb single route directly into parent domain! Zero 1-route subfolders!
-        for (const sr of subRoutes) rootDirect.push(sr);
       }
+
+      const result: (ApiFolder | ApiRoute)[] = [];
+
+      for (const [groupName, groupItems] of groups.entries()) {
+        // Sub-Resource Mass Guard:
+        // A subfolder is ONLY created if it has >= minSubCluster routes!
+        // If it has fewer routes, absorb into parent so we NEVER create 1-route clutter.
+        if (groupItems.length >= minSubCluster) {
+          const childPath = `${pathPrefix}/${groupName}`;
+          const childChildren = buildRecursiveLevel(groupItems, depth + 1, childPath);
+
+          const childFolder: ApiFolder = {
+            id: crypto.createHash("sha256").update(childPath).digest("hex").slice(0, 12),
+            name: groupName,
+            children: childChildren,
+          };
+
+          // Redundant Single-Child Unwrapping:
+          // If childFolder has 0 direct routes and EXACTLY 1 subfolder, unwrap/collapse it!
+          const directCount = childFolder.children.filter((c) => !("children" in c)).length;
+          const subCount = childFolder.children.filter((c) => "children" in c).length;
+          if (directCount === 0 && subCount === 1) {
+            const onlyChild = childFolder.children[0] as ApiFolder;
+            const mergedName = groupName.toLowerCase().includes(onlyChild.name.toLowerCase())
+              ? groupName
+              : `${groupName} > ${onlyChild.name}`;
+            childFolder.name = mergedName;
+            childFolder.children = onlyChild.children;
+          }
+
+          result.push(childFolder);
+        } else {
+          // Absorb into parent
+          for (const gi of groupItems) {
+            direct.push(gi);
+          }
+        }
+      }
+
+      // Add direct routes
+      for (const d of direct) {
+        result.push({
+          ...d.raw,
+          name: d.operationName,
+        });
+      }
+
+      return result;
     }
 
-    for (const dr of rootDirect) {
-      domainFolder.children.push({
-        ...dr.raw,
-        name: dr.operationName,
-      });
-    }
+    domainFolder.children = buildRecursiveLevel(sanitizedRoutes, 0, domainName);
 
-    // Unnecessary intermediate single-subfolder elimination:
-    // If domainFolder has NO direct routes and EXACTLY ONE subfolder,
-    // promote the subfolder's items directly into domainFolder to eliminate redundant 1:1 nesting!
-    if (rootDirect.length === 0 && domainFolder.children.length === 1 && "children" in domainFolder.children[0]) {
+    // If domainFolder has NO direct routes and EXACTLY ONE subfolder, unwrap it
+    if (
+      domainFolder.children.length === 1 &&
+      "children" in domainFolder.children[0]
+    ) {
       const singleSub = domainFolder.children[0] as ApiFolder;
+      domainFolder.name = domainFolder.name.toLowerCase() === singleSub.name.toLowerCase()
+        ? domainFolder.name
+        : `${domainFolder.name} - ${singleSub.name}`;
       domainFolder.children = singleSub.children;
     }
 
-    // 4. Root Singleton Absorption Rule:
-    // If an entire root collection has < minRootCluster routes (isolated 1-route endpoint),
-    // absorb it into General or System & Health to eliminate 1-route root folder noise!
-    const totalDomainRoutes = domainFolder.children.reduce((acc, c) => {
-      return acc + ("children" in c ? (c as ApiFolder).children.length : 1);
-    }, 0);
+    // 3. Root Singleton Absorption Rule
+    const totalDomainRoutes = countFolderRoutes(domainFolder);
 
     if (totalDomainRoutes < minRootCluster) {
       const isHealth = domainName.toLowerCase().includes("health") ||
@@ -177,7 +187,8 @@ export function synthesizeApiCollection(
                        domainName.toLowerCase().includes("version") ||
                        domainName.toLowerCase().includes("status");
 
-      for (const dr of rootDirect) {
+      const leafRoutes = extractLeafRoutes(domainFolder);
+      for (const dr of leafRoutes) {
         if (isHealth) absorbedHealth.push(dr);
         else absorbedGeneral.push(dr);
       }
@@ -186,12 +197,12 @@ export function synthesizeApiCollection(
     }
   }
 
-  // 5. Add Consolidated General & System & Health Collections if populated
+  // 4. Add Consolidated General & System & Health Collections if populated
   if (absorbedGeneral.length > 0) {
     rootFolders.push({
       id: crypto.createHash("sha256").update("General").digest("hex").slice(0, 12),
       name: "General",
-      children: absorbedGeneral.map(r => ({
+      children: absorbedGeneral.map((r) => ({
         ...r.raw,
         name: r.operationName,
       })),
@@ -202,14 +213,14 @@ export function synthesizeApiCollection(
     rootFolders.push({
       id: crypto.createHash("sha256").update("System & Health").digest("hex").slice(0, 12),
       name: "System & Health",
-      children: absorbedHealth.map(r => ({
+      children: absorbedHealth.map((r) => ({
         ...r.raw,
         name: r.operationName,
       })),
     });
   }
 
-  // 6. Deterministic Hierarchical Sorting
+  // 5. Deterministic Hierarchical & Method Sorting
   const methodWeights: Record<string, number> = { GET: 1, POST: 2, PUT: 3, PATCH: 4, DELETE: 5 };
   const sortTree = (folder: ApiFolder) => {
     folder.children.sort((a, b) => {
@@ -223,7 +234,7 @@ export function synthesizeApiCollection(
       const wa = methodWeights[ra.method] || 99;
       const wb = methodWeights[rb.method] || 99;
       if (wa !== wb) return wa - wb;
-      return ra.path.localeCompare(rb.path);
+      return (ra.name || ra.path).localeCompare(rb.name || rb.path);
     });
     for (const c of folder.children) {
       if ("children" in c) sortTree(c as ApiFolder);
@@ -244,3 +255,29 @@ export function synthesizeApiCollection(
   return rootFolders;
 }
 
+function countFolderRoutes(folder: ApiFolder): number {
+  let count = 0;
+  for (const item of folder.children) {
+    if ("children" in item) {
+      count += countFolderRoutes(item as ApiFolder);
+    } else {
+      count++;
+    }
+  }
+  return count;
+}
+
+function extractLeafRoutes(folder: ApiFolder): any[] {
+  const routes: any[] = [];
+  for (const item of folder.children) {
+    if ("children" in item) {
+      routes.push(...extractLeafRoutes(item as ApiFolder));
+    } else {
+      routes.push({
+        raw: item,
+        operationName: item.name,
+      });
+    }
+  }
+  return routes;
+}

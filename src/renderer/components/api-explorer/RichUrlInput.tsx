@@ -132,6 +132,43 @@ function VariableBadge({
   );
 }
 
+export function parsePathVariableToken(tokenText: string): { key: string; raw: string; typeHint?: string } {
+  // 1. Colon: :id -> key="id"
+  if (tokenText.startsWith(":")) {
+    const rawName = tokenText.slice(1);
+    return { key: rawName, raw: tokenText };
+  }
+  // 2. Curly: {id} or {id:int} or {param:type}
+  if (tokenText.startsWith("{") && tokenText.endsWith("}")) {
+    const inner = tokenText.slice(1, -1).trim();
+    if (inner.includes(":")) {
+      const parts = inner.split(":");
+      return { key: parts[0].trim(), raw: tokenText, typeHint: parts[1].trim() };
+    }
+    return { key: inner, raw: tokenText };
+  }
+  // 3. Angle bracket: <id> or <int:id> or <path:subpath>
+  if (tokenText.startsWith("<") && tokenText.endsWith(">")) {
+    const inner = tokenText.slice(1, -1).trim();
+    if (inner.includes(":")) {
+      const parts = inner.split(":");
+      return { key: parts[1].trim(), raw: tokenText, typeHint: parts[0].trim() };
+    }
+    return { key: inner, raw: tokenText };
+  }
+  // 4. Square bracket: [id] or [...slug] or [[...slug]]
+  if (tokenText.startsWith("[") && tokenText.endsWith("]")) {
+    let inner = tokenText;
+    while (inner.startsWith("[") && inner.endsWith("]")) {
+      inner = inner.slice(1, -1).trim();
+    }
+    const isCatchAll = inner.startsWith("...");
+    const cleanKey = isCatchAll ? inner.slice(3) : inner;
+    return { key: cleanKey, raw: tokenText, typeHint: isCatchAll ? "catch-all" : undefined };
+  }
+  return { key: tokenText, raw: tokenText };
+}
+
 export function RichUrlInput({
   value,
   onChange,
@@ -270,11 +307,11 @@ export function RichUrlInput({
     }
   };
 
-  // Tokenize the URL value for highlighting
+  // Tokenize the URL value for highlighting (supporting {{env}}, :id, {id}, <id>, [id])
   const parts = useMemo(() => {
     if (!value) return [];
-    const regex = /(\{\{[^}]+\}\})|((?<=\/):[a-zA-Z0-9_-]+)/g;
-    const result: { text: string; isToken: boolean; key?: string; isPathVar?: boolean }[] = [];
+    const regex = /(\{\{[^{}]+\}\})|((?<=\/)(:[a-zA-Z0-9_-]+|\{(?!\{)[^{}]+\}|<[^<>]+>|\[[^\[\]]+\]))/g;
+    const result: { text: string; isToken: boolean; key?: string; isPathVar?: boolean; typeHint?: string }[] = [];
     let lastIndex = 0;
     let match;
 
@@ -294,11 +331,13 @@ export function RichUrlInput({
           key: tokenText.slice(2, -2),
         });
       } else {
+        const parsed = parsePathVariableToken(tokenText);
         result.push({
           text: tokenText,
           isToken: true,
-          key: tokenText.slice(1),
+          key: parsed.key,
           isPathVar: true,
+          typeHint: parsed.typeHint,
         });
       }
       lastIndex = regex.lastIndex;
@@ -338,7 +377,9 @@ export function RichUrlInput({
           parts.map((part, index) => {
             if (part.isToken && part.key) {
               if (part.isPathVar) {
-                const pv = pathVariables.find((p) => p.key === part.key);
+                const pv = pathVariables.find(
+                  (p) => p.key === part.key || p.key === part.text || p.rawToken === part.text
+                );
                 const hasValue = !!(pv && pv.value && pv.value.trim() !== "");
                 return (
                   <span
@@ -349,7 +390,11 @@ export function RichUrlInput({
                         ? "text-sky-400 bg-sky-500/10 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.35)]"
                         : "text-rose-400 bg-rose-500/10 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.45)]"
                     )}
-                    title={hasValue ? `Path Parameter: ${part.key} = ${pv.value}` : `Path Parameter: ${part.key} (Empty)`}
+                    title={
+                      hasValue
+                        ? `Path Parameter: ${part.key} = ${pv.value}`
+                        : `Path Parameter: ${part.text} (Empty)`
+                    }
                   >
                     {part.text}
                   </span>
