@@ -1,6 +1,6 @@
 {
   "name": "routelens",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Auto-Discovery API Client & Explorer",
   "author": "Tilak <tilakbuilds@gmail.com>",
   "main": "./out/main/index.js",
