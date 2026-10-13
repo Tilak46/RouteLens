@@ -37,10 +37,8 @@ Welcome to **RouteLens**! This tool is an interactive API Discovery Client & Loc
 
 ---
 
-## ⚠️ Important Beta Information
-
-- **Early Access Expiry**: To prevent misuse, this early access beta build is set to expire on **August 28, 2026**.
-- **Get Updates**: When the testing period ends, the app will show a notice. Simply contact Tilak to receive the latest version:
+## 💬 Feedback & Updates
+- **Feedback**: Please share your bugs, suggestions, and feedback directly to help improve RouteLens!
+- **Contact Tilak**:
   - **Email**: tilakbuilds@gmail.com
   - **Reddit DM**: u/OutrageousSalt8997 (or DM MrSanito)
-- **Feedback**: Please share your bugs, suggestions, and feedback directly to help improve RouteLens!
