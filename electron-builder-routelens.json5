@@ -18,6 +18,12 @@
       repo: "routelens-releases",
       releaseType: "release",
     },
+    {
+      provider: "github",
+      owner: "Tilak46",
+      repo: "Dev-Dashv1.2",
+      releaseType: "release",
+    },
   ],
   mac: {
     target: ["dmg"],
