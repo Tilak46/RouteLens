@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Terminal,
-  Lock,
   Ghost,
   Power,
   SlidersHorizontal,
@@ -38,7 +37,6 @@ type DashboardLayoutProps = {
   sidebarWidth?: number;
   onSidebarResizeStart?: (e: React.MouseEvent) => void;
   onDevToolsClick?: () => void;
-  onTestExpiryClick?: () => void;
   onDevTriggerScanAnimation?: () => void;
   appVersion?: string;
   updateBanner?: React.ReactNode;
@@ -109,7 +107,6 @@ export function DashboardLayout({
   sidebarWidth,
   onSidebarResizeStart,
   onDevToolsClick,
-  onTestExpiryClick,
   onDevTriggerScanAnimation,
   appVersion,
   updateBanner,
@@ -226,22 +223,6 @@ export function DashboardLayout({
               </Tooltip>
             )}
 
-            {/* Expiry Test Button (Development Only) */}
-            {import.meta.env.DEV && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={onTestExpiryClick}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all duration-200 cursor-pointer"
-                  >
-                    <Lock size={15} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-[#141416] border border-white/[0.08] text-foreground text-[11px] shadow-xl px-2 py-1 rounded">
-                  Test Expiry Screen
-                </TooltipContent>
-              </Tooltip>
-            )}
 
             {/* Dev: Restart App / Power (Development Only) */}
             {import.meta.env.DEV && (

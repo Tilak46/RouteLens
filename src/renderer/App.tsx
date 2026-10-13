@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import apiClient from "@/lib/apiClient";
 import { Toaster, toast } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Compass, Plus, Server, Zap, Hourglass, FolderCode, Send, RefreshCw, ArrowRight, FolderOpen, Layers, Code2 } from "lucide-react";
+import { Compass, Plus, Server, Zap, FolderCode, Send, RefreshCw, ArrowRight, FolderOpen, Layers, Code2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { ApiExplorerSidebarPanel, mergeTrees, extractRoutePath, toRouteKey } from "@/views/ApiExplorerView";
@@ -89,8 +89,6 @@ const defaultTab = (projectId?: string | null): RequestTab => ({
 
 // State variables initialTabs and initialActiveId removed. Persisted in Electron Store.
 
-// Early Access Beta Expiration Configuration
-const BETA_EXPIRY_DATE_STR = "2026-09-28T23:59:59Z"; // GMT / UTC time format
 
 // Development Diagnostic Tool: Live scan stopwatch & completion timing toast.
 // Guarded for development testing; will not be included in production releases.
@@ -144,8 +142,6 @@ const ScanBenchmarkTimerBadge = React.memo(function ScanBenchmarkTimerBadge({
 });
 
 function App() {
-  const [testForceExpired, setTestForceExpired] = useState(false);
-  const isBetaExpired = (Date.now() > new Date(BETA_EXPIRY_DATE_STR).getTime()) || testForceExpired;
   const [projects, setProjects] = useState<Project[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -2064,42 +2060,8 @@ function App() {
           </div>
         </div>
       )}
-      {isBetaExpired ? (
-        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[9999] backdrop-blur-md text-foreground select-none p-6">
-          <div className="max-w-md w-full bg-bg-card border border-border-main rounded-xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-300">
-            <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 mx-auto animate-pulse">
-              <Hourglass size={32} />
-            </div>
-            
-            <div className="space-y-2">
-              <h1 className="text-xl font-bold text-white tracking-tight">Testing Period Ended</h1>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Thank you for participating in the **RouteLens** early access program! The testing period for this beta build has expired.
-              </p>
-            </div>
-
-            <div className="bg-black/20 border border-border/40 rounded-lg p-4 text-xs font-mono text-zinc-300 leading-normal text-left space-y-2">
-              <div className="font-semibold text-zinc-400">To get the next build or extend access:</div>
-              <div>• Send a DM on Reddit to: <span className="text-primary font-semibold">u/OutrageousSalt8997</span></div>
-              <div>• Or contact Tilak via Email: <span className="text-primary font-semibold">tilakbuilds@gmail.com</span></div>
-            </div>
-
-            <div className="text-[10px] text-muted-foreground flex justify-between items-center px-1">
-              <span>Build expiration: {new Date(BETA_EXPIRY_DATE_STR).toLocaleDateString()}</span>
-              {testForceExpired && (
-                <button
-                  onClick={() => setTestForceExpired(false)}
-                  className="text-rose-500 hover:text-rose-400 font-semibold underline underline-offset-2 cursor-pointer"
-                >
-                  Close Preview
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <ErrorBoundary>
-          <DashboardLayout
+      <ErrorBoundary>
+        <DashboardLayout
           activeTab={activeSidebarTab}
           onTabChange={setActiveSidebarTab}
           sidebarContent={sidebarContent}
@@ -2143,7 +2105,6 @@ function App() {
           sidebarWidth={sidebarWidth}
           onSidebarResizeStart={startSidebarResize}
           onDevToolsClick={() => setIsDevToolsModalOpen(true)}
-          onTestExpiryClick={() => setTestForceExpired(true)}
           onDevTriggerScanAnimation={handleDevTriggerScanAnimation}
           appVersion={appVersion}
           updateBanner={<UpdateGraceBanner enforcement={enforcementStatus} onInstall={handleInstallUpdate} />}
@@ -2403,7 +2364,6 @@ function App() {
     })()}
       </DashboardLayout>
       </ErrorBoundary>
-      )}
 
       <ManageCookiesModal
         isOpen={isCookiesModalOpen}
