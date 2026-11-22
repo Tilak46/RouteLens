@@ -7,6 +7,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -34,24 +37,19 @@ jobs:
       # 🐧 Linux AppImage Packaging
       - name: Package Linux AppImage
         if: matrix.os == 'ubuntu-latest'
-        run: npx electron-builder --linux AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux AppImage --publish never
 
       # 🍎 macOS Packaging (Both Apple Silicon M1-M4 arm64 + Intel x64)
       - name: Package Mac DMG & Zip
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac --x64 --arm64
+        run: npx electron-builder --mac --x64 --arm64 --publish never
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       # 🪟 Windows Setup Packaging
       - name: Package Windows Installer
         if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win --x64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish never
 
       # Artifact Uploads
       - name: Upload Linux Artifact
