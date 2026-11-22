@@ -18,11 +18,27 @@
       repo: "routelens-releases",
       releaseType: "release",
     },
+    {
+      provider: "github",
+      owner: "Tilak46",
+      repo: "Dev-Dashv1.2",
+      releaseType: "release",
+    },
   ],
   mac: {
-    target: ["dmg"],
+    target: [
+      {
+        target: "dmg",
+        arch: ["x64", "arm64"],
+      },
+      {
+        target: "zip",
+        arch: ["x64", "arm64"],
+      },
+    ],
     icon: "resources/icon.png",
-    artifactName: "${productName}-Mac-${version}-Installer.${ext}",
+    category: "public.app-category.developer-tools",
+    artifactName: "${productName}-Mac-${version}-${arch}.${ext}",
   },
   win: {
     icon: "resources/icon.ico",
