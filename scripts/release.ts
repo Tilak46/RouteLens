@@ -25,7 +25,7 @@ const pkgPath = resolve(process.cwd(), "package.json");
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
 console.log(`\n🚀 RouteLens Release Publisher`);
 console.log(`📦 Current version: v${pkg.version}`);
-console.log(`🎯 Target repository: Tilak46/routelens-releases\n`);
+console.log(`🎯 Target repository: Tilak46/RouteLens\n`);
 
 // Handle optional version bump argument: patch | minor | major | explicit version
 const arg = process.argv[2];
@@ -63,7 +63,7 @@ try {
   );
 
   console.log(`\n🎉 SUCCESS! RouteLens v${updatedPkg.version} (Windows + Linux) has been published to GitHub!`);
-  console.log(`🔗 Releases URL: https://github.com/Tilak46/routelens-releases/releases\n`);
+  console.log(`🔗 Releases URL: https://github.com/Tilak46/RouteLens/releases\n`);
 } catch (error: any) {
   console.error(`\n❌ Release failed:`, error?.message || error);
   process.exit(1);
