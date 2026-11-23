@@ -1,10 +1,12 @@
-name: Build RouteLens Installers (Windows, Mac, Linux)
+name: Build and Release RouteLens (Windows, Mac, Linux)
 
 on:
   push:
     branches:
       - tilak
       - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -77,3 +79,47 @@ jobs:
           name: RouteLens-Windows-Setup
           path: release/*/*.exe
           if-no-files-found: error
+
+  # 🚀 Automated GitHub Release Publisher
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/tilak' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-dist
+          find artifacts -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.AppImage" \) -exec cp {} release-dist/ \;
+          echo "--- Assets ready for GitHub Release ---"
+          ls -lh release-dist
+
+      - name: Extract Project Version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG_NAME="v$VERSION"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Building release for: $TAG_NAME"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          name: "RouteLens ${{ steps.version.outputs.tag_name }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: release-dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

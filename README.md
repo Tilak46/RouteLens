@@ -38,8 +38,8 @@ Every backend engineer and engineering team suffers from **API Collection Drift*
 
 ### The Solution: RouteLens
 
-**RouteLens** treats your backend source code as the single source of truth. By combining **Tree-sitter WebAssembly Concrete Syntax Trees (CST)** with an **Abstract Interpretation Mount Linker**, RouteLens statically analyzes raw, uncompiled source code across any directory, immediately extracting:
-* **100% of HTTP endpoints** (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, etc.)
+**RouteLens** treats your backend source code as the single source of truth. By combining **Tree-sitter WebAssembly Concrete Syntax Trees (CST)** with an **Abstract Interpretation Mount Linker**, RouteLens statically analyzes raw, uncompiled source code across your project directories, automatically discovering:
+* **Declared HTTP endpoints** (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, etc.)
 * **Dynamic URL parameters & path variables** (`/api/v1/users/:id/orders/:orderId`)
 * **Nested router hierarchies & factory-instantiated routers**
 * **Request payloads, query parameters, and header expectations**
@@ -122,21 +122,24 @@ For deep technical details, read the [OmniRoute Architecture Specification](docs
 
 ---
 
-## 📊 Supported Frameworks & Languages
+## 📊 Supported Frameworks & Ecosystem Coverage
 
-RouteLens has been benchmarked and verified across **18+ production repositories**:
+RouteLens is actively tested against real-world open-source repositories to validate AST precision and mount resolution:
 
-| Language | Frameworks / Libraries | Route Resolution | Parameter Extraction |
-| :--- | :--- | :---: | :---: |
-| **TypeScript / JavaScript** | Express, NestJS, Fastify, Hono, Next.js (App & Pages), Koa | 100% | ✅ Full |
-| **Python** | FastAPI, Flask, Django REST Framework, Tornado | 100% | ✅ Full |
-| **Go** | Gin, Fiber, Echo, Chi, standard `net/http` | 100% | ✅ Full |
-| **Java / Kotlin** | Spring Boot (`@RestController`, `@RequestMapping`), Micronaut | 100% | ✅ Full |
-| **Rust** | Actix-web, Axum, Rocket | 95% | ✅ Full |
-| **PHP** | Laravel Routes (`Route::get`), Symfony | 95% | ✅ Full |
-| **C# / .NET** | ASP.NET Core Minimal APIs & Controller Attributes | 95% | ✅ Full |
+| Ecosystem | Frameworks / Libraries | Status | Routing Patterns Supported |
+| :--- | :--- | :---: | :--- |
+| **Node.js / TypeScript** | Express, NestJS, Fastify, Hono, Next.js (App & Pages) | 🟢 **Stable** | Sub-routers, controller decorators, chained handlers, prefix mounts |
+| **Python** | FastAPI, Flask, Django REST Framework | 🟢 **Stable** | APIRouter, Blueprint prefixes, path decorators, ViewSets |
+| **Go** | Gin, Fiber, Echo, Chi, standard `net/http` | 🟡 **Active** | Engine groups, sub-routing, method handlers |
+| **Java / Kotlin** | Spring Boot (`@RestController`, `@RequestMapping`) | 🟡 **Active** | Class & method annotations, path variables |
+| **Rust** | Actix-web, Axum | ⚪ **Beta** | Macro-based route declarations, scoped services |
+| **PHP** | Laravel Routes (`Route::get`), Symfony | ⚪ **Beta** | Static facade routing, controller groups |
+| **C# / .NET** | ASP.NET Core Minimal APIs & Controllers | ⚪ **Beta** | `app.MapGet` patterns, route attributes |
 
-See our [Benchmark Testing Protocol](docs/benchmarks/TESTING_PROTOCOL.md) and [Tested Repositories Registry](docs/benchmarks/REPOSITORIES_REGISTRY.md) for detailed accuracy reports.
+> [!NOTE]
+> **Engineering Philosophy & Precision**: Static analysis works best with conventional, idiomatic routing structures. To avoid cluttering your workspace with false positives, RouteLens strictly resolves verifiable AST evidence chains rather than making speculative guesses. Dynamic routes loaded via external database tables or custom runtime loaders are flagged for manual review.
+
+See our [Benchmark Testing Protocol](docs/benchmarks/TESTING_PROTOCOL.md) and [Tested Repositories Registry](docs/benchmarks/REPOSITORIES_REGISTRY.md) for architectural test suites.
 
 ---
 

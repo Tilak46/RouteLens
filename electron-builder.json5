@@ -15,13 +15,7 @@
     {
       provider: "github",
       owner: "Tilak46",
-      repo: "routelens-releases",
-      releaseType: "release",
-    },
-    {
-      provider: "github",
-      owner: "Tilak46",
-      repo: "Dev-Dashv1.2",
+      repo: "RouteLens",
       releaseType: "release",
     },
   ],
